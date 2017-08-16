@@ -120,6 +120,7 @@ function tsload_file {
 exit_value=0
 
 # load the files using tsload.
+# TODO:  If your table names have underscores or dashes, modify the sed below to keep them.
 pushd ${DATA_DIR}
 for fn in `ls *${DATA_FILE_EXTENSION}`; do
   tn="`echo ${fn} | sed s/${DATA_FILE_EXTENSION}// | sed s/-.*// | sed s/_.*//`"
