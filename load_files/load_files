@@ -137,6 +137,7 @@ done
 # NOTE:  Uncomment if using semaphore.
 #rm ${DATA_DIR}/${SEMAPHORE_FILE_NAME}
 rm ${LOADING_FLAG}
+cp ${RESULTS_FILE} ${OLD_DIR}
 
 # check the success of the load.
 cd ${OLD_DIR}
