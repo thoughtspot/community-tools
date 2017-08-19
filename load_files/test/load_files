@@ -30,9 +30,9 @@
 
 # TODO The following should be modified for your environment.
 declare -r DATA_FILE_EXTENSION=".csv"                                  # extension for files to be loaded.
-declare -r ROOT_DIR="/home/admin/test_load_files"                      # Root of where data, etc. will reside.
+declare -r ROOT_DIR="/home/admin/test_load_files"                                      # Root of where data, etc. will reside.
 declare -r RESULTS_EMAIL=("you@thoughtspot.com")                       # email addresses to send the results to.
-declare -r SEMAPHORE_FILE_NAME="stage_done"                            # name of a file that indicates all staging files are loaded.
+declare -r SEMAPHORE_FILE_NAME="stage_done"                           # name of a file that indicates all staging files are loaded.
 declare -r DEFAULT_EMPTY_TARGET="--empty_target"                       # use if always empty target unless specified.
 #declare -r DEFAULT_EMPTY_TARGET=""                                    # use if always incremental load (upserts) unless specified.
 
@@ -50,9 +50,9 @@ declare -r V_LEVEL=0                                                   # logging
 # TODO Uncomment the following if using a semaphore for reason to load.
 # See if the semaphore has been set.  If not, exit since not ready to load.
 # NOTE:  This approach should be avoided in favor of remote execution of the script.  Uncomment if using semaphore approach.
-# if [ ! -e ${DATA_DIR}/${SEMAPHORE_FILE_NAME} ]; then
-#   exit 0
-# fi
+if [ ! -e ${DATA_DIR}/${SEMAPHORE_FILE_NAME} ]; then
+  exit 0
+fi
 
 # Create the needed directories. 
 if [ ! -e ${DATA_DIR} ]; then
@@ -99,7 +99,7 @@ function tsload_file {
 
   # if the files are gzip change cat to zcat.
   cat ${filename} | dos2unix | \
-    tsload --target_database your_database \
+    tsload --target_database load_files_test \
            --target_schema falcon_default_schema \
            --target_table ${tablename} \
            --bad_records_file ${OLD_DIR}/bad_records/${1}_bad_records.csv \
@@ -135,7 +135,7 @@ done
 
 # remove the semaphore since we are done with loading.
 # NOTE:  Uncomment if using semaphore.
-#rm ${DATA_DIR}/${SEMAPHORE_FILE_NAME}
+rm ${DATA_DIR}/${SEMAPHORE_FILE_NAME}
 rm ${LOADING_FLAG}
 
 # check the success of the load.
@@ -155,7 +155,7 @@ for address in ${RESULTS_EMAIL[*]}; do
 done
 
 # compress the backup folder
-cd ${OLD_DIR}/.. && tar czf ${OLD_DIR}.tar.gz ${THE_DATE_TIME} && rm -r ${THE_DATE_TIME}
+#cd ${OLD_DIR}/.. && tar czf ${OLD_DIR}.tar.gz ${THE_DATE_TIME} && rm -r ${THE_DATE_TIME}
 
 popd
 
