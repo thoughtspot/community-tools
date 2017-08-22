@@ -1,0 +1,135 @@
+#!/bin/bash
+
+# Copyright 2017 ThoughtSpot
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation 
+# files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, 
+# modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the 
+# Software is furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES 
+# OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS 
+# BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT 
+# OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+# Needed when running from cron since this path is set in /home/admin/.bashrc  tsload is in this path.
+# PATH=$PATH:/usr/local/scaligent/bin:/usr/local/scaligent/release/bin
+
+# Called by a control process that will call, passing the file name and [full | incremental] indicating if this is a reload or not.
+# Loads all of the data from files in a staging area into ThoughtSpot and then moves the files to a new location.
+# To use this file, change the settings and flags below.  
+
+# Assumptions:
+#   File names are the same as names of the tables.
+#   All formats are the same for all files including separators, enclosing characters, data/time formats, etc.
+
+# TODO The following should be modified once SAN is mounted.
+declare -r DATA_ROOT="/home/admin"                            # root of all data files.
+declare -r V_LEVEL=0                                          # logging verbosity level.  0-6.  0 recommended for production.
+declare -r DATA_FILE_EXTENSION=".csv"                         # extension for files to be loaded.
+# TODO switch to data after load issues have been worked out.
+#declare -r DATA_FILE_DIR="${DATA_ROOT}/data"                  # where the data files to reside exist.  
+declare -r DATA_FILE_DIR="${DATA_ROOT}/small_data"               # where the data files to reside exist.  
+declare -r LOADED_DATA_DIR="${DATA_ROOT}/loaded"              # name of root directory to copy loaded files to.  Must exist.
+declare -r THE_DATE_TIME="`date +"%Y-%m-%d_%H%M%S_%Z"`"       # date and time to use for load name.
+# NOTE:  Using a different file name since one file at a time is created.  Can be blank name if error calling.
+declare -r RESULTS_FILE="${LOADED_DATA_DIR}/${1}_results.txt" # stores the results of the data load.
+declare -r RESULTS_EMAIL=("bill.back@thoughtspot.com", "gmarifosque@wsipc.org") # email addresses to send the results to.
+
+# if the results file doesn't exist, create it.
+if [ ! -e ${RESULTS_FILE} ]; then
+  echo "" > ${RESULTS_FILE}
+fi
+
+had_tsload_error=false # indicates if there was a tsload error.
+
+# loads from a file into TS.  
+#   - $1 is the full filename within the DATA_FILE_DIR
+#   - $2 is either --empty_target or blank
+#   - you may also need to add a sed for any data manipulation after the file name.
+function tsload_file {
+  filename=${1}
+  load_type=${2}
+
+  if [[ ${load_type} = "full" ]]; then
+    empty="--empty_target"
+  else
+    empty=""
+  fi
+
+  # assumes four charactes at front, e.g. dbo. or agg.
+  # probably could be one command, but this works.
+  tn=`echo ${1} | sed s/^....// | sed s/.csv$//`
+  echo "loading ${filename} into ${tn} ..."
+  # if the files are gzip change cat to zcat.
+  # TODO - change flags and values as necessary before deploying.
+  cat ${filename} | dos2unix | \
+    tsload --target_database wsipc \
+           --target_table ${tn} \
+           --bad_records_file ${LOADED_DATA_DIR}/bad_records/${tn}_bad_records.csv \
+           ${empty} \
+           --source_data_format csv \
+           --field_separator "|" \
+           --max_ignored_rows 10 \
+           --has_header_row \
+           --null_value "" \
+           --date_format "%m/%d/%Y" \
+           --date_time_format "%m/%d/%Y %H:%M:%S %p" \
+           --boolean_representation "True_False" \
+           -v ${V_LEVEL} \
+           &>> ${RESULTS_FILE} 
+  if [ $? != 0 ]; then
+    has_tsload_error=true
+  fi
+
+  # Move the loaded files to the old directory.
+#  mv ${filename} ${LOADED_DATA_DIR}/
+}
+
+pushd ${DATA_FILE_DIR} # work from the data directory
+
+# verify the arguments.
+file_name=${1} # passed in as first argument.
+load_type=${2} # full or incremental.  Passed in as second argument.
+has_param_error=false
+
+if [[ ! -e ${file_name} ]]; then
+  echo "file ${file_name} doesn't exist."
+  echo "file ${file_name} doesn't exist." >> ${RESULTS_FILE}
+  has_param_error=true
+fi
+
+if [[ ${load_type} != "full" && ${load_type} != "incremental" ]]; then 
+  echo "unknown load type: ${load_type}"
+  echo "unknown load type: ${load_type}" >> ${RESULTS_FILE}
+  has_param_error=true
+fi
+
+exit_value=0
+
+# load the files using tsload.
+if [[ ${has_param_error} == false ]]; then
+  tsload_file ${file_name} ${load_type}
+fi
+
+# check the success of the load.
+cd ${LOADED_DATA_DIR}
+
+subject="Data load for ${file_name} at ${THE_DATE_TIME} appears successful"
+body="The data load for ${file_name} at ${THE_DATE_TIME} appears successful.  See attached load results."
+if [[ ${has_tsload_error} = true ]]; then
+  subject="Data load for ${file_name} at ${THE_DATE_TIME} had errors"
+  body="The data load for ${file_name} at ${THE_DATE_TIME} had errors loading files or rows.  See attached load results."
+  exit_value=1
+fi
+
+echo ${body}
+for address in ${RESULTS_EMAIL[*]}; do
+  echo "${body}" | mutt -s "${subject}" -a ${RESULTS_FILE} -- ${address}
+done
+
+popd
+
+exit ${exit_value}

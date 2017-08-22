@@ -1,0 +1,5 @@
+create database load_files_test;
+use load_files_test;
+
+create table test1 (col1 varchar(0), col2 int);
+create table test2 (col1 double, col2 varchar(0));
