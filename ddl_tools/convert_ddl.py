@@ -30,7 +30,7 @@ The following assumptions are made about the DDL being read:
 import sys
 import argparse
 from datamodel import Database, eprint
-from datamodelio import DDLParser, TQLWriter, XLSWriter, XLSReader
+from datamodelio import DDLParser, TQLWriter, XLSWriter, XLSReader, TsloadWriter
 
 
 def main():
@@ -65,6 +65,10 @@ def main():
             print("Writing Excel ...")
             write_excel(args=args, database=database)
 
+        if args.to_tsload:
+            print("Writing tsload ...")
+            write_tsload(args=args, database=database)
+
 
 def parse_args():
     """Parses the arguments from the command line."""
@@ -81,6 +85,9 @@ def parse_args():
     parser.add_argument("--to_excel",
                         help="will convert to Excel and write to the outfile.",
                         action="store_true")
+    parser.add_argument("--to_tsload",
+                        help="will generate the tsload commands and write it to the outfile.",
+                        action="store_true")
     parser.add_argument("-d", "--database",
                         help="name of ThoughtSpot database")
     parser.add_argument("-s", "--schema",
@@ -96,6 +103,8 @@ def parse_args():
                         help="name of the Excel file to read from.")
     parser.add_argument("--excel_outfile",
                         help="name of the Excel file to write to.")
+    parser.add_argument("--tsload_outfile",
+                        help="name of the tsload file to write to.")
     parser.add_argument("-c", "--create_db",
                         action="store_true",
                         help="generate create database and schema statements")
@@ -194,6 +203,21 @@ def write_excel(args, database):
         filename = args.database + "_" + args.schema
 
     writer.write_database(database, filename)
+
+
+def write_tsload(args, database):
+    """
+    Write the tsload commands
+    :param args: The command line arguments.
+    :param database: The database to write.
+    :type database: Database
+    """
+    writer = TsloadWriter()
+    filename = args.tsload_outfile
+    if filename is None:
+        filename = args.database + ".tsload"
+
+    writer.write_tsloadcommand(database, filename)
 
 
 if __name__ == "__main__":

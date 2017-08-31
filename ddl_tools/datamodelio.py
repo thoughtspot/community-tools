@@ -18,8 +18,12 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 import re
 import sys
 import xlrd  # reading Excel
+# import datetime -- used by TsloadWriter, but commented out for now.
+import csv
+import os
 from openpyxl import Workbook  # writing Excel
 from datamodel import Database, Table, Column, ShardKey, DatamodelConstants, eprint
+
 
 # -------------------------------------------------------------------------------------------------------------------
 
@@ -39,6 +43,7 @@ def list_to_string(a_list, quote=False):
         string = ", ".join('{0}'.format(v) for v in a_list)
 
     return string
+
 
 # -------------------------------------------------------------------------------------------------------------------
 
@@ -269,7 +274,7 @@ class DDLParser(object):
             new_t = "INT"
         elif "uniqueidentifier" in t:  # Oracle type
             new_t = "VARCHAR(0)"
-        elif "serial" in t: # serial index, Oracle and others
+        elif "serial" in t:  # serial index, Oracle and others
             new_t = "INT"
         elif "bit" in t:
             new_t = "BOOL"
@@ -610,7 +615,7 @@ class XLSWriter:
 
         ws = self.workbook.create_sheet(title="Tables")
         self._write_header(ws=ws, cols=["Database", "Schema", "Table", "Updated", "Update Type", "# Rows", "# Columns",
-                           "Primary Key", "Shard Key", "# Shards", "RLS Column"])
+                                        "Primary Key", "Shard Key", "# Shards", "RLS Column"])
         # Write the data.
         row_cnt = 1
         for table in database:
@@ -703,6 +708,7 @@ class XLSWriter:
 
         self.workbook.save(filename)
 
+
 # -------------------------------------------------------------------------------------------------------------------
 
 
@@ -715,10 +721,10 @@ class XLSReader:
     """
     required_sheets = ["Columns", "Tables", "Foreign Keys", "Relationships"]
     required_columns = {
-        "Columns":       ["Database", "Schema", "Table", "Column", "Name", "Type"],
-        "Tables":        ["Database", "Schema", "Table", "Updated", "Update Type", "# Rows", "# Columns",
-                          "Primary Key", "Shard Key", "# Shards", "RLS Column"],
-        "Foreign Keys":  ["Name", "Database", "Schema", "From Table", "From Columns", "To Table", "To Columns"],
+        "Columns": ["Database", "Schema", "Table", "Column", "Name", "Type"],
+        "Tables": ["Database", "Schema", "Table", "Updated", "Update Type", "# Rows", "# Columns",
+                   "Primary Key", "Shard Key", "# Shards", "RLS Column"],
+        "Foreign Keys": ["Name", "Database", "Schema", "From Table", "From Columns", "To Table", "To Columns"],
         "Relationships": ["Name", "Database", "Schema", "From Table", "To Table", "Conditions"]
     }
 
@@ -735,7 +741,7 @@ class XLSReader:
         :param filepath: The path to the Excel document.
         :type filepath: str
         :return: A Database object based on the contents of the Excel document.
-        :rtype: dict of Database
+        :rtype: dict of str:Database
         """
         self.workbook = xlrd.open_workbook(filepath)
         if self._verify_file_format():
@@ -912,3 +918,114 @@ class XLSReader:
                 table.add_relationship(to_table=row[indices["To Table"]],
                                        conditions=row[indices["Conditions"]]
                                        )
+
+
+# -------------------------------------------------------------------------------------------------------------------
+
+
+class TsloadWriter:
+    """
+    Write the tsload commands with all the flags.
+    """
+
+    def __init__(self, default_flags=None):
+        """
+        Create a tsload writer.
+        :param default_flags: this includes the default flags used in tsload command.
+        :type default_flags: dict
+        """
+        self._default_flags = {
+            "empty_target": "",
+            "max_ignored_rows": "0",
+            "skip_second_fraction": "",
+            "source_data_format": "",
+            "null_value": "",
+            "has_header_row": ""
+        }
+        if default_flags is not None:
+            self._default_flags.update(default_flags)
+
+    def write_tsloadcommand(self, database, filename):
+        """
+        Write tsload command to the file.
+        :param database:  The database object to write to Excel.
+        :type database: Database
+        :param filename:  Name of the Excel file without extension.
+        :type filename: str
+        """
+        with open(filename, "w") as tsload_outfile:
+
+            for table in database:
+                flags = self._get_flags_from_csv(database.database_name, table)
+                tsload_string = "tsload "
+                for flag, value in flags.items():
+                    # TODO Add locic or flags without values.
+                    tsload_string += '--%s "%s" ' % (flag, value)
+                tsload_outfile.write(tsload_string + "\n")
+
+    def _get_flags_from_csv(self, database_name, table):
+        """
+        This function will read the csv file and determine the flags
+        :param database_name: Name of the database
+        :type  database_name: str
+        :param table: table object
+        :type table: Table
+        :return: all the dict for the tsload flags.
+        :rtype: dict
+        """
+        flags = self._default_flags.copy()
+
+        flags['target_database'] = database_name
+        flags['target_schema'] = table.schema_name
+        flags['target_table'] = table.table_name
+        flags['source_file'] = table.table_name + '.csv'
+
+        if not os.path.isfile(flags['source_file']):
+            return flags
+
+        # todo get default flags from csv
+
+        with open(flags['source_file']) as csv_file:
+            csv_reader = csv.DictReader(csv_file)
+
+            for column in table:
+                if column.column_type == 'DATE' and flags.get('date_format', None) is None:
+                    flags['date_format'] = TsloadWriter._get_date_format(column.column_name, csv_reader)
+
+        return flags
+
+    @staticmethod
+    def _get_date_format(column_name, csv_reader):
+        """
+        :param column_name: Name of the column to get the date format for.
+        :type column_name: str
+        :param csv_reader: Open file reader.
+        :type csv_reader: csv.DictReader
+        :return: date_format for tsload command.
+        :rtype: str
+        """
+        # TODO Add logic to determine the actual flag value.
+
+        patterns = ['%Y', '%b %d, %Y', '%b %d, %Y', '%B %d, %Y', '%m/%d/%Y', '%Y/%m/%d', '%m/%d/%y', '%m-%d-%y',
+                    '%m-%d-%Y',
+                    '%Y-%m-%d', '%y/%m/%d', '%y-%m-%d', '%d/%m/%y', '%d/%m/%Y', '%d-%m-%y', '%d-%m-%Y', '%d%B%y',
+                    '%d%b%y',
+                    '%d%B%Y', '%d%b%Y']  # all the formats the date
+
+        date_format = '%y/%m/%d'
+
+        # parse = []
+
+        # for fmt in patterns:
+        #     try:
+        #         dt = datetime.datetime.strptime(v, fmt)
+        #         parse.append(fmt)
+        #         print parse
+        #         break
+
+        #     except ValueError as err:
+        #         pass
+
+        # date_format = parse[0]
+
+        return date_format

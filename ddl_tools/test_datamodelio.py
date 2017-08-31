@@ -1,7 +1,7 @@
 import unittest
 from StringIO import StringIO
 from datamodel import DatamodelConstants, Database, Table, Column, ShardKey
-from datamodelio import DDLParser, TQLWriter, XLSWriter, XLSReader
+from datamodelio import DDLParser, TQLWriter, XLSWriter, XLSReader, TsloadWriter
 
 # -------------------------------------------------------------------------------------------------------------------
 
@@ -264,6 +264,49 @@ class TestXLSReader(unittest.TestCase):
         self.assertEqual(fk.from_keys, ["column_1", "column_2"])
         self.assertEqual(fk.to_table, "table4")
         self.assertEqual(fk.to_keys, ["column_1", "column_3"])
+
+# -------------------------------------------------------------------------------------------------------------------
+
+
+class TestTsloadWriter(unittest.TestCase):
+    """ Test the tsload writer"""
+
+    def test_with_csvfile(self):
+        """test the tsload writer when the csv exists"""
+        # todo Create the csv file.
+        database = Database(database_name="xdb")
+
+        table = Table(table_name="table1", schema_name="s1", primary_key="column_1",
+                      shard_key=ShardKey("column_1", 128))
+        table.add_column(Column(column_name="column_1", column_type="INT"))
+        table.add_column(Column(column_name="column_2", column_type="DOUBLE"))
+        table.add_column(Column(column_name="column_3", column_type="FLOAT"))
+        table.add_column(Column(column_name="column_3", column_type="DATE"))
+        database.add_table(table)
+
+        table = Table(table_name="table2", schema_name="s1", primary_key="column_1",
+                      shard_key=ShardKey("column_1", 128))
+        table.add_column(Column(column_name="column_1", column_type="INT"))
+        table.add_column(Column(column_name="column_2", column_type="FLOAT"))
+        table.add_column(Column(column_name="column_3", column_type="DOUBLE"))
+        database.add_table(table)
+
+        table = Table(table_name="table3", schema_name="s1", primary_key="column_1",
+                      shard_key=ShardKey("column_1", 128))
+        table.add_column(Column(column_name="column_1", column_type="INT"))
+        table.add_column(Column(column_name="column_2", column_type="FLOAT"))
+        table.add_column(Column(column_name="column_3", column_type="VARCHAR"))
+        database.add_table(table)
+
+        tsload_writer = TsloadWriter()
+        tsload_writer.write_tsloadcommand(database, "tsloadwriter_test")
+        with open("tsloadwriter_test", "r") as infile:
+            line = infile.readline()
+            self.assertTrue(line.startswith("tsload "))
+            self.assertTrue(line.index('--target_database "xdb"') > 0)
+            self.assertTrue(line.index('--target_schema "s1"'))
+            # create a csv files
+            # todo complete for all the other flags
 
 # -------------------------------------------------------------------------------------------------------------------
 
