@@ -180,7 +180,7 @@ class DDLParser(object):
         """
         # The fields will be between the ( ).
         columns = []
-        buff = buff[buff.find('(') + 1:buff.rfind(')')]
+        buff = buff[buff.find('(') + 1:buff.rfind(')')].strip()
 
         # think all DBs use commas for field separators
         # need to find the commas that are not inside of parents.
@@ -189,6 +189,7 @@ class DDLParser(object):
         raw_fields = []
 
         for c in buff:
+
             if open_paren:
                 field_buff += c
                 if c == ')':
@@ -268,6 +269,8 @@ class DDLParser(object):
             new_t = "INT"
         elif "uniqueidentifier" in t:  # Oracle type
             new_t = "VARCHAR(0)"
+        elif "serial" in t: # serial index, Oracle and others
+            new_t = "INT"
         elif "bit" in t:
             new_t = "BOOL"
         elif "blob" in t or "binary" in t:

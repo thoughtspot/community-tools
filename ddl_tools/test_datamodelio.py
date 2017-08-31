@@ -26,6 +26,7 @@ class TestDDLParser(unittest.TestCase):
         self.assertEqual("BIGINT", DDLParser.convert_type("integer"))
         self.assertEqual("INT", DDLParser.convert_type("rowversion"))
         self.assertEqual("VARCHAR(0)", DDLParser.convert_type("uniqueidentifier"))
+        self.assertEqual("INT", DDLParser.convert_type("serial"))
         self.assertEqual("BOOL", DDLParser.convert_type("bit"))
         self.assertEqual("UNKNOWN", DDLParser.convert_type("blob"))
         self.assertEqual("UNKNOWN", DDLParser.convert_type("binary"))
@@ -49,6 +50,7 @@ class TestDDLParser(unittest.TestCase):
         self.assertEqual("VARCHAR(0)", DDLParser.convert_type("char"))
         self.assertEqual("VARCHAR(88)", DDLParser.convert_type("varchar(88)"))
         self.assertEqual("UNKNOWN", DDLParser.convert_type("something_new"))
+
 
 # -------------------------------------------------------------------------------------------------------------------
 
