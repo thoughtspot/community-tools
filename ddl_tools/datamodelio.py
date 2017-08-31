@@ -695,7 +695,10 @@ class XLSWriter:
         Writes the data to an Excel file.
         :param filename: The name of the file (without extension) to write to.
         """
-        self.workbook.save(filename + XLSWriter.EXTENSION)
+        if not filename.endswith(XLSWriter.EXTENSION):
+            filename = filename + XLSWriter.EXTENSION
+
+        self.workbook.save(filename)
 
 # -------------------------------------------------------------------------------------------------------------------
 
