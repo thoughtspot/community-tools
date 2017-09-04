@@ -237,7 +237,8 @@ class TestXLSReader(unittest.TestCase):
         self.assertEqual(table2.table_name, "table2")
         self.assertEqual(table2.schema_name, "s1")
         self.assertEqual(table2.primary_key, ["column_1"])
-        self.assertIsNone(table2.shard_key)
+        self.assertEqual(table2.shard_key.shard_keys, ["column_1", "column_2"])
+        self.assertEqual(table2.shard_key.number_shards, 128)
 
         self.assertTrue(table2.has_column("column_1"))
         self.assertEqual(table2.get_column("column_1").column_type, "INT")

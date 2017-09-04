@@ -825,13 +825,16 @@ class XLSReader:
             else:
                 pk = [x.strip() for x in pk.split(',')]
 
-            # TODO handle multiple shard keys like primary keys above.
-            # TODO make sure unit test has this case.
             sk = None
             sk_name = row[indices["Shard Key"]]
             sk_nbr_shards = row[indices["# Shards"]]
+            sk = row[indices["Primary Key"]]
+            if sk == "":
+                sk = None
+            else:
+                sk = [x.strip() for x in sk_name.split(',')]
             if sk_name != "" and sk_nbr_shards != "":
-                sk = ShardKey(shard_keys=sk_name, number_shards=sk_nbr_shards)
+                sk = ShardKey(shard_keys=sk, number_shards=sk_nbr_shards)
 
             table = Table(table_name=row[indices["Table"]],
                           schema_name=row[indices["Schema"]],
@@ -885,10 +888,10 @@ class XLSReader:
                 table = database.get_table(table_name)
                 if table is None:
                     eprint("ERROR:  Table %s from the Foreign Keys tab is not known." % table_name)
-                from_keys = row[indices["From Columns"]].split(",")
-                from_keys = map(unicode.strip, from_keys)
-                to_keys = row[indices["To Columns"]].split(",")
-                to_keys = map(unicode.strip, to_keys)
+                from_keys = row[indices["From Columns"]]
+                from_keys = [x.strip() for x in from_keys.split(",")]
+                to_keys = row[indices["To Columns"]]
+                to_keys = [x.strip() for x in to_keys.split(",")]
                 table.add_foreign_key(from_keys=from_keys,
                                       to_table=row[indices["To Table"]],
                                       to_keys=to_keys
