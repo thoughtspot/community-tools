@@ -819,17 +819,15 @@ class XLSReader:
                 database = Database(database_name=database_name)
                 self.databases[database_name] = database
 
-            pk = row[indices["Primary Key"]]
+            pk = row[indices["Primary Key"]].strip()
             if pk == "":
                 pk = None
             else:
                 pk = [x.strip() for x in pk.split(',')]
 
-            sk = None
-            sk_name = row[indices["Shard Key"]]
+            sk_name = row[indices["Shard Key"]].strip()
             sk_nbr_shards = row[indices["# Shards"]]
-            sk = row[indices["Primary Key"]]
-            if sk == "":
+            if sk_name == "":
                 sk = None
             else:
                 sk = [x.strip() for x in sk_name.split(',')]
