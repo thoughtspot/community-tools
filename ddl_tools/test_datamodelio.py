@@ -35,6 +35,7 @@ class TestDDLParser(unittest.TestCase):
         self.assertEqual("INT", DDLParser.convert_type("NUMBER(1)"))
         self.assertEqual("INT", DDLParser.convert_type("NUMBER(3,0)"))
         self.assertEqual("BIGINT", DDLParser.convert_type("NUMBER(10,0)"))
+        self.assertEqual("BIGINT", DDLParser.convert_type("NUMBER(*,0)"))
         self.assertEqual("DOUBLE", DDLParser.convert_type("NUMBER(4,2)"))
         self.assertEqual("DOUBLE", DDLParser.convert_type("decimal"))
         self.assertEqual("DOUBLE", DDLParser.convert_type("numeric"))
@@ -49,6 +50,7 @@ class TestDDLParser(unittest.TestCase):
         self.assertEqual("VARCHAR(0)", DDLParser.convert_type("varchar"))
         self.assertEqual("VARCHAR(0)", DDLParser.convert_type("char"))
         self.assertEqual("VARCHAR(88)", DDLParser.convert_type("varchar(88)"))
+        self.assertEqual("VARCHAR(0)", DDLParser.convert_type("long"))
         self.assertEqual("UNKNOWN", DDLParser.convert_type("something_new"))
 
 

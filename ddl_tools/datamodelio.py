@@ -286,7 +286,7 @@ class DDLParser(object):
                 if "," in numsize:
                     first_num, second_num = numsize.split(",")
                     if second_num.strip() == "0":
-                        if int(first_num) > 9:
+                        if first_num == "*" or int(first_num) > 9:  # Support Oracle Number(*,n)
                             new_t = "BIGINT"
                         else:
                             new_t = "INT"
@@ -310,6 +310,8 @@ class DDLParser(object):
         elif "bool" in t:
             new_t = "BOOL"
         elif "text" in t:
+            new_t = "VARCHAR(0)"
+        elif "long" in t: # Oracle variable type
             new_t = "VARCHAR(0)"
         elif "char" in t:
             nbytes = 0
