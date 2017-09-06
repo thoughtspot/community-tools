@@ -313,6 +313,8 @@ class DDLParser(object):
             new_t = "VARCHAR(0)"
         elif "long" in t: # Oracle variable type
             new_t = "VARCHAR(0)"
+        elif "enum" in t:
+            new_t = "VARCHAR(0)"
         elif "char" in t:
             nbytes = 0
             if ')' in t:
