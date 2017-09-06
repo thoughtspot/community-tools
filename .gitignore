@@ -4,6 +4,9 @@
 .AppleDouble
 .LSOverride
 
+# Compiled Python
+.pyc
+
 # Icon must end with two \r
 Icon
 
