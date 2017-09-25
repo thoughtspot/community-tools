@@ -76,13 +76,18 @@ class DDLParser(object):
         self.database = Database(database_name=database_name)
         self.parse_keys = parse_keys
 
-    def parse_ddl(self, stream):
+    def parse_ddl(self, filename):
         """
         Parsed DDL from a stream and returns a populated Database.
-        :param stream: An input stream to read from.
+        :param filename: Name of the file to read from.
         :return: A Database object.
         :rtype: Database
         """
+
+        if filename is None:
+            stream = open(sys.stdin, "r")
+        else:
+            stream = open(filename, "r")
 
         # First read the entire input into memory.  This will allow multiple passes through the data.
         input_ddl = []
@@ -311,9 +316,11 @@ class DDLParser(object):
             new_t = "BOOL"
         elif "text" in t:
             new_t = "VARCHAR(0)"
-        elif "long" in t: # Oracle variable type
+        elif "long" in t:  # Oracle variable type
             new_t = "VARCHAR(0)"
         elif "enum" in t:
+            new_t = "VARCHAR(0)"
+        elif "xml" in t:
             new_t = "VARCHAR(0)"
         elif "char" in t:
             nbytes = 0
@@ -447,16 +454,18 @@ class TQLWriter:
 
         return results
 
-    def write_tql(self, database, outfile=None):
+    def write_tql(self, database, filename=None):
         """
         Main function to write the Database to TQL.
         :param database: The database object to convert.
         :type database: Database
-        :param outfile: File to write to or STDOUT is not set.  The caller is expected to close the output stream.
+        :param filename: File to write to or STDOUT is not set.  The caller is expected to close the output stream.
         """
 
-        if outfile is None:
+        if filename is None:
             outfile = open(sys.stdout, "w")
+        else:
+            outfile = open(filename, "w")
 
         db_name = self.to_case(database.database_name)
 
@@ -866,7 +875,8 @@ class XLSReader:
                 table = database.get_table(table_name)
                 if table is None:
                     eprint("ERROR:  Table %s from the Columns tab is not known." % table_name)
-                table.add_column(Column(column_name=row[indices["Name"]], column_type=row[indices["Type"]]))
+                else:
+                    table.add_column(Column(column_name=row[indices["Name"]], column_type=row[indices["Type"]]))
 
     def _read_foreign_keys_from_workbook(self):
         """
@@ -890,14 +900,21 @@ class XLSReader:
                 table = database.get_table(table_name)
                 if table is None:
                     eprint("ERROR:  Table %s from the Foreign Keys tab is not known." % table_name)
-                from_keys = row[indices["From Columns"]]
-                from_keys = [x.strip() for x in from_keys.split(",")]
-                to_keys = row[indices["To Columns"]]
-                to_keys = [x.strip() for x in to_keys.split(",")]
-                table.add_foreign_key(from_keys=from_keys,
-                                      to_table=row[indices["To Table"]],
-                                      to_keys=to_keys
-                                      )
+
+                else:
+                    key_name = row[indices["Name"]]
+                    if key_name is None:
+                        eprint("ERROR:  Table %s from the Foreign Keys tab is missing a FK name." % table_name)
+
+                    from_keys = row[indices["From Columns"]]
+                    from_keys = [x.strip() for x in from_keys.split(",")]
+                    to_keys = row[indices["To Columns"]]
+                    to_keys = [x.strip() for x in to_keys.split(",")]
+                    table.add_foreign_key(name=key_name,
+                                          from_keys=from_keys,
+                                          to_table=row[indices["To Table"]],
+                                          to_keys=to_keys
+                                          )
 
     def _read_relationships_from_workbook(self):
         """

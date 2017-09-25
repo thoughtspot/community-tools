@@ -602,10 +602,24 @@ class DatabaseValidator:
                                                    issue="foreign key %s column %s isn't in primary key for %s" %
                                                    (fk.name, to_name, to_table.table_name))
 
-                    if from_col is None or to_col is None or from_col.column_type != to_col.column_type:
+                    missing_column = False
+                    if from_col is None:
                         self._add_validation_issue(table=table,
-                                                   issue="foreign key %s column %s doesn't match type for %s" %
-                                                   (fk.name, to_name, to_table.table_name))
+                                                   issue="foreign key %s missing from_column %s from table %s" %
+                                                         (fk.name, from_name, table.table_name))
+                        missing_column = True
+
+                    if to_col is None:
+                        self._add_validation_issue(table=table,
+                                                   issue="foreign key %s missing to_column %s from table %s" %
+                                                                      (fk.name, to_name, table.table_name))
+                        missing_column = True
+
+                    if not missing_column and from_col.column_type != to_col.column_type:
+                        self._add_validation_issue(table=table,
+                                                   issue="foreign key %s column %s type %s doesn't match type %s for %s column %s" %
+                                                   (fk.name, to_name, from_col.column_type,
+                                                    to_col.column_type, to_table.table_name, to_col.column_name))
 
     def _validate_relationships(self, table):
         """
