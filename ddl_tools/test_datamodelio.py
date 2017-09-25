@@ -52,6 +52,7 @@ class TestDDLParser(unittest.TestCase):
         self.assertEqual("VARCHAR(88)", DDLParser.convert_type("varchar(88)"))
         self.assertEqual("VARCHAR(0)", DDLParser.convert_type("long"))
         self.assertEqual("VARCHAR(0)", DDLParser.convert_type("enum"))
+        self.assertEqual("VARCHAR(0)", DDLParser.convert_type("xml"))
         self.assertEqual("UNKNOWN", DDLParser.convert_type("something_new"))
 
 

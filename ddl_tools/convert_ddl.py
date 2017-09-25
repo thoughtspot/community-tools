@@ -36,6 +36,7 @@ from datamodelio import DDLParser, TQLWriter, XLSWriter, XLSReader, TsloadWriter
 def main():
     """Main function for the script."""
     args = parse_args()
+
     database = None
     if valid_args(args):
         print (args)
@@ -94,11 +95,9 @@ def parse_args():
                         default='falcon_default_schema',
                         help="name of ThoughtSpot schema")
     parser.add_argument("-i", "--ddl_infile", nargs="?",
-                        type=argparse.FileType('r'), default=sys.stdin,
-                        help="name of input file with DDL default STDIN")
+                        help="name of input file with DDL")
     parser.add_argument("-o", "--tql_outfile", nargs="?",
-                        type=argparse.FileType('w'), default=sys.stdout,
-                        help="name of output file to write to or STDOUT")
+                        help="name of output file to write to")
     parser.add_argument("--excel_infile",
                         help="name of the Excel file to read from.")
     parser.add_argument("--excel_outfile",
@@ -150,8 +149,6 @@ def read_ddl(args):
     :returns: The database read from the DDL.
     :rtype: Database
     """
-    # args.outfile.write("/* Converting DDL\n *  args:  %s\n */\n" % args)
-
     parser = DDLParser(args.database, args.schema)
     return parser.parse_ddl(args.ddl_infile)
 
