@@ -1,0 +1,4 @@
+create database "delete_from";
+use "delete_from";
+create table table_1 (a_string varchar(10), an_int bigint, a_date date);
+create table table_2 (a_string varchar(10), an_int bigint, a_date_time datetime);
