@@ -1,15 +1,33 @@
 #!/usr/bin/env python
 
-'''Delete records from tables based on a CSV document.  
-   Each line of the description file has the following format:  table_name, col1, col2, etc.
-   Each line of the data file has the following format: table_name, val1, val2, etc.
-   The delete will be of the format DELETE FROM table_name WHERE col1 = val1 AND col2 = val2, etc.
+"""
+Copyright 2017 ThoughtSpot
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated 
+documentation files (the "Software"), to deal in the Software without restriction, including without limitation the 
+rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to 
+permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions 
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED 
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, 
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+"""
+
+"""
+elete records from tables based on a CSV document.  
+ach line of the description file has the following format:  table_name, col1, col2, etc.
+ach line of the data file has the following format: table_name, val1, val2, etc.
+he delete will be of the format DELETE FROM table_name WHERE col1 = val1 AND col2 = val2, etc.
    
-   ASSUMPTIONS:
-     * the format of TQL output will not change
-     * this script will be run on the appliance and be able to call TQL to execute delete commands.
-     * fields do not contain the separator value.
-'''
+ASSUMPTIONS:
+  * the format of TQL output will not change
+  * this script will be run on the appliance and be able to call TQL to execute delete commands.
+  * fields do not contain the separator value.
+"""
 
 from __future__ import print_function
 import sys
