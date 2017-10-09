@@ -1,0 +1,107 @@
+#!/bin/bash
+
+# Copyright 2017 ThoughtSpot
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation 
+# files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, 
+# modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the 
+# Software is furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES 
+# OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS 
+# BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT 
+# OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+# This script is intended to generate delete commands based on date column values. 
+
+# Assumptions:
+#   - All of the tables are in the same database and schema.
+#   - Going back full increments of time units, i.e. not from 10:45am.
+#   - Handle days, months, years
+#   - Only deleting based on a single column's date value.
+#   - Only Linux and Darwin are checked for in the OS.  May not work in other environments.
+
+# Change to your database name and schema name.
+declare -r dbname="delete_from"
+declare -r schema="falcon_default_schema"
+
+# For each table enter the table name, date column to test against, the number of 
+# units to go back, the time unit (d, m, y) and the comparison symbol. > deletes newer data and < deletes older data.
+# You can specify to use the "first" of the time unit or "specific" for the unit.  For days this has no impact,
+# but for years and months, this will cause the year to be on Jan 1 and for Mon it will cause to be the first of the month.
+# You also have to specify if the column is a date or datetime because the format is different.  
+declare -r tables=( 
+    "table_1" "a_date"      "date"     2 "d" "<" "specific"
+    "table_2" "a_date_time" "datetime" 3 "m" ">" "specific"
+    "table_3" "a_date_time" "datetime" 2 "y" ">" "specific"
+    "table_4" "a_date"      "date"     2 "d" "<" "first"
+    "table_5" "a_date_time" "datetime" 3 "m" ">" "first"
+    "table_6" "a_date_time" "datetime" 2 "y" ">" "first"
+)
+
+# WARNING: Here there be dragons!!  You shouldn't have to edit anything below this point.
+
+declare -r OS="`uname -s`"
+
+let nbr_tables=${#tables[@]}/7
+for ((idx = 0; idx < $nbr_tables; idx++))
+do
+    let offset=idx*7
+
+    table_name=${tables[offset]}
+    column_name=${tables[offset + 1]}
+    column_type=${tables[offset + 2]}
+    nbr_units=${tables[offset + 3]}
+    the_unit=${tables[offset + 4]}
+    the_symbol=${tables[offset + 5]}
+    first=${tables[offset + 6]}
+
+    month_fmt="%m"
+    day_fmt="%d"
+
+    case ${the_unit} in
+        "m")
+            if [ ${first} == "first" ]; then
+                day_fmt="01"
+            fi
+            ;;
+        "y")
+            if [ ${first} == "first" ]; then
+                month_fmt="01"
+                day_fmt="01"
+            fi
+            ;;
+    esac
+
+    if [ ${OS} == 'Linux' ]; then
+        case ${the_unit} in
+            "d")
+                the_unit="day"
+                ;;
+            "m")
+                the_unit="month"
+                ;;
+            "y")
+                the_unit="year"
+                ;;
+        esac
+    fi
+
+    if [ ${column_type} = "date" ]; then
+        if [ ${OS} == 'Linux' ]; then
+            days_back=`date -d"$(date) -${nbr_units} ${the_unit}" +"%Y-${month_fmt}-${day_fmt}"`  # gnu linux version
+        elif [ ${OS} == 'Darwin' ]; then
+            days_back=`date -v -${nbr_units}${the_unit} +"%Y-${month_fmt}-${day_fmt}"`  # macOS version
+        fi
+    else # assume datetime
+        if [ ${OS} == 'Linux' ]; then
+            days_back=`date -d"$(date) -${nbr_units} ${the_unit}" +"%Y-${month_fmt}-${day_fmt} 00:00:00"`  # gnu linux version
+        elif [ ${OS} == 'Darwin' ]; then
+            days_back=`date -v -${nbr_units}${the_unit} +"%Y-${month_fmt}-${day_fmt} 00:00:00"`  # macOS version
+        fi
+    fi
+
+    echo "delete from \"$dbname\".\"$schema\".\"$table_name\" where "$column_name" $the_symbol '$days_back';"
+done

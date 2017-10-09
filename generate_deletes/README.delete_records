@@ -1,0 +1,30 @@
+File:  delete_records.py
+
+Purpose:  Delete records from a table based on a delimited file that had the column values to use.
+
+usage: delete_records.py [-h] [-f FILENAME] [-t TABLE] [-d DATABASE]
+                         [-s SCHEMA] [-p SEPARATOR]
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -f FILENAME, --filename FILENAME
+                        path to file with records to delete
+  -t TABLE, --table TABLE
+                        name of the table to delete records from
+  -d DATABASE, --database DATABASE
+                        database to delete from
+  -s SCHEMA, --schema SCHEMA
+                        schema to delete from
+  -p SEPARATOR, --separator SEPARATOR
+                        separator to use in data
+
+Description:  When delete_records is called, it will read from the given database and determine 
+              the columns and types for all tables. It will then read from the file and generate delete
+              commands.  The first record should be the column names in the table.  Each consecutive row
+              contains values for the given column. 
+
+Assumptions:
+  * the format of TQL output will not change
+  * this script will be run on the appliance and be able to call TQL to execute delete commands.
+  * fields do not contain the separator value.
+
