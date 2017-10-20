@@ -103,5 +103,5 @@ do
         fi
     fi
 
-    echo "delete from \"$dbname\".\"$schema\".\"$table_name\" where "$column_name" $the_symbol '$days_back';"
+    echo "delete from \"$dbname\".\"$schema\".\"$table_name\" where "\"$column_name\"" $the_symbol '$days_back';"
 done
