@@ -152,7 +152,7 @@ fi
 
 echo ${body}
 for address in ${RESULTS_EMAIL[*]}; do
-  echo "${body}" | mutt -s "${subject}" -a ${RESULTS_FILE}  -- ${address}
+  echo "${body}" | mail -s "${subject}" -a ${RESULTS_FILE} ${address}
 done
 
 # compress the backup folder
