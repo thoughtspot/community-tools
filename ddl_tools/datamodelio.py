@@ -323,13 +323,14 @@ class DDLParser(object):
         elif "xml" in t:
             new_t = "VARCHAR(0)"
         elif "char" in t:
-            nbytes = 0
-            if ')' in t:
-                nbytes = t[t.find('(') + 1:t.find(')')]
-                nbytes = re.sub("[^0-9]", "", nbytes)
-                if nbytes == "":
-                    nbytes = 0
-            new_t = "VARCHAR(%s)" % nbytes
+            new_t = "VARCHAR(0)"
+            # nbytes = 0
+            # if ')' in t:
+            #     nbytes = t[t.find('(') + 1:t.find(')')]
+            #     nbytes = re.sub("[^0-9]", "", nbytes)
+            #     if nbytes == "":
+            #         nbytes = 0
+            # new_t = "VARCHAR(%s)" % nbytes
         else:
             new_t = "UNKNOWN"
 
