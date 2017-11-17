@@ -98,7 +98,7 @@ function tsload_file {
   fi
 
   # if the files are gzip change cat to zcat.
-  cat ${filename} | dos2unix | \
+  cat ${filename} | \
     tsload --target_database your_database \
            --target_schema falcon_default_schema \
            --target_table ${tablename} \

@@ -559,7 +559,7 @@ class DatabaseValidator:
                     self._add_validation_issue(table=table,
                                                issue="column %s in shard key does not exist in the the table." % sk)
 
-                if sk not in pks:
+                if pks != [] and sk not in pks:
                     self._add_validation_issue(table=table,
                                                issue="column %s in shard key not in primary key %s" % (sk, pks))
 
@@ -615,11 +615,21 @@ class DatabaseValidator:
                                                                       (fk.name, to_name, table.table_name))
                         missing_column = True
 
-                    if not missing_column and from_col.column_type != to_col.column_type:
-                        self._add_validation_issue(table=table,
-                                                   issue="foreign key %s column %s type %s doesn't match type %s for %s column %s" %
-                                                   (fk.name, to_name, from_col.column_type,
-                                                    to_col.column_type, to_table.table_name, to_col.column_name))
+                    if not missing_column:
+                        if (not from_col.column_type.startswith("VARCHAR")) and \
+                            (from_col.column_type != to_col.column_type):
+                            self._add_validation_issue(table=table,
+                                                       issue="foreign key %s column %s type %s doesn't match type %s for %s column %s" %
+                                                       (fk.name, to_name, from_col.column_type,
+                                                       to_col.column_type, to_table.table_name,
+                                                       to_col.column_name))
+
+                        elif (from_col.column_type.startswith("VARCHAR") and not to_col.column_type.startswith("VARCHAR") or \
+                              to_col.column_type.startswith("VARCHAR") and not from_col.column_type.startswith("VARCHAR")):
+                            self._add_validation_issue(table=table,
+                                                       issue="foreign key %s column %s type %s doesn't match type %s for %s column %s" %
+                                                       (fk.name, to_name, from_col.column_type,
+                                                        to_col.column_type, to_table.table_name, to_col.column_name))
 
     def _validate_relationships(self, table):
         """
