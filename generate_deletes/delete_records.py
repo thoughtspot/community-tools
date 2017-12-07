@@ -22,6 +22,7 @@ import argparse
 import csv
 import os.path
 import subprocess
+import time
 from subprocess import check_output
 
 
@@ -135,6 +136,9 @@ def generate_deletes(args):
     Creates and executes the delete statements from from the values file.
     :param args: Command line arguments.
     """
+    start = time.time()
+    nbr_deletes = 0
+
     # get the column descriptions.
     columns = descriptions.get(args.schema, {}).get(args.table, None)
 
@@ -142,30 +146,34 @@ def generate_deletes(args):
         eprint("Table %s.%s not found." % (args.schema, args.table))
         return
 
+    tmpfile = "/tmp/deleteme"
     with open(args.filename, 'rb') as valuefile:
         filereader = csv.DictReader(valuefile, delimiter='|', quotechar='"')
-        for values in filereader:
+        with open(tmpfile, "w") as deletefile:
+            for values in filereader:
+                delete_stmt = "DELETE FROM %s.%s.%s WHERE " % (args.database, args.schema, args.table)
 
-            delete_stmt = "echo \"DELETE FROM %s.%s.%s WHERE " % (args.database, args.schema, args.table)
+                first = True
+                for key in values.keys():
+                    if not first:
+                        delete_stmt += " AND "
+                    else:
+                        first = False
 
-            first = True
-            for key in values.keys():
-                if not first:
-                    delete_stmt += " AND "
-                else:
-                    first = False
+                    # TODO see if I need to un-quote non-numeric.  Might need to re-do desc file.
+                    if "int" in columns[key] or "double" in columns[key]:
+                        delete_stmt += ("%s = %s" % (key, values[key]))
+                    else:
+                        delete_stmt += ("%s = '%s'" % (key, values[key]))
 
-                # TODO see if I need to un-quote non-numeric.  Might need to re-do desc file.
-                if "int" in columns[key] or "double" in columns[key]:
-                    delete_stmt += ("%s = %s" % (key, values[key]))
-                else:
-                    delete_stmt += ("%s = '%s'" % (key, values[key]))
+                delete_stmt += ";\n"
+                deletefile.write(delete_stmt)
+                nbr_deletes += 1
 
-            delete_stmt += ";\" | tql"
-            print(delete_stmt)
-            subprocess.call(delete_stmt, shell=True)
+    subprocess.call("cat %s | tql" % tmpfile, shell=True)
 
-    valuefile.close()
+    finish = time.time()
+    print("Executed %d deletes in %s seconds." % (nbr_deletes, (finish-start)))
 
 
 def eprint(*args, **kwargs):

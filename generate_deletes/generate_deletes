@@ -23,11 +23,11 @@
 #   - Only deleting based on a single column's date value.
 #   - Only Linux and Darwin are checked for in the OS.  May not work in other environments.
 
-# Change to your database name and schema name.
+# TODO: Change to your database name and schema name.
 declare -r dbname="delete_from"
 declare -r schema="falcon_default_schema"
 
-# For each table enter the table name, date column to test against, the number of 
+# TODO: For each table enter the table name, date column to test against, the number of 
 # units to go back, the time unit (d, m, y) and the comparison symbol. > deletes newer data and < deletes older data.
 # You can specify to use the "first" of the time unit or "specific" for the unit.  For days this has no impact,
 # but for years and months, this will cause the year to be on Jan 1 and for Mon it will cause to be the first of the month.
