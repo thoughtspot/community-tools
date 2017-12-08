@@ -158,6 +158,10 @@ done
 # compress the backup folder
 cd ${OLD_DIR}/.. && tar czf ${OLD_DIR}.tar.gz ${THE_DATE_TIME} && rm -r ${THE_DATE_TIME}
 
+# TODO optionally remove old archive files
+# +7 means delete older than seven days.  Modify for your specs.
+# find ${OLD_DIR} -type f -mtime +7 -name '*.gz' -execdir rm -- '{}' \;
+
 popd
 
 exit ${exit_value}
