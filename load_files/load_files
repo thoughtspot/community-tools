@@ -30,7 +30,8 @@
 
 # TODO The following should be modified for your environment.
 declare -r DATA_FILE_EXTENSION=".csv"                                  # extension for files to be loaded.
-declare -r ROOT_DIR="/home/admin/test_load_files"                      # Root of where data, etc. will reside.
+# declare -r ROOT_DIR="/home/admin/test_load_files"                      # Root of where data, etc. will reside.
+declare -r ROOT_DIR="./foo"                      # Root of where data, etc. will reside.
 declare -r RESULTS_EMAIL=("you@thoughtspot.com")                       # email addresses to send the results to.
 declare -r SEMAPHORE_FILE_NAME="stage_done"                            # name of a file that indicates all staging files are loaded.
 declare -r DEFAULT_EMPTY_TARGET="--empty_target"                       # use if always empty target unless specified.
@@ -44,7 +45,7 @@ declare -r LOG_DIR=${ROOT_DIR}/logs                                    # directo
 declare -r OLD_DIR="${ROOT_DIR}/old/${THE_DATE_TIME}"                  # directory to move files to.
 declare -r BAD_RECORDS_DIR="${OLD_DIR}/bad_records"                    # directory with bad records.
 declare -r RESULTS_FILE="${LOG_DIR}/${CLUSTER_NAME}-results-${THE_DATE_TIME}.txt" # stores the results of the data load.
-declare -r LOADING_FLAG="${DATA_DIR}/loading"                          # flag to indicate we are currently loading.
+declare -r LOADING_FILE="${DATA_DIR}/loading"                          # flag to indicate we are currently loading.
 declare -r V_LEVEL=0                                                   # logging verbosity level.  0-6.  0 recommended for production.
 
 # TODO Uncomment the following if using a semaphore for reason to load.
@@ -72,12 +73,20 @@ if [ ! -e ${OLD_DIR}/bad_records ]; then
 fi
 
 # loading is a flag that indicates this process is running.  Needed to avoid two copies running at once.
-if [ -e ${LOADING_FLAG} ]; then
-  exit 0
+# TODO add code to check for the PID
+if [ -e ${LOADING_FILE} ]; then
+  other_pid=`head -n 1 ${LOADING_FILE}`
+  running_pid=`ps -ef | awk '{ print $2 }' | grep $other_pid`
+  if [ "$running_pid" == "" ]; then
+    echo $$ > ${LOADING_FILE}
+    echo "taking over from stopped process $other_pid" > ${RESULTS_FILE}
+  else
+    exit 0
+  fi
+else
+  echo $$ > ${LOADING_FILE}
+  echo "" > ${RESULTS_FILE}
 fi
-touch ${LOADING_FLAG}
-
-echo "" > ${RESULTS_FILE}
 
 had_tsload_error=false # indicates if there was a tsload error.
 
@@ -136,7 +145,7 @@ done
 # remove the semaphore since we are done with loading.
 # NOTE:  Uncomment if using semaphore.
 #rm ${DATA_DIR}/${SEMAPHORE_FILE_NAME}
-rm ${LOADING_FLAG}
+rm ${LOADING_FILE}
 cp ${RESULTS_FILE} ${OLD_DIR}
 
 # check the success of the load.
