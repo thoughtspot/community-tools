@@ -1,5 +1,5 @@
 import unittest
-from tsUserGroupApi import UsersAndGroups, User, Group, SyncUserAndGroups, Visibility
+from tsUserGroupApi import UsersAndGroups, User, Group, SyncUserAndGroups, Visibility, Privileges, SetGroupPrivilegesAPI
 
 """
 Copyright 2018 ThoughtSpot
@@ -252,3 +252,14 @@ class TestSyncUsersAndGroups(unittest.TestCase):
         auag = UsersAndGroups()
         auag.add_user(User(name="userx", display_name="User X", password="password1"))
         sync.update_user_password(userid="userx", currentpassword="password1", password="password2")
+
+
+    def test_add_and_remove_privilege(self):
+        """
+        Tests adding a privilege to a group and then removing it.
+        """
+
+        self.create_common_users_and_groups()
+
+        sgp = SetGroupPrivilegesAPI(tsurl=TS_URL, username=TS_USER, password=TS_PASSWORD, disable_ssl=True)
+        sgp.add_privilege(groups=["Group 1", "Group 2"], privilege=Privileges.CAN_USE_SPOTIQ)
