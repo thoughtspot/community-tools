@@ -523,7 +523,7 @@ class BaseApiInterface(object):
         Log into the ThoughtSpot server.
         """
 
-        url = SyncUserAndGroups.LOGIN_URL.format(tsurl=self.tsurl)
+        url = self.format_url(SyncUserAndGroups.LOGIN_URL)
         response = requests.post(
             url, data={'username': self.username, 'password': self.password}, verify=self.should_verify
         )
@@ -543,16 +543,27 @@ class BaseApiInterface(object):
         """
         return self.cookies is not None
 
+    def format_url(self, url):
+        """
+        Returns a URL that has the correct server.
+        :param url: The URL template to add the server to.
+        :type url: str
+        :return: A URL that has the correct server info.
+        :rtype: str
+        """
+        url = BaseApiInterface.SERVER_URL + url
+        return url.format(tsurl=self.tsurl)
+
 
 class SyncUserAndGroups(BaseApiInterface):
     """
     Synchronized with ThoughtSpot and also gets users and groups from ThoughtSpot.
     """
 
-    LOGIN_URL = BaseApiInterface.SERVER_URL + "/tspublic/v1/session/login"
-    GET_ALL_URL = BaseApiInterface.SERVER_URL + "/tspublic/v1/user/list"
-    SYNC_ALL_URL = BaseApiInterface.SERVER_URL + "/tspublic/v1/user/sync"
-    UPDATE_PASSWORD_URL = BaseApiInterface.SERVER_URL + "/tspublic/v1/user/updatepassword"
+    LOGIN_URL = "/tspublic/v1/session/login"
+    GET_ALL_URL = "/tspublic/v1/user/list"
+    SYNC_ALL_URL = "/tspublic/v1/user/sync"
+    UPDATE_PASSWORD_URL = "/tspublic/v1/user/updatepassword"
 
     def __init__(self, tsurl, username, password, disable_ssl=False, global_password=False):
         """
@@ -576,7 +587,7 @@ class SyncUserAndGroups(BaseApiInterface):
         :rtype: UsersAndGroups
         """
 
-        url = SyncUserAndGroups.GET_ALL_URL.format(tsurl=self.tsurl)
+        url = self.format_url(SyncUserAndGroups.GET_ALL_URL)
         response = requests.get(url, cookies=self.cookies, verify=self.should_verify)
         if response.status_code == 200:
             logging.info("Successfully got users and groups.")
@@ -606,7 +617,7 @@ class SyncUserAndGroups(BaseApiInterface):
             # print("Invalid user and group structure.")
             raise Exception("Invalid users and groups")
 
-        url = SyncUserAndGroups.SYNC_ALL_URL.format(tsurl=self.tsurl)
+        url = self.format_url(SyncUserAndGroups.SYNC_ALL_URL)
 
         logging.debug("calling %s" % url)
         json_str = users_and_groups.to_json()
@@ -651,7 +662,7 @@ class SyncUserAndGroups(BaseApiInterface):
         :type password: str
         """
 
-        SyncUserAndGroups.UPDATE_PASSWORD_URL.format(tsurl=self.tsurl)
+        url = self.format_url(SyncUserAndGroups.UPDATE_PASSWORD_URL)
         params = {
             "userid": userid,
             "currentpassword": {"password": [currentpassword], "empty": "false"},
@@ -673,22 +684,139 @@ class SyncUserAndGroups(BaseApiInterface):
                                            (response.status_code, userid, response.text))
 
 
-class TransferOwnershipApi(BaseApiInterface):
+class Privileges(object):
+    """
+    Contains the various privileges that groups can have.
+    """
+    IS_ADMINSTRATOR="ADMINISTRATION"
+    CAN_UPLOAD_DATA="USERDATAUPLOADING"
+    CAN_DOWNLOAD_DATA="DATADOWNLOADING"
+    CAN_SHARE_WITH_ALL="SHAREWITHALL"
+    CAN_MANAGE_DATA="DATAMANAGEMENT"
+    CAN_SCHEDULE_PINBOARDS="JOBSCHEDULING"
+    CAN_USE_SPOTIQ="A3ANALYSIS"
+    CAN_ADMINISTER_RLS="BYPASSRLS"
+    CAN_AUTHOR="AUTHORING"
+    CAN_MANAGE_SYSTEM="SYSTEMMANAGEMENT"
 
-    TRANSFER_OWNERSHIP_URL = BaseApiInterface.SERVER_URL + "/tspublic/v1/user/transfer/ownership"
 
-    def __init__(self, tsurl, username, password, disable_ssl=False, global_password=False):
+class SetGroupPrivilegesAPI(BaseApiInterface):
+
+    # Note that some of these URLs are not part of the public API and subject to change.
+    METADATA_LIST_URL = "/metadata/list?type=USER_GROUP"
+    METADATA_DETAIL_URL = "/metadata/detail/{guid}?type=USER_GROUP"
+
+    ADD_PRIVILEGE_URL = "/tspublic/v1/group/addprivilege"
+    REMOVE_PRIVILEGE_URL = "/tspublic/v1/group/removeprivilege"
+
+    def __init__(self, tsurl, username, password, disable_ssl=False):
         """
         Creates a new sync object and logs into ThoughtSpot
         :param tsurl: Root ThoughtSpot URL, e.g. http://some-company.com/
         :param username: Name of the admin login to use.
         :param password: Password for admin login.
         :param disable_ssl: If true, then disable SSL for calls.
-        :param global_password: If provided, will be passed to the sync call.  This is used to have a single
-        password for all users.  This can be significantly faster than individual passwords.
+        """
+        super(SetGroupPrivilegesAPI, self).__init__(tsurl=tsurl, username=username, password=password,
+                                                disable_ssl=disable_ssl)
+
+    @api_call
+    def get_privileges_for_group(self, group_name):
+        """
+        Gets the current privileges for a given group.
+        :param group_name:  Name of the group to get privileges for.
+        :returns: A list of privileges.
+        :rtype: list of str
+        """
+        url = self.format_url(SetGroupPrivilegesAPI.METADATA_LIST_URL) + "&pattern=" + group_name
+        response = requests.get(url, cookies=self.cookies, verify=self.should_verify)
+        if response.status_code == 200:  # success
+            results = json.loads(response.text)
+            try:
+                group_id = results["headers"][0]["id"]  # should always be present, but might want to add try / catch.
+                detail_url = SetGroupPrivilegesAPI.METADATA_DETAIL_URL.format(guid=group_id)
+                detail_url = self.format_url(detail_url)
+                detail_response = requests.get(detail_url, cookies=self.cookies, verify=self.should_verify)
+                if detail_response.status_code == 200:  # success
+                    privileges = json.loads(detail_response.text)["privileges"]
+                    return privileges
+                else:
+                    logging.error("Failed to get privileges for group %s" % group_name)
+                    raise requests.ConnectionError('Error (%d) setting privileges for group %s.  %s' %
+                                                   (response.status_code, group_name, response.text))
+            except:
+                print("Error getting group details.")
+                raise
+        else:
+            logging.error("Failed to get privileges for group %s" % group_name)
+            raise requests.ConnectionError('Error (%d) setting privileges for group %s.  %s' %
+                                           (response.status_code, group_name, response.text))
+
+    @api_call
+    def add_privilege(self, groups, privilege):
+        """
+        Adds a privilege to a list of groups.
+        :param groups List of groups to add the privilege to.
+        :type groups: list of str
+        :param privilege: Privilege being set.
+        :type privilege: str
+        """
+
+        url = self.format_url(SetGroupPrivilegesAPI.ADD_PRIVILEGE_URL)
+
+        params = {
+            "privilege": privilege,
+            "groupNames": json.dumps(groups)
+        }
+        response = requests.post(url, files=params, cookies=self.cookies, verify=self.should_verify)
+
+        if response.status_code == 204:
+            logging.info("Successfully added privilege %s for groups %s." % (privilege, groups))
+        else:
+            logging.error("Failed to add privilege %s for groups %s." % (privilege, groups))
+            raise requests.ConnectionError('Error (%d) adding privilege %s for groups %s.  %s' %
+                                           (response.status_code, privilege, groups, response.text))
+
+    @api_call
+    def remove_privilege(self, groups, privilege):
+        """
+        Removes a privilege to a list of groups.
+        :param groups List of groups to add the privilege to.
+        :type groups: list of str
+        :param privilege: Privilege being removed.
+        :type privilege: str
+        """
+
+        url = self.format_url(SetGroupPrivilegesAPI.REMOVE_PRIVILEGE_URL)
+
+        params = {
+            "privilege": privilege,
+            "groupNames": json.dumps(groups)
+        }
+        response = requests.post(url, files=params, cookies=self.cookies, verify=self.should_verify)
+
+        if response.status_code == 204:
+            logging.info("Successfully removed privilege %s for groups %s." % (privilege, groups))
+        else:
+            logging.error("Failed to remove privilege %s for groups %s." % (privilege, groups))
+            raise requests.ConnectionError('Error (%d) removing privilege %s for groups %s.  %s' %
+                                           (response.status_code, privilege, groups, response.text))
+
+
+class TransferOwnershipApi(BaseApiInterface):
+
+    TRANSFER_OWNERSHIP_URL = "{tsurl}/tspublic/v1/user/transfer/ownership"
+
+    def __init__(self, tsurl, username, password, disable_ssl=False):
+        """
+        Creates a new sync object and logs into ThoughtSpot
+        :param tsurl: Root ThoughtSpot URL, e.g. http://some-company.com/
+        :param username: Name of the admin login to use.
+        :param password: Password for admin login.
+        :param disable_ssl: If true, then disable SSL for calls.
         """
         super(TransferOwnershipApi, self).__init__(tsurl=tsurl, username=username, password=password,
-                                                disable_ssl=disable_ssl)
+                                                   disable_ssl=disable_ssl)
 
     @api_call
     def transfer_ownership(self, from_username, to_username):
@@ -700,7 +828,7 @@ class TransferOwnershipApi(BaseApiInterface):
         :type to_username: str
         """
 
-        url = TransferOwnershipApi.TRANSFER_OWNERSHIP_URL.format(tsurl=self.tsurl)
+        url = self.format_url(TransferOwnershipApi.TRANSFER_OWNERSHIP_URL)
         url = url + '?fromUserName=' + from_username + '&toUserName=' + to_username
         response = requests.post(url, cookies=self.cookies, verify=self.should_verify)
 
