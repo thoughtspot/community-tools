@@ -75,35 +75,20 @@ def parse_args():
     """Parses the arguments from the command line."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--from_ddl",
-                        help="will attempt to convert DDL from the infile.",
-                        action="store_true")
+                        help="will attempt to convert DDL from the infile")
     parser.add_argument("--to_tql",
-                        help="will convert to TQL to the outfile.",
-                        action="store_true")
+                        help="will convert to TQL to the outfile")
     parser.add_argument("--from_excel",
-                        help="will attempt to convert from Excel from the infile.",
-                        action="store_true")
+                        help="convert from the given Excel file")
     parser.add_argument("--to_excel",
-                        help="will convert to Excel and write to the outfile.",
-                        action="store_true")
+                        help="will convert to Excel and write to the outfile.")
     parser.add_argument("--to_tsload",
-                        help="will generate the tsload commands and write it to the outfile.",
-                        action="store_true")
+                        help="will generate the tsload commands and write it to the outfile.")
     parser.add_argument("-d", "--database",
                         help="name of ThoughtSpot database")
     parser.add_argument("-s", "--schema",
                         default='falcon_default_schema',
                         help="name of ThoughtSpot schema")
-    parser.add_argument("-i", "--ddl_infile", nargs="?",
-                        help="name of input file with DDL")
-    parser.add_argument("-o", "--tql_outfile", nargs="?",
-                        help="name of output file to write to")
-    parser.add_argument("--excel_infile",
-                        help="name of the Excel file to read from.")
-    parser.add_argument("--excel_outfile",
-                        help="name of the Excel file to write to.")
-    parser.add_argument("--tsload_outfile",
-                        help="name of the tsload file to write to.")
     parser.add_argument("-c", "--create_db",
                         action="store_true",
                         help="generate create database and schema statements")
@@ -126,18 +111,14 @@ def valid_args(args):
     :param args: The command line arguments.
     :return: True if valid, false otherwise.
     """
-    # TODO rethink what is and isn't valid and update.
     # make sure there is a to_ flag since data has to come from somewhere.
-    if args.from_ddl is False and args.from_excel is False:
+    if args.from_ddl is None and args.from_excel is None:
         eprint("--from_ddl or --from_excel must be provided as arguments.")
         return False
 
-    # if args.to_excel is False and args.to_tql is False:
-    #     eprint("--to_tql or --to_excel must be provided as arguments.")
-    #     return False
-
-    # if args.database is None:
-    #     eprint("a database name must be provided with --database")
+    if args.from_ddl is not None and args.database is None:
+        eprint("--from_ddl requires the --database option.")
+        return False
 
     return True
 
@@ -150,7 +131,7 @@ def read_ddl(args):
     :rtype: Database
     """
     parser = DDLParser(args.database, args.schema)
-    return parser.parse_ddl(args.ddl_infile)
+    return parser.parse_ddl(args.from_ddl)
 
 
 def read_excel(args):
@@ -165,7 +146,7 @@ def read_excel(args):
     """
 
     reader = XLSReader()
-    databases = reader.read_xls(filepath=args.excel_infile)
+    databases = reader.read_xls(filepath=args.from_excel)
     if len(databases) == 0:
         eprint("ERROR:  No databases read.")
         return None
@@ -184,7 +165,7 @@ def write_tql(args, database):
     :type database: Database
     """
     writer = TQLWriter(args.uppercase, args.lowercase, args.camelcase, args.create_db)
-    writer.write_tql(database, args.tql_outfile)
+    writer.write_tql(database, args.to_tql)
 
 
 def write_excel(args, database):
@@ -195,7 +176,7 @@ def write_excel(args, database):
     :type database: Database
     """
     writer = XLSWriter()
-    filename = args.excel_outfile
+    filename = args.to_excel
     if filename is None:
         filename = args.database + "_" + args.schema
 
@@ -210,7 +191,7 @@ def write_tsload(args, database):
     :type database: Database
     """
     writer = TsloadWriter()
-    filename = args.tsload_outfile
+    filename = args.to_tql
     if filename is None:
         filename = args.database + ".tsload"
 

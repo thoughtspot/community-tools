@@ -35,19 +35,19 @@ After that, you can go ahead and create the database tables in TQL.
 
 To convert from some other database DDL to Excel:
 ```
-convert_ddl.py --from_ddl --ddl_infile <somefile> --to_excel --excel_outfile <somefile> --database <db-name>
+convert_ddl.py --from_ddl <somefile> --to_excel <somefile> --database <db-name>
 ```
 This will result in a new excel file.  Note that the .xlsx extension is option on the excel file name.
 
 To validate a model from Excel:
 ```
-convert_ddl.py --from_excel --excel_infile <somefile>.xlsx --validate
+convert_ddl.py --from_excel <somefile>.xlsx --validate
 ```
 You will either get errors or a message that the model is valid.
 
 To convert from Excel to TQL DDL:
 ```bazaar
-convert_ddl.py --from_excel --excel_infile <somefile>.xlsx --to_tql --tql_outfile <somefile> --database <db-name>
+convert_ddl.py --from_excel <somefile>.xlsx --to_tql <somefile> 
 ```
 You will get an output file that contains (hopefully) valid TQL syntax.
 
