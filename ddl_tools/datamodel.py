@@ -639,8 +639,11 @@ class DatabaseValidator:
         """
         for rel in table.relationships_iter():
             if rel.from_table != table.table_name:
-                self._add_validation_issue(table=table, issue="from table %s doesn't exist in relationshiop %s." %
+                self._add_validation_issue(table=table, issue="from table %s doesn't exist in relationship %s." %
                                            (table.table_name, rel.name))
-            if rel.to_table != table.table_name:
-                self._add_validation_issue(table=table, issue="to table %s doesn't exist in relationshiop %s." %
-                                           (table.table_name, rel.name))
+
+            to_table = self.database.get_table(rel.to_table)
+            # make sure the other table exists in the database.
+            if to_table is None:
+                self._add_validation_issue(table=table, issue="to table %s doesn't exist in relationship %s." %
+                                                              (to_table, rel.name))
