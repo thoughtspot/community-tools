@@ -53,8 +53,7 @@ def main():
             print("Validating database")
             vr = database.validate()
             if not vr.is_valid:
-                for issue in vr.issues:
-                    eprint(issue)
+                vr.eprint_issues()
             else:
                 print("Database is valid.")
 

@@ -370,6 +370,10 @@ class ValidationResult:
     Provides the results of validation.
     """
 
+    INFO = "Information"
+    WARNING = "Warning"
+    ERROR = "Error"
+
     def __init__(self):
         """
         Creates a new validation result that is valid with no issues.
@@ -377,14 +381,47 @@ class ValidationResult:
         self.is_valid = True
         self.issues = []
 
-    def add_issue(self, issue):
+    def add_issue(self, issue, level=ERROR):
         """
         Adds an issue to the validation results, automatically making it invalid.
         :param issue: The issue to add.
         :type issue: str
+        :param level: The level of the error (INFO, WARNING, ERROR).
+        :type level: str
         """
         self.is_valid = False
-        self.issues.append(issue)
+        self.issues.append((issue, level))
+
+    def add_error(self, issue):
+        """
+        Adds a validation error.
+        :param issue: The issue to add.
+        :type issue: str
+        """
+        self.add_issue(issue, ValidationResult.ERROR)
+
+    def add_warning(self, issue):
+        """
+        Adds a validation warning.
+        :param issue: The issue to add.
+        :type issue: str
+        """
+        self.add_issue(issue, ValidationResult.WARNING)
+
+    def add_info(self, issue):
+        """
+        Adds a validation info.
+        :param issue: The issue to add.
+        :type issue: str
+        """
+        self.add_issue(issue, ValidationResult.INFO)
+
+    def eprint_issues(self):
+        """
+        Prints the issues to standard error.
+        """
+        for issue in self.issues:
+            eprint(issue[1] + ":  " + issue[0])
 
 # -------------------------------------------------------------------------------------------------------------------
 
@@ -514,6 +551,7 @@ class DatabaseValidator:
         """
 
         for table in self.database:
+            self._validate_column_types(table)
             self._validate_primary_key(table)
             self._validate_shard_keys(table)
             self._validate_foreign_keys(table)
@@ -521,7 +559,7 @@ class DatabaseValidator:
 
         return self.validation_results
 
-    def _add_validation_issue(self, table, issue):
+    def _add_validation_issue(self, table, issue, level=ValidationResult.ERROR):
         """
         Adds a formatted validation message.
         :param table: The table being validated.
@@ -529,13 +567,25 @@ class DatabaseValidator:
         :param issue: The issue to add.
         :type issue: str
         """
-        self.validation_results.add_issue("%s, %s:  %s" % (self.database.database_name, table.table_name, issue))
+        self.validation_results.add_issue("database %s, table %s:  %s" % (self.database.database_name, table.table_name, issue),
+                                          level=level)
+
+    def _validate_column_types(self, table):
+        """
+        Validates that the column types are all known.
+        :param table: The table being validated.
+        :type table: Table
+        """
+        for column in table.columns.values():
+            if column.column_type == "UNKNOWN":
+                self._add_validation_issue(table=table, issue="column %s is of type UNKNOWN." % column.column_name,
+                                           level=ValidationResult.WARNING)
 
     def _validate_primary_key(self, table):
         """
         Validates that the primary key is a key in this table.
-        :param table: 
-        :return: 
+        :param table: The table being validated.
+        :type table: Table
         """
         pks = table.primary_key
         for pk in pks:
