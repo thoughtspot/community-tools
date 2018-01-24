@@ -564,6 +564,10 @@ class SyncUserAndGroups(BaseApiInterface):
     GET_ALL_URL = "/tspublic/v1/user/list"
     SYNC_ALL_URL = "/tspublic/v1/user/sync"
     UPDATE_PASSWORD_URL = "/tspublic/v1/user/updatepassword"
+    DELETE_USERS_URL = "/session/user/deleteusers"
+    DELETE_GROUPS_URL = "/session/group/deletegroups"
+    USER_METADATA_URL = "/metadata/list?type=USER"
+    GROUP_METADATA_URL = "/metadata/list?type=USER_GROUP"
 
     def __init__(self, tsurl, username, password, disable_ssl=False, global_password=False):
         """
@@ -649,6 +653,102 @@ class SyncUserAndGroups(BaseApiInterface):
             with open("ts_users_and_groups.json", "w") as outfile:
                 outfile.write(json_str.encode("utf-8"))
             raise requests.ConnectionError('Error syncing users and groups (%d)' % response.status_code, response.text)
+
+    @api_call
+    def delete_users(self, usernames):
+        """
+        Deletes a list of users based on their user name.
+        :param usernames: List of the names of the users to delete.
+        :type usernames: list of str
+        """
+
+        # for each username, get the guid and put in a list.  Log errors for users not found, but don't stop.
+        url = self.format_url(SyncUserAndGroups.USER_METADATA_URL)
+        response = requests.get(url, cookies=self.cookies, verify=self.should_verify)
+        users = {}
+        if response.status_code == 200:
+            logging.info("Successfully got user metadata.")
+            json_list = json.loads(response.text)
+            for h in json_list["headers"]:
+                name = h["name"]
+                id = h["id"]
+                users[name] = id
+
+            user_list = []
+            for u in usernames:
+                id = users.get(u, None)
+                if id is None:
+                    eprint("  user %s not found, not attempting to delete." % u)
+                else:
+                    user_list.append(id)
+            url = self.format_url(SyncUserAndGroups.DELETE_USERS_URL)
+            params = {
+                "ids": json.dumps(user_list)
+            }
+            response = requests.post(url, data=params, cookies=self.cookies, verify=self.should_verify)
+
+            if response.status_code != 204:
+                logging.error("Failed to delete %s" % user_list)
+                raise requests.ConnectionError('Error getting users and groups (%d)' % response.status_code, response.text)
+        else:
+            logging.error("Failed to get users and groups.")
+            raise requests.ConnectionError('Error getting users and groups (%d)' % response.status_code, response.text)
+
+    def delete_user(self, username):
+        """
+        Deletes the user with the given username.
+        :param username: The name of the user.
+        :type username: str
+        """
+        self.delete_users([username])  # just call the list method.
+
+    @api_call
+    def delete_groups(self, groupnames):
+        """
+        Deletes a list of groups based on their group name.
+        :param groupnames: List of the names of the groups to delete.
+        :type groupnames: list of str
+        """
+
+        # for each groupname, get the guid and put in a list.  Log errors for groups not found, but don't stop.
+        url = self.format_url(SyncUserAndGroups.GROUP_METADATA_URL)
+        response = requests.get(url, cookies=self.cookies, verify=self.should_verify)
+        groups = {}
+        if response.status_code == 200:
+            logging.info("Successfully got group metadata.")
+            json_list = json.loads(response.text)
+            for h in json_list["headers"]:
+                name = h["name"]
+                id = h["id"]
+                groups[name] = id
+
+            group_list = []
+            for u in groupnames:
+                id = groups.get(u, None)
+                if id is None:
+                    eprint("  group %s not found, not attempting to delete." % u)
+                else:
+                    group_list.append(id)
+            url = self.format_url(SyncUserAndGroups.DELETE_GROUPS_URL)
+            params = {
+                "ids": json.dumps(group_list)
+            }
+            response = requests.post(url, data=params, cookies=self.cookies, verify=self.should_verify)
+
+            if response.status_code != 204:
+                logging.error("Failed to delete %s" % group_list)
+                raise requests.ConnectionError('Error getting groups and groups (%d)' % response.status_code, response.text)
+        else:
+            logging.error("Failed to get users and groups.")
+            raise requests.ConnectionError('Error getting users and groups (%d)' % response.status_code, response.text)
+
+    def delete_group(self, groupname):
+        """
+        Deletes the group with the given groupname.
+        :param groupname: The name of the group.
+        :type groupname: str
+        """
+        self.delete_groups([groupname])  # just call the list method.
 
     @api_call
     def update_user_password(self, userid, currentpassword, password):
