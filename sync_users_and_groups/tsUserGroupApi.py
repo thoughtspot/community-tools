@@ -604,7 +604,7 @@ class SyncUserAndGroups(BaseApiInterface):
             raise requests.ConnectionError('Error getting users and groups (%d)' % response.status_code, response.text)
 
     @api_call
-    def sync_users_and_groups(self, users_and_groups, apply_changes=True, remove_deleted=True):
+    def sync_users_and_groups(self, users_and_groups, apply_changes=True, remove_deleted=False):
         """
         Syncs users and groups.
         :param users_and_groups: List of users and groups to sync.
