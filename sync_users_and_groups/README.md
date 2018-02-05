@@ -45,6 +45,13 @@ Usage:  get_users [flags]
 
 To get a full list of the available flags, run python get_users.py --help
 
+## delete_ugs.py
+
+This file will delete a list of users and/or groups from ThoughtSpot by userid.  
+
+Usage:  delete_ugs [flags]
+
+To get a full list of the available flags, run python delete_ugs.py --help
 
 ## transfer_ownership.py
 
