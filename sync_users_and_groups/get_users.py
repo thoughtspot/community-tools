@@ -1,9 +1,7 @@
 #!/usr/bin/python
 
-from __future__ import print_function
-import sys
 import argparse
-from tsUserGroupApi import SyncUserAndGroups, UGXLSWriter
+from tsUserGroupApi import SyncUserAndGroups, UGXLSWriter, eprint
 
 """
 Copyright 2018 ThoughtSpot
@@ -48,6 +46,8 @@ def parse_args():
     parser.add_argument("-p", "--password",
                         default='admin',
                         help="Password for login of the user to log in as.")
+    parser.add_argument("--disable_ssl", action="store_true",
+                        help="Will ignore SSL errors.")
     parser.add_argument("-o", "--output_type",
                         default="xls",
                         help="Output type, either xls or json")
@@ -71,7 +71,7 @@ def valid_args(args):
         is_valid = False
 
     # Allow some variation for excel for ease of use.
-    if args.output_type not in ["xls", "excel" "json"]:
+    if args.output_type not in ["xls", "excel", "json"]:
         eprint("Invalid output_type parameter %s" % args.output_type)
         is_valid = False
 
@@ -83,26 +83,18 @@ def dump_users_and_groups(args):
     Gets users and groups from the server and dumps them in the correct format.
     :param args: The command line arguments.
     """
-    sync = SyncUserAndGroups(tsurl=args.ts_url, username=args.username, password=args.password)
+    sync = SyncUserAndGroups(tsurl=args.ts_url, username=args.username, password=args.password,
+                             disable_ssl=args.disable_ssl)
     all_users_and_groups = sync.get_all_users_and_groups()
 
     print ("writing to %s" % args.filename)
 
-    if args.output_type is "json":
+    if args.output_type == "json":
         with open(args.filename, "w") as outfile:
             outfile.write(all_users_and_groups.to_json())
     else:
         writer = UGXLSWriter()
         writer.write(users_and_groups=all_users_and_groups, filename=args.filename)
-
-
-def eprint(*args, **kwargs):
-    """
-    Prints to standard error similar to regular print.
-    :param args:  Positional arguments.
-    :param kwargs:  Keyword arguments.
-    """
-    print(*args, file=sys.stderr, **kwargs)
 
 
 if __name__ == "__main__":
