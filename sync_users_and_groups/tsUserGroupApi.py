@@ -956,7 +956,10 @@ class UGXLSWriter (object):
         workbook.remove_sheet(workbook.active)  # remove the default sheet since we'll be creating the ones we want.
         self._write_users(workbook, users_and_groups.get_users())
         self._write_groups(workbook, users_and_groups.get_groups())
-        workbook.save(filename + ".xlsx")
+        if not (filename.endswith("xls") or filename.endswith("xlsx")):
+            filename += ".xlsx"
+
+        workbook.save(filename)
 
     def _write_users(self, workbook, users):
         """
