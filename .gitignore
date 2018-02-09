@@ -5,7 +5,7 @@
 .LSOverride
 
 # Compiled Python
-.pyc
+*.pyc
 
 # Icon must end with two \r
 Icon
