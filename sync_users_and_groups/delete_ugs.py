@@ -33,8 +33,12 @@ def main():
                                  disable_ssl=args.disable_ssl)
         if args.users is not None:
             delete_users(args, sync)
+        if args.user_file is not None:
+            delete_users_from_file(args, sync)
         if args.groups is not None:
             delete_groups(args, sync)
+        if args.group_file is not None:
+            delete_groups_from_file(args, sync)
 
 
 def parse_args():
@@ -57,6 +61,11 @@ def parse_args():
                         help="List of comma separated users.  Use quotes if there are spaces.")
     parser.add_argument("--groups",
                         help="List of comma separated groups.  Use quotes if there are spaces.")
+    parser.add_argument("--user_file",
+                        help="File containing list of users to delete.  One user per line, optionally quoted.")
+    parser.add_argument("--group_file",
+                        help="File containing list of groups to delete.  One user per line, optionally quoted.")
+
     args = parser.parse_args()
     return args
 
@@ -74,7 +83,7 @@ def valid_args(args):
         eprint("Missing TS URL")
         is_valid = False
 
-    if args.users is None and args.groups is None:
+    if args.users is None and args.groups is None and args.user_file is None and args.group_file is None:
         eprint("Must provide a list of users and/or groups to delete.")
         is_valid = False
 
@@ -93,6 +102,25 @@ def delete_users(args, sync):
     sync.delete_users(usernames=users)
 
 
+def delete_users_from_file(args, sync):
+    """
+    Deletes users from a file with list of users, one per line.
+    :param args: Command line arguments.
+    :type args: dict
+    :param sync: A sync to use for deleting users.
+    :type sync: SyncUserAndGroups
+    """
+    users = []
+    with open(args.user_file, "r") as user_file:
+        for row in user_file:
+            user = row.strip()
+            user = user.strip('"')
+            if user != "" and user is not None:
+                users.append(user)
+
+    sync.delete_users(usernames=users)
+
+
 def delete_groups(args, sync):
     """
     Deletes the named groups.
@@ -103,6 +131,26 @@ def delete_groups(args, sync):
     """
     groups = [x.strip() for x in args.groups.split(",")]
     sync.delete_groups(groupnames=groups)
+
+
+def delete_groups_from_file(args, sync):
+    """
+    Deletes groups from a file with list of groups, one per line.
+    :param args: Command line arguments.
+    :type args: dict
+    :param sync: A sync to use for deleting groups.
+    :type sync: SyncUserAndGroups
+    """
+    groups = []
+    with open(args.group_file, "r") as group_file:
+        for row in group_file:
+            group = row.strip()
+            group = group.strip('"')
+            if group != "" and group is not None:
+                groups.append(group)
+
+    sync.delete_groups(groupnames=groups)
+
 
 if __name__ == "__main__":
     main()
