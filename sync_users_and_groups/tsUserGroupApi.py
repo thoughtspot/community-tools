@@ -681,6 +681,11 @@ class SyncUserAndGroups(BaseApiInterface):
                     eprint("  user %s not found, not attempting to delete." % u)
                 else:
                     user_list.append(id)
+
+            if user_list == []:
+                eprint("No valid users to delete.")
+                return
+
             url = self.format_url(SyncUserAndGroups.DELETE_USERS_URL)
             params = {
                 "ids": json.dumps(user_list)
@@ -729,6 +734,11 @@ class SyncUserAndGroups(BaseApiInterface):
                     eprint("  group %s not found, not attempting to delete." % u)
                 else:
                     group_list.append(id)
+
+            if group_list == []:
+                eprint("No valid groups to delete.")
+                return
+
             url = self.format_url(SyncUserAndGroups.DELETE_GROUPS_URL)
             params = {
                 "ids": json.dumps(group_list)
