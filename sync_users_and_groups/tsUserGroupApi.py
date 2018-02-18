@@ -1,13 +1,13 @@
-#!/usr/bin/env python
-
 from __future__ import print_function
 import sys
+import ast
 import requests
 import logging
 import json
 import time
 from collections import OrderedDict, namedtuple
 from openpyxl import Workbook
+import xlrd  # reading Excel
 
 """
 Copyright 2018 ThoughtSpot
@@ -91,6 +91,7 @@ class User(object):
     Represents a user to TS.
     """
 
+    # TODO take out description since it's not used by the system.
     def __init__(self, name, password=None, mail=None, display_name=None, description=None,
                  group_names=None, visibility=Visibility.DEFAULT):
         """
@@ -432,7 +433,7 @@ class UGJsonReader(object):
         """
         with open(filename, "r") as json_file:
             json_list = json.load(json_file)
-            return self.parse_json(json_list)
+            return UGJsonReader.parse_json(json_list)
 
     def read_from_string(self, json_string):
         """
@@ -443,7 +444,7 @@ class UGJsonReader(object):
         :rtype: UsersAndGroups
         """
         json_list = json.loads(json_string)
-        return self.parse_json(json_list)
+        return UGJsonReader.parse_json(json_list)
 
     def parse_json(self, json_list):
         """
@@ -1010,7 +1011,7 @@ class UGXLSWriter (object):
             ws.cell(column=2, row=cnt, value=group.displayName)
             ws.cell(column=3, row=cnt, value=group.description)
             ws.cell(column=4, row=cnt, value=json.dumps(group.groupNames))
-            ws.cell(column=7, row=cnt, value=group.visibility)
+            ws.cell(column=5, row=cnt, value=group.visibility)
             cnt += 1
 
     def _write_header(self, worksheet, cols):
@@ -1021,3 +1022,134 @@ class UGXLSWriter (object):
         """
         for ccnt in range(0, len(cols)):
             worksheet.cell(column=(ccnt + 1), row=1, value=cols[ccnt])
+
+
+class UGXLSReader (object):
+    """
+    Reads user and group info from an Excel file that is formatted the same as the UGXLSWriter writes.
+    """
+
+    required_sheets = ["Users", "Groups"]
+    required_columns = {
+        "Users": ["Name", "Password", "Display Name", "Email", "Description", "Groups", "Visibility"],
+        "Groups": ["Name", "Display Name", "Description", "Groups", "Visibility"]
+    }
+
+    def __init__(self):
+        """
+        Creates a new UGXLSReader
+        """
+        self.workbook = None
+        self.indices = {}
+        self.users_and_groups = UsersAndGroups()
+
+    def read_from_excel(self, filepath):
+        """
+        Reads users and groups from the given file.
+        :param filepath:  Path to the Excel file to read from.
+        :type filepath: str
+        :return: Returns the users and groups read from the Excel file.  The users and groups are not validated
+        :rtype UsersAndGroups
+        so that they can be modified prior to validation.
+        """
+        self.workbook = xlrd.open_workbook(filepath)
+        if self._verify_file_format():
+            self._get_column_indices()
+            self._read_users_from_workbook()
+            self._read_groups_from_workbook()
+        return self.users_and_groups
+
+    def _verify_file_format(self):
+        """
+        :return: True if the format of the workbook is valid.
+        :rtype: bool
+        """
+        is_valid = True
+        sheet_names = self.workbook.sheet_names()
+        for required_sheet in UGXLSReader.required_sheets:
+            if required_sheet not in sheet_names:
+                eprint("Error:  missing sheet %s!" % required_sheet)
+                is_valid = False
+            else:
+                sheet = self.workbook.sheet_by_name(required_sheet)
+                header_row = sheet.row_values(rowx=0, start_colx=0)
+                for required_column in UGXLSReader.required_columns[required_sheet]:
+                    if required_column not in header_row:
+                        eprint("Error:  missing column %s in sheet %s!" % (required_column, required_sheet))
+                        is_valid = False
+
+        return is_valid
+
+    def _get_column_indices(self):
+        """
+        Reads the sheets to get all of the column indices.  Assumes the format was already checked.
+        """
+        sheet_names = self.workbook.sheet_names()
+        for sheet_name in sheet_names:
+            if sheet_name in self.required_sheets:
+                sheet = self.workbook.sheet_by_name(sheet_name)
+                col_indices = {}
+                ccnt = 0
+                for col in sheet.row_values(rowx=0, start_colx=0):
+                    col_indices[col] = ccnt
+                    ccnt += 1
+                self.indices[sheet_name] = col_indices
+
+    def _read_users_from_workbook(self):
+        """
+        Reads all the users from the workbook.
+        """
+
+        table_sheet = self.workbook.sheet_by_name("Users")
+        indices = self.indices["Users"]
+
+        for row_count in range(1, table_sheet.nrows):
+            row = table_sheet.row_values(rowx=row_count, start_colx=0)
+
+            # "Name", "Password", "Display Name", "Email", "Description", "Groups", "Visibility"
+            username = row[indices["Name"]]
+            password = row[indices["Password"]]
+            display_name = row[indices["Display Name"]]
+            email = row[indices["Email"]]
+            groups = []
+            if row[indices["Groups"]] is not None and row[indices["Groups"]] != "":
+                groups = ast.literal_eval(row[indices["Groups"]])  # assumes a valid list format, e.g. ["a", "b", ...]
+            visibility = row[indices["Visibility"]]
+
+            try:
+                user = User(name=username, password=password, display_name=display_name, mail=email,
+                            group_names=groups, visibility=visibility)
+                # The format should be consistent with only one user per line.
+                self.users_and_groups.add_user(user, duplicate=UsersAndGroups.RAISE_ERROR_ON_DUPLICATE)
+            except:
+                eprint("Error reading user with name %s" % username)
+
+    def _read_groups_from_workbook(self):
+        """
+        Reads all the groups from the workbook.
+        """
+
+        table_sheet = self.workbook.sheet_by_name("Groups")
+        indices = self.indices["Groups"]
+
+        for row_count in range(1, table_sheet.nrows):
+            row = table_sheet.row_values(rowx=row_count, start_colx=0)
+
+            # Name", "Display Name", "Description", "Groups", "Visibility"
+            group_name = row[indices["Name"]]
+            display_name = row[indices["Display Name"]]
+            description = row[indices["Description"]]
+            visibility = row[indices["Visibility"]]
+            groups = []
+            if row[indices["Groups"]] is not None and row[indices["Groups"]] != "":
+                groups = ast.literal_eval(row[indices["Groups"]])  # assumes a valid list format, e.g. ["a", "b", ...]
+            visibility = row[indices["Visibility"]]
+
+            try:
+                group = Group(name=group_name, display_name=display_name, description=description,
+                             group_names=groups, visibility=visibility)
+                # The format should be consistent with only one group per line.
+                self.users_and_groups.add_group(group, duplicate=UsersAndGroups.RAISE_ERROR_ON_DUPLICATE)
+            except:
+                eprint("Error reading group with name %s" % group_name)
+
