@@ -122,7 +122,6 @@ class DDLParser(object):
             else:  # looking for the end of a create table.
                 buff += l
                 if self.is_complete_create(buff):
-                    # print(buff)
                     self.parse_create_table(buff)
                     buff = ""
                     creating = False
@@ -363,7 +362,6 @@ class DDLParser(object):
             else:  # looking for the end of a create table.
                 buff += l
                 if self.is_complete_create(buff):
-                    # print(buff)
                     self.parse_create_table(buff)
                     buff = ""
                     create_or_update = False
