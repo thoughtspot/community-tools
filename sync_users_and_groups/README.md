@@ -39,11 +39,21 @@ You will also need to have Python 2.7 running in your environment.  Python 3 *mi
 
 ## get_users.py
 
-This file will retrieve a list of users and groups from ThoughtSpot and write to either JSON or Excel.
+This script will retrieve a list of users and groups from ThoughtSpot and write to either JSON or Excel.
 
 Usage:  get_users [flags]
 
 To get a full list of the available flags, run python get_users.py --help
+
+## sync_from_excel.py
+
+This script will sync users and groups from a formatted Excel file to ThoughtSpot.  The format is the same as 
+that returned by get_users.py.  So a common workflow would be to run get_users.py, edit the file, then 
+run sync_from_excel.py.
+
+Usage:  sync_from_excel [flags]
+
+To get a full list of the available flags, run python sync_from_excel.py --help
 
 ## delete_ugs.py
 
