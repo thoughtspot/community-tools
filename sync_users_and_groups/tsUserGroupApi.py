@@ -91,9 +91,8 @@ class User(object):
     Represents a user to TS.
     """
 
-    # TODO take out description since it's not used by the system.
-    def __init__(self, name, password=None, mail=None, display_name=None, description=None,
-                 group_names=None, visibility=Visibility.DEFAULT):
+    def __init__(self, name, password=None, mail=None, display_name=None,
+                 group_names=None, visibility=Visibility.DEFAULT, created=None):
         """
         Creates a new user object.
         :param name: The name of the user.  This is the login name.
@@ -104,21 +103,21 @@ class User(object):
         :type mail: str
         :param display_name: The name to display in the UI.  Set to name if not provided.
         :type display_name: str
-        :param description: The optional description of the user.
-        :type description: str
         :param group_names: Set of groups the user belongs to.
         :type group_names: list of str
         :param visibility: Visibility for sharing.
         :type visibility: str
+        :param created: Epoch time when the user was created.
+        :type created: str
         :return: Returns a new user object populated with the passed in values.
         :rtype: User
         """
         self.principalTypeEnum = "LOCAL_USER"
-        self.name = name
+        self.name = name.strip()
         self.displayName = display_name if not None else name
         self.password = password
         self.mail = mail
-        self.description = description
+        self.created = created
         if group_names is None:
             self.groupNames = list()
         else:
@@ -156,7 +155,8 @@ class Group(object):
     Represents a group to TS.
     """
 
-    def __init__(self, name, display_name=None, description=None, group_names=None, visibility=Visibility.DEFAULT):
+    def __init__(self, name, display_name=None, description=None, group_names=None,
+                 visibility=Visibility.DEFAULT, created=None):
         """
         Creates a new group object.
         :param name: The name of the group.
@@ -169,14 +169,17 @@ class Group(object):
         :type group_names: list of str
         :param visibility: Indicates if the group is visibility or default.
         :type visibility: str
+        :param created: The epoch date when the group was created.
+        :type created: str
         :return: Returns a new group object populated with the passed in values.
         :rtype: Group
         """
         self.principalTypeEnum = "LOCAL_GROUP"
-        self.name = name
+        self.name = name.strip()
         self.displayName = display_name if not None else name
         self.description = description
         self.visibility = visibility
+        self.created = created
         if group_names is None:
             self.groupNames = list()
         else:
@@ -433,7 +436,7 @@ class UGJsonReader(object):
         """
         with open(filename, "r") as json_file:
             json_list = json.load(json_file)
-            return UGJsonReader.parse_json(json_list)
+            return self.parse_json(json_list)
 
     def read_from_string(self, json_string):
         """
@@ -444,7 +447,7 @@ class UGJsonReader(object):
         :rtype: UsersAndGroups
         """
         json_list = json.loads(json_string)
-        return UGJsonReader.parse_json(json_list)
+        return self.parse_json(json_list)
 
     def parse_json(self, json_list):
         """
@@ -460,7 +463,8 @@ class UGJsonReader(object):
                             display_name=value.get("displayName", None),
                             mail=value.get("mail", None),
                             group_names=value.get("groupNames", None),
-                            visibility=value.get("visibility", None)
+                            visibility=value.get("visibility", None),
+                            created=value.get("created", None)
                             )
                 auag.add_user(user)
             else:
@@ -855,7 +859,7 @@ class SetGroupPrivilegesAPI(BaseApiInterface):
                     logging.error("Failed to get privileges for group %s" % group_name)
                     raise requests.ConnectionError('Error (%d) setting privileges for group %s.  %s' %
                                                    (response.status_code, group_name, response.text))
-            except:
+            except Exception:
                 print("Error getting group details.")
                 raise
         else:
@@ -982,16 +986,16 @@ class UGXLSWriter (object):
         :return:
         """
         ws = workbook.create_sheet(title="Users")
-        self._write_header(ws, ["Name", "Password", "Display Name", "Email", "Description", "Groups", "Visibility"])
+        self._write_header(ws, ["Name", "Password", "Display Name", "Email", "Groups", "Visibility", "Created"])
         cnt = 2  # start after header.
         for user in users:
             ws.cell(column=1, row=cnt, value=user.name)
             ws.cell(column=2, row=cnt, value=user.password)
             ws.cell(column=3, row=cnt, value=user.displayName)
             ws.cell(column=4, row=cnt, value=user.mail)
-            ws.cell(column=5, row=cnt, value=user.description)
-            ws.cell(column=6, row=cnt, value=json.dumps(user.groupNames))
-            ws.cell(column=7, row=cnt, value=user.visibility)
+            ws.cell(column=5, row=cnt, value=json.dumps(user.groupNames))
+            ws.cell(column=6, row=cnt, value=user.visibility)
+            ws.cell(column=7, row=cnt, value=user.created)
             cnt += 1
 
     def _write_groups(self, workbook, groups):
@@ -1004,7 +1008,7 @@ class UGXLSWriter (object):
         :return:
         """
         ws = workbook.create_sheet(title="Groups")
-        self._write_header(ws, ["Name", "Display Name", "Description", "Groups", "Visibility"])
+        self._write_header(ws, ["Name", "Display Name", "Description", "Groups", "Visibility", "Created"])
         cnt = 2  # start after header.
         for group in groups:
             ws.cell(column=1, row=cnt, value=group.name)
@@ -1012,6 +1016,7 @@ class UGXLSWriter (object):
             ws.cell(column=3, row=cnt, value=group.description)
             ws.cell(column=4, row=cnt, value=json.dumps(group.groupNames))
             ws.cell(column=5, row=cnt, value=group.visibility)
+            ws.cell(column=6, row=cnt, value=group.created)
             cnt += 1
 
     def _write_header(self, worksheet, cols):
@@ -1031,8 +1036,8 @@ class UGXLSReader (object):
 
     required_sheets = ["Users", "Groups"]
     required_columns = {
-        "Users": ["Name", "Password", "Display Name", "Email", "Description", "Groups", "Visibility"],
-        "Groups": ["Name", "Display Name", "Description", "Groups", "Visibility"]
+        "Users": ["Name", "Password", "Display Name", "Email", "Groups", "Visibility", "Created"],
+        "Groups": ["Name", "Display Name", "Description", "Groups", "Visibility", "Created"]
     }
 
     def __init__(self):
@@ -1115,10 +1120,11 @@ class UGXLSReader (object):
             if row[indices["Groups"]] is not None and row[indices["Groups"]] != "":
                 groups = ast.literal_eval(row[indices["Groups"]])  # assumes a valid list format, e.g. ["a", "b", ...]
             visibility = row[indices["Visibility"]]
+            created = row[indices["Created"]]
 
             try:
                 user = User(name=username, password=password, display_name=display_name, mail=email,
-                            group_names=groups, visibility=visibility)
+                            group_names=groups, visibility=visibility, created=created)
                 # The format should be consistent with only one user per line.
                 self.users_and_groups.add_user(user, duplicate=UsersAndGroups.RAISE_ERROR_ON_DUPLICATE)
             except:
@@ -1140,16 +1146,15 @@ class UGXLSReader (object):
             display_name = row[indices["Display Name"]]
             description = row[indices["Description"]]
             visibility = row[indices["Visibility"]]
+            created = row[indices["Created"]]
+
             groups = []
             if row[indices["Groups"]] is not None and row[indices["Groups"]] != "":
                 groups = ast.literal_eval(row[indices["Groups"]])  # assumes a valid list format, e.g. ["a", "b", ...]
-            visibility = row[indices["Visibility"]]
-
             try:
                 group = Group(name=group_name, display_name=display_name, description=description,
-                             group_names=groups, visibility=visibility)
+                             group_names=groups, visibility=visibility, created=created)
                 # The format should be consistent with only one group per line.
                 self.users_and_groups.add_group(group, duplicate=UsersAndGroups.RAISE_ERROR_ON_DUPLICATE)
             except:
                 eprint("Error reading group with name %s" % group_name)
-

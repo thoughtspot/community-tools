@@ -57,7 +57,7 @@ class TestSyncUsersAndGroups(unittest.TestCase):
         print(auag)
 
         sync = SyncUserAndGroups(tsurl=TS_URL, username=TS_USER, password=TS_PASSWORD, disable_ssl=True)
-        sync.sync_users_and_groups(auag)
+        sync.sync_users_and_groups(auag, remove_deleted=True)
 
     def test_syncing_user_and_groups(self):
         """
