@@ -24,33 +24,32 @@ class TestUser(unittest.TestCase):
     def test_create_user(self):
         """Tests creation of a new user."""
         u = User(name="someuser", password="mysecretpwd", mail="myemail@company.com",
-                 display_name="Some User", description="Just some average user")
+                 display_name="Some User", created="1234")
 
         self.assertEquals(u.principalTypeEnum, "LOCAL_USER")
         self.assertEquals(u.name, "someuser")
         self.assertEquals(u.password, "mysecretpwd")
         self.assertEquals(u.mail, "myemail@company.com")
         self.assertEquals(u.displayName, "Some User")
-        self.assertEquals(u.description, "Just some average user")
         self.assertEqual(u.visibility, Visibility.DEFAULT)
+        self.assertEqual(u.created, "1234")
 
     def test_create_non_shareable_user(self):
         """Tests creation of a new user."""
         u = User(name="someuser", password="mysecretpwd", mail="myemail@company.com",
-                 display_name="Some User", description="Just some average user", visibility=Visibility.NON_SHAREABLE)
+                 display_name="Some User", visibility=Visibility.NON_SHAREABLE)
 
         self.assertEquals(u.principalTypeEnum, "LOCAL_USER")
         self.assertEquals(u.name, "someuser")
         self.assertEquals(u.password, "mysecretpwd")
         self.assertEquals(u.mail, "myemail@company.com")
         self.assertEquals(u.displayName, "Some User")
-        self.assertEquals(u.description, "Just some average user")
         self.assertEqual(u.visibility, Visibility.NON_SHAREABLE)
 
     def test_user_to_json(self):
         """Tests converting a user to JSON."""
         u = User(name="someuser", password="mysecretpwd", mail="myemail@company.com",
-                 display_name="Some User", description="Just some average user")
+                 display_name="Some User", created="1234")
 
         json = u.to_json()
         self.assertTrue('"principalTypeEnum":"LOCAL_USER"' in json)
@@ -58,15 +57,15 @@ class TestUser(unittest.TestCase):
         self.assertTrue('"password":"mysecretpwd"' in json)
         self.assertTrue('"mail":"myemail@company.com"' in json)
         self.assertTrue('"displayName":"Some User"' in json)
-        self.assertTrue('"description":"Just some average user"' in json)
         self.assertTrue('"visibility":"' + Visibility.DEFAULT + '"' in json)
+        self.assertTrue('"created":"' + "1234" + '"' in json)
         self.assertTrue(json[0], "{")
         self.assertTrue(json.endswith("}"))
 
     def test_non_shareable_user_to_json(self):
         """Tests converting a non-shareable user to JSON."""
         u = User(name="someuser", password="mysecretpwd", mail="myemail@company.com",
-                 display_name="Some User", description="Just some average user", visibility=Visibility.NON_SHAREABLE)
+                 display_name="Some User", visibility=Visibility.NON_SHAREABLE)
 
         json = u.to_json()
         self.assertTrue('"principalTypeEnum":"LOCAL_USER"' in json)
@@ -74,7 +73,6 @@ class TestUser(unittest.TestCase):
         self.assertTrue('"password":"mysecretpwd"' in json)
         self.assertTrue('"mail":"myemail@company.com"' in json)
         self.assertTrue('"displayName":"Some User"' in json)
-        self.assertTrue('"description":"Just some average user"' in json)
         self.assertTrue('"visibility":"' + Visibility.NON_SHAREABLE + '"' in json)
         self.assertTrue(json[0], "{")
         self.assertTrue(json.endswith("}"))

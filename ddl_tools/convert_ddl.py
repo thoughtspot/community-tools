@@ -27,7 +27,6 @@ The following assumptions are made about the DDL being read:
 """
 # TODO(Bill): capture primary keys and add to create.
 
-import sys
 import argparse
 from datamodel import Database, eprint
 from datamodelio import DDLParser, TQLWriter, XLSWriter, XLSReader, TsloadWriter
