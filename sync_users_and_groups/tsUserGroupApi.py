@@ -683,11 +683,11 @@ class SyncUserAndGroups(BaseApiInterface):
             for u in usernames:
                 id = users.get(u, None)
                 if id is None:
-                    eprint("  user %s not found, not attempting to delete." % u)
+                    eprint("WARNING:  user %s not found, not attempting to delete this user." % u)
                 else:
                     user_list.append(id)
 
-            if user_list == []:
+            if not user_list:
                 eprint("No valid users to delete.")
                 return
 
@@ -736,7 +736,7 @@ class SyncUserAndGroups(BaseApiInterface):
             for u in groupnames:
                 id = groups.get(u, None)
                 if id is None:
-                    eprint("  group %s not found, not attempting to delete." % u)
+                    eprint("WARNING:  group %s not found, not attempting to delete this group." % u)
                 else:
                     group_list.append(id)
 
