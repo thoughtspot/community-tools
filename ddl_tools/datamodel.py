@@ -639,7 +639,7 @@ class DatabaseValidator:
                 if len(fk.to_keys) != len(to_table.primary_key):
                     self._add_validation_issue(table=table,
                                                issue="FK %s doesn't match number of columns in primary key %s" %
-                                               (fk.name, table.primary_key))
+                                               (fk.name, to_table.primary_key))
                 # verify to keys match types of columns in primary key of other table.
                 for col_cnt in range(0, len(fk.from_keys)):
                     from_name = fk.from_keys[col_cnt]
