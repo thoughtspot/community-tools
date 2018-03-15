@@ -109,6 +109,7 @@ def valid_args(args):
     :param args: The command line arguments.
     :return: True if valid, false otherwise.
     """
+
     # make sure there is a to_ flag since data has to come from somewhere.
     if args.from_ddl is None and args.from_excel is None:
         eprint("--from_ddl or --from_excel must be provided as arguments.")

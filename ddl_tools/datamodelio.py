@@ -839,17 +839,23 @@ class XLSReader:
 
             sk_name = row[indices["Shard Key"]].strip()
             sk_nbr_shards = row[indices["# Shards"]]
+
+            if (sk_name == "" and sk_nbr_shards != "") or (sk_name != "" and sk_nbr_shards == ""):
+                eprint("ERROR:  %s need to provide both a shard key name and number of shards." % row[indices["Table"]])
+
             if sk_name == "":
                 sk = None
             else:
                 sk = [x.strip() for x in sk_name.split(',')]
+
+            shard_key = None
             if sk_name != "" and sk_nbr_shards != "":
-                sk = ShardKey(shard_keys=sk, number_shards=sk_nbr_shards)
+                shard_key = ShardKey(shard_keys=sk, number_shards=sk_nbr_shards)
 
             table = Table(table_name=row[indices["Table"]],
                           schema_name=row[indices["Schema"]],
                           primary_key=pk,
-                          shard_key=sk
+                          shard_key=None
                           )
             database.add_table(table)
 
