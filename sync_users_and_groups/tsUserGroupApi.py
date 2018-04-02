@@ -46,7 +46,7 @@ def public_props(obj):
     """
     Returns any property that doesn't start with an _
     """
-    return (name for name in vars(obj).keys() if not name.startswith('_'))
+    return (name for name in vars(obj).keys() if not name.startswith("_"))
 
 
 def obj_to_json(obj):
@@ -81,6 +81,8 @@ def obj_to_json(obj):
 
 # Visibility values for the UI
 # Note:  could use enum in Python 3
+
+
 class Visibility(object):
     DEFAULT = "DEFAULT"
     NON_SHAREABLE = "NON_SHARABLE"
@@ -91,8 +93,16 @@ class User(object):
     Represents a user to TS.
     """
 
-    def __init__(self, name, password=None, mail=None, display_name=None,
-                 group_names=None, visibility=Visibility.DEFAULT, created=None):
+    def __init__(
+        self,
+        name,
+        password=None,
+        mail=None,
+        display_name=None,
+        group_names=None,
+        visibility=Visibility.DEFAULT,
+        created=None,
+    ):
         """
         Creates a new user object.
         :param name: The name of the user.  This is the login name.
@@ -155,8 +165,15 @@ class Group(object):
     Represents a group to TS.
     """
 
-    def __init__(self, name, display_name=None, description=None, group_names=None,
-                 visibility=Visibility.DEFAULT, created=None):
+    def __init__(
+        self,
+        name,
+        display_name=None,
+        description=None,
+        group_names=None,
+        visibility=Visibility.DEFAULT,
+        created=None,
+    ):
         """
         Creates a new group object.
         :param name: The name of the group.
@@ -246,6 +263,7 @@ class UsersAndGroups(object):
         else:
             if duplicate == UsersAndGroups.RAISE_ERROR_ON_DUPLICATE:
                 raise Exception("Duplicate user %s" % u)
+
             elif duplicate == UsersAndGroups.IGNORE_ON_DUPLICATE:
                 pass  # keep the old one.
             elif duplicate == UsersAndGroups.OVERWRITE_ON_DUPLICATE:
@@ -309,6 +327,7 @@ class UsersAndGroups(object):
         else:
             if duplicate == UsersAndGroups.RAISE_ERROR_ON_DUPLICATE:
                 raise Exception("Duplicate group %s" % g)
+
             elif duplicate == UsersAndGroups.OVERWRITE_ON_DUPLICATE:
                 self.groups[g.name] = g
             elif duplicate == UsersAndGroups.UPDATE_ON_DUPLICATE:
@@ -405,16 +424,20 @@ class UsersAndGroups(object):
         for user in self.users.values():
             for parent_group in user.groupNames:
                 if parent_group not in self.groups:
-                    issue = "user group %s for user %s does not exist" % (parent_group, user.name)
-                    print (issue)
+                    issue = "user group %s for user %s does not exist" % (
+                        parent_group, user.name
+                    )
+                    print(issue)
                     issues.append(issue)
                     valid = False
 
         for group in self.groups.values():
             for parent_group in group.groupNames:
                 if parent_group not in self.groups:
-                    issue = "parent group %s for group %s does not exist" % (parent_group, group.name)
-                    print (issue)
+                    issue = "parent group %s for group %s does not exist" % (
+                        parent_group, group.name
+                    )
+                    print(issue)
                     issues.append(issue)
                     valid = False
 
@@ -459,21 +482,23 @@ class UGJsonReader(object):
         auag = UsersAndGroups()
         for value in json_list:
             if str(value["principalTypeEnum"]).endswith("_USER"):
-                user = User(name=value.get("name", None),
-                            display_name=value.get("displayName", None),
-                            mail=value.get("mail", None),
-                            group_names=value.get("groupNames", None),
-                            visibility=value.get("visibility", None),
-                            created=value.get("created", None)
-                            )
+                user = User(
+                    name=value.get("name", None),
+                    display_name=value.get("displayName", None),
+                    mail=value.get("mail", None),
+                    group_names=value.get("groupNames", None),
+                    visibility=value.get("visibility", None),
+                    created=value.get("created", None),
+                )
                 auag.add_user(user)
             else:
-                group = Group(name=value.get("name", None),
-                              display_name=value.get("displayName", None),
-                              description=value.get("description", None),
-                              group_names=value.get("groupNames", None),
-                              visibility=value.get("visibility", None)
-                              )
+                group = Group(
+                    name=value.get("name", None),
+                    display_name=value.get("displayName", None),
+                    description=value.get("description", None),
+                    group_names=value.get("groupNames", None),
+                    visibility=value.get("visibility", None),
+                )
                 auag.add_group(group)
         return auag
 
@@ -484,6 +509,7 @@ def api_call(f):
     :param f: Function to decorate.
     :return: A new callable method that will try to login first.
     """
+
     def wrap(self, *args, **kwargs):
         """
         Verifies that the user is logged in and then makes the call.  Assumes something will be returned.
@@ -495,6 +521,7 @@ def api_call(f):
         if not self.is_authenticated():
             self.login()
         return f(self, *args, **kwargs)
+
     return wrap
 
 
@@ -530,7 +557,9 @@ class BaseApiInterface(object):
 
         url = self.format_url(SyncUserAndGroups.LOGIN_URL)
         response = requests.post(
-            url, data={'username': self.username, 'password': self.password}, verify=self.should_verify
+            url,
+            data={"username": self.username, "password": self.password},
+            verify=self.should_verify,
         )
 
         if response.status_code == 204:
@@ -538,7 +567,10 @@ class BaseApiInterface(object):
             logging.info("Successfully logged in as %s" % self.username)
         else:
             logging.error("Failed to log in as %s" % self.username)
-            raise requests.ConnectionError('Error logging in to TS (%d)' % response.status_code, response.text)
+            raise requests.ConnectionError(
+                "Error logging in to TS (%d)" % response.status_code,
+                response.text,
+            )
 
     def is_authenticated(self):
         """
@@ -574,7 +606,14 @@ class SyncUserAndGroups(BaseApiInterface):
     USER_METADATA_URL = "/metadata/list?type=USER"
     GROUP_METADATA_URL = "/metadata/list?type=USER_GROUP"
 
-    def __init__(self, tsurl, username, password, disable_ssl=False, global_password=False):
+    def __init__(
+        self,
+        tsurl,
+        username,
+        password,
+        disable_ssl=False,
+        global_password=False,
+    ):
         """
         Creates a new sync object and logs into ThoughtSpot
         :param tsurl: Root ThoughtSpot URL, e.g. http://some-company.com/
@@ -584,8 +623,12 @@ class SyncUserAndGroups(BaseApiInterface):
         :param global_password: If provided, will be passed to the sync call.  This is used to have a single
         password for all users.  This can be significantly faster than individual passwords.
         """
-        super(SyncUserAndGroups, self).__init__(tsurl=tsurl, username=username, password=password,
-                                                disable_ssl=disable_ssl)
+        super(SyncUserAndGroups, self).__init__(
+            tsurl=tsurl,
+            username=username,
+            password=password,
+            disable_ssl=disable_ssl,
+        )
         self.global_password = global_password
 
     @api_call
@@ -597,19 +640,27 @@ class SyncUserAndGroups(BaseApiInterface):
         """
 
         url = self.format_url(SyncUserAndGroups.GET_ALL_URL)
-        response = requests.get(url, cookies=self.cookies, verify=self.should_verify)
+        response = requests.get(
+            url, cookies=self.cookies, verify=self.should_verify
+        )
         if response.status_code == 200:
             logging.info("Successfully got users and groups.")
             json_list = json.loads(response.text)
             reader = UGJsonReader()
             auag = reader.parse_json(json_list=json_list)
             return auag
+
         else:
             logging.error("Failed to get users and groups.")
-            raise requests.ConnectionError('Error getting users and groups (%d)' % response.status_code, response.text)
+            raise requests.ConnectionError(
+                "Error getting users and groups (%d)" % response.status_code,
+                response.text,
+            )
 
     @api_call
-    def sync_users_and_groups(self, users_and_groups, apply_changes=True, remove_deleted=False):
+    def sync_users_and_groups(
+        self, users_and_groups, apply_changes=True, remove_deleted=False
+    ):
         """
         Syncs users and groups.
         :param users_and_groups: List of users and groups to sync.
@@ -638,26 +689,32 @@ class SyncUserAndGroups(BaseApiInterface):
             out.write(json_str)
 
         params = {
-            "principals": (tmp_file, open(tmp_file, "rb"), 'text/json'),
+            "principals": (tmp_file, open(tmp_file, "rb"), "text/json"),
             "applyChanges": json.dumps(apply_changes),
-            "removeDeleted": json.dumps(remove_deleted)
+            "removeDeleted": json.dumps(remove_deleted),
         }
 
         if self.global_password is not None:
             params["password"] = json.dumps(self.global_password)
 
-        response = requests.post(url, files=params, cookies=self.cookies, verify=self.should_verify)
+        response = requests.post(
+            url, files=params, cookies=self.cookies, verify=self.should_verify
+        )
 
         if response.status_code == 200:
             logging.info("Successfully synced users and groups.")
-            print (response.text.encode("utf-8"))
+            print(response.text.encode("utf-8"))
             return response
+
         else:
             logging.error("Failed synced users and groups.")
-            print (response.text.encode("utf-8"))
+            print(response.text.encode("utf-8"))
             with open("ts_users_and_groups.json", "w") as outfile:
                 outfile.write(json_str.encode("utf-8"))
-            raise requests.ConnectionError('Error syncing users and groups (%d)' % response.status_code, response.text)
+            raise requests.ConnectionError(
+                "Error syncing users and groups (%d)" % response.status_code,
+                response.text,
+            )
 
     @api_call
     def delete_users(self, usernames):
@@ -669,7 +726,9 @@ class SyncUserAndGroups(BaseApiInterface):
 
         # for each username, get the guid and put in a list.  Log errors for users not found, but don't stop.
         url = self.format_url(SyncUserAndGroups.USER_METADATA_URL)
-        response = requests.get(url, cookies=self.cookies, verify=self.should_verify)
+        response = requests.get(
+            url, cookies=self.cookies, verify=self.should_verify
+        )
         users = {}
         if response.status_code == 200:
             logging.info("Successfully got user metadata.")
@@ -683,7 +742,10 @@ class SyncUserAndGroups(BaseApiInterface):
             for u in usernames:
                 id = users.get(u, None)
                 if id is None:
-                    eprint("WARNING:  user %s not found, not attempting to delete this user." % u)
+                    eprint(
+                        "WARNING:  user %s not found, not attempting to delete this user."
+                        % u
+                    )
                 else:
                     user_list.append(id)
 
@@ -692,17 +754,28 @@ class SyncUserAndGroups(BaseApiInterface):
                 return
 
             url = self.format_url(SyncUserAndGroups.DELETE_USERS_URL)
-            params = {
-                "ids": json.dumps(user_list)
-            }
-            response = requests.post(url, data=params, cookies=self.cookies, verify=self.should_verify)
+            params = {"ids": json.dumps(user_list)}
+            response = requests.post(
+                url,
+                data=params,
+                cookies=self.cookies,
+                verify=self.should_verify,
+            )
 
             if response.status_code != 204:
                 logging.error("Failed to delete %s" % user_list)
-                raise requests.ConnectionError('Error getting users and groups (%d)' % response.status_code, response.text)
+                raise requests.ConnectionError(
+                    "Error getting users and groups (%d)"
+                    % response.status_code,
+                    response.text,
+                )
+
         else:
             logging.error("Failed to get users and groups.")
-            raise requests.ConnectionError('Error getting users and groups (%d)' % response.status_code, response.text)
+            raise requests.ConnectionError(
+                "Error getting users and groups (%d)" % response.status_code,
+                response.text,
+            )
 
     def delete_user(self, username):
         """
@@ -722,7 +795,9 @@ class SyncUserAndGroups(BaseApiInterface):
 
         # for each groupname, get the guid and put in a list.  Log errors for groups not found, but don't stop.
         url = self.format_url(SyncUserAndGroups.GROUP_METADATA_URL)
-        response = requests.get(url, cookies=self.cookies, verify=self.should_verify)
+        response = requests.get(
+            url, cookies=self.cookies, verify=self.should_verify
+        )
         groups = {}
         if response.status_code == 200:
             logging.info("Successfully got group metadata.")
@@ -736,7 +811,10 @@ class SyncUserAndGroups(BaseApiInterface):
             for u in groupnames:
                 id = groups.get(u, None)
                 if id is None:
-                    eprint("WARNING:  group %s not found, not attempting to delete this group." % u)
+                    eprint(
+                        "WARNING:  group %s not found, not attempting to delete this group."
+                        % u
+                    )
                 else:
                     group_list.append(id)
 
@@ -745,17 +823,28 @@ class SyncUserAndGroups(BaseApiInterface):
                 return
 
             url = self.format_url(SyncUserAndGroups.DELETE_GROUPS_URL)
-            params = {
-                "ids": json.dumps(group_list)
-            }
-            response = requests.post(url, data=params, cookies=self.cookies, verify=self.should_verify)
+            params = {"ids": json.dumps(group_list)}
+            response = requests.post(
+                url,
+                data=params,
+                cookies=self.cookies,
+                verify=self.should_verify,
+            )
 
             if response.status_code != 204:
                 logging.error("Failed to delete %s" % group_list)
-                raise requests.ConnectionError('Error getting groups and groups (%d)' % response.status_code, response.text)
+                raise requests.ConnectionError(
+                    "Error getting groups and groups (%d)"
+                    % response.status_code,
+                    response.text,
+                )
+
         else:
             logging.error("Failed to get users and groups.")
-            raise requests.ConnectionError('Error getting users and groups (%d)' % response.status_code, response.text)
+            raise requests.ConnectionError(
+                "Error getting users and groups (%d)" % response.status_code,
+                response.text,
+            )
 
     def delete_group(self, groupname):
         """
@@ -780,39 +869,45 @@ class SyncUserAndGroups(BaseApiInterface):
         url = self.format_url(SyncUserAndGroups.UPDATE_PASSWORD_URL)
         params = {
             "userid": userid,
-            "currentpassword": {"password": [currentpassword], "empty": "false"},
-            "password": {"password": [password], "empty": "false"}
+            "currentpassword": {
+                "password": [currentpassword], "empty": "false"
+            },
+            "password": {"password": [password], "empty": "false"},
         }
 
         params = json.dumps(params)
         print(params)
 
-        return   # TODO add after 4.4 is released.
+        return  # TODO add after 4.4 is released.
 
-        response = requests.post(url, data=params, cookies=self.cookies, verify=self.should_verify)
+        response = requests.post(
+            url, data=params, cookies=self.cookies, verify=self.should_verify
+        )
 
         if response.status_code == 200:
             logging.info("Successfully updated password for %s." % userid)
         else:
             logging.error("Failed to update password for %s." % userid)
-            raise requests.ConnectionError('Error (%d) updating user password for %s:  %s' %
-                                           (response.status_code, userid, response.text))
+            raise requests.ConnectionError(
+                "Error (%d) updating user password for %s:  %s"
+                % (response.status_code, userid, response.text)
+            )
 
 
 class Privileges(object):
     """
     Contains the various privileges that groups can have.
     """
-    IS_ADMINSTRATOR="ADMINISTRATION"
-    CAN_UPLOAD_DATA="USERDATAUPLOADING"
-    CAN_DOWNLOAD_DATA="DATADOWNLOADING"
-    CAN_SHARE_WITH_ALL="SHAREWITHALL"
-    CAN_MANAGE_DATA="DATAMANAGEMENT"
-    CAN_SCHEDULE_PINBOARDS="JOBSCHEDULING"
-    CAN_USE_SPOTIQ="A3ANALYSIS"
-    CAN_ADMINISTER_RLS="BYPASSRLS"
-    CAN_AUTHOR="AUTHORING"
-    CAN_MANAGE_SYSTEM="SYSTEMMANAGEMENT"
+    IS_ADMINSTRATOR = "ADMINISTRATION"
+    CAN_UPLOAD_DATA = "USERDATAUPLOADING"
+    CAN_DOWNLOAD_DATA = "DATADOWNLOADING"
+    CAN_SHARE_WITH_ALL = "SHAREWITHALL"
+    CAN_MANAGE_DATA = "DATAMANAGEMENT"
+    CAN_SCHEDULE_PINBOARDS = "JOBSCHEDULING"
+    CAN_USE_SPOTIQ = "A3ANALYSIS"
+    CAN_ADMINISTER_RLS = "BYPASSRLS"
+    CAN_AUTHOR = "AUTHORING"
+    CAN_MANAGE_SYSTEM = "SYSTEMMANAGEMENT"
 
 
 class SetGroupPrivilegesAPI(BaseApiInterface):
@@ -832,8 +927,12 @@ class SetGroupPrivilegesAPI(BaseApiInterface):
         :param password: Password for admin login.
         :param disable_ssl: If true, then disable SSL for calls.
         """
-        super(SetGroupPrivilegesAPI, self).__init__(tsurl=tsurl, username=username, password=password,
-                                                disable_ssl=disable_ssl)
+        super(SetGroupPrivilegesAPI, self).__init__(
+            tsurl=tsurl,
+            username=username,
+            password=password,
+            disable_ssl=disable_ssl,
+        )
 
     @api_call
     def get_privileges_for_group(self, group_name):
@@ -843,29 +942,48 @@ class SetGroupPrivilegesAPI(BaseApiInterface):
         :returns: A list of privileges.
         :rtype: list of str
         """
-        url = self.format_url(SetGroupPrivilegesAPI.METADATA_LIST_URL) + "&pattern=" + group_name
-        response = requests.get(url, cookies=self.cookies, verify=self.should_verify)
+        url = self.format_url(
+            SetGroupPrivilegesAPI.METADATA_LIST_URL
+        ) + "&pattern=" + group_name
+        response = requests.get(
+            url, cookies=self.cookies, verify=self.should_verify
+        )
         if response.status_code == 200:  # success
             results = json.loads(response.text)
             try:
-                group_id = results["headers"][0]["id"]  # should always be present, but might want to add try / catch.
-                detail_url = SetGroupPrivilegesAPI.METADATA_DETAIL_URL.format(guid=group_id)
+                group_id = results["headers"][0][
+                    "id"
+                ]  # should always be present, but might want to add try / catch.
+                detail_url = SetGroupPrivilegesAPI.METADATA_DETAIL_URL.format(
+                    guid=group_id
+                )
                 detail_url = self.format_url(detail_url)
-                detail_response = requests.get(detail_url, cookies=self.cookies, verify=self.should_verify)
+                detail_response = requests.get(
+                    detail_url, cookies=self.cookies, verify=self.should_verify
+                )
                 if detail_response.status_code == 200:  # success
                     privileges = json.loads(detail_response.text)["privileges"]
                     return privileges
+
                 else:
-                    logging.error("Failed to get privileges for group %s" % group_name)
-                    raise requests.ConnectionError('Error (%d) setting privileges for group %s.  %s' %
-                                                   (response.status_code, group_name, response.text))
+                    logging.error(
+                        "Failed to get privileges for group %s" % group_name
+                    )
+                    raise requests.ConnectionError(
+                        "Error (%d) setting privileges for group %s.  %s"
+                        % (response.status_code, group_name, response.text)
+                    )
+
             except Exception:
                 print("Error getting group details.")
                 raise
+
         else:
             logging.error("Failed to get privileges for group %s" % group_name)
-            raise requests.ConnectionError('Error (%d) setting privileges for group %s.  %s' %
-                                           (response.status_code, group_name, response.text))
+            raise requests.ConnectionError(
+                "Error (%d) setting privileges for group %s.  %s"
+                % (response.status_code, group_name, response.text)
+            )
 
     @api_call
     def add_privilege(self, groups, privilege):
@@ -879,18 +997,25 @@ class SetGroupPrivilegesAPI(BaseApiInterface):
 
         url = self.format_url(SetGroupPrivilegesAPI.ADD_PRIVILEGE_URL)
 
-        params = {
-            "privilege": privilege,
-            "groupNames": json.dumps(groups)
-        }
-        response = requests.post(url, files=params, cookies=self.cookies, verify=self.should_verify)
+        params = {"privilege": privilege, "groupNames": json.dumps(groups)}
+        response = requests.post(
+            url, files=params, cookies=self.cookies, verify=self.should_verify
+        )
 
         if response.status_code == 204:
-            logging.info("Successfully added privilege %s for groups %s." % (privilege, groups))
+            logging.info(
+                "Successfully added privilege %s for groups %s."
+                % (privilege, groups)
+            )
         else:
-            logging.error("Failed to add privilege %s for groups %s." % (privilege, groups))
-            raise requests.ConnectionError('Error (%d) adding privilege %s for groups %s.  %s' %
-                                           (response.status_code, privilege, groups, response.text))
+            logging.error(
+                "Failed to add privilege %s for groups %s."
+                % (privilege, groups)
+            )
+            raise requests.ConnectionError(
+                "Error (%d) adding privilege %s for groups %s.  %s"
+                % (response.status_code, privilege, groups, response.text)
+            )
 
     @api_call
     def remove_privilege(self, groups, privilege):
@@ -904,18 +1029,25 @@ class SetGroupPrivilegesAPI(BaseApiInterface):
 
         url = self.format_url(SetGroupPrivilegesAPI.REMOVE_PRIVILEGE_URL)
 
-        params = {
-            "privilege": privilege,
-            "groupNames": json.dumps(groups)
-        }
-        response = requests.post(url, files=params, cookies=self.cookies, verify=self.should_verify)
+        params = {"privilege": privilege, "groupNames": json.dumps(groups)}
+        response = requests.post(
+            url, files=params, cookies=self.cookies, verify=self.should_verify
+        )
 
         if response.status_code == 204:
-            logging.info("Successfully removed privilege %s for groups %s." % (privilege, groups))
+            logging.info(
+                "Successfully removed privilege %s for groups %s."
+                % (privilege, groups)
+            )
         else:
-            logging.error("Failed to remove privilege %s for groups %s." % (privilege, groups))
-            raise requests.ConnectionError('Error (%d) removing privilege %s for groups %s.  %s' %
-                                           (response.status_code, privilege, groups, response.text))
+            logging.error(
+                "Failed to remove privilege %s for groups %s."
+                % (privilege, groups)
+            )
+            raise requests.ConnectionError(
+                "Error (%d) removing privilege %s for groups %s.  %s"
+                % (response.status_code, privilege, groups, response.text)
+            )
 
 
 class TransferOwnershipApi(BaseApiInterface):
@@ -930,8 +1062,12 @@ class TransferOwnershipApi(BaseApiInterface):
         :param password: Password for admin login.
         :param disable_ssl: If true, then disable SSL for calls.
         """
-        super(TransferOwnershipApi, self).__init__(tsurl=tsurl, username=username, password=password,
-                                                   disable_ssl=disable_ssl)
+        super(TransferOwnershipApi, self).__init__(
+            tsurl=tsurl,
+            username=username,
+            password=password,
+            disable_ssl=disable_ssl,
+        )
 
     @api_call
     def transfer_ownership(self, from_username, to_username):
@@ -944,21 +1080,28 @@ class TransferOwnershipApi(BaseApiInterface):
         """
 
         url = self.format_url(TransferOwnershipApi.TRANSFER_OWNERSHIP_URL)
-        url = url + '?fromUserName=' + from_username + '&toUserName=' + to_username
-        response = requests.post(url, cookies=self.cookies, verify=self.should_verify)
+        url = url + "?fromUserName=" + from_username + "&toUserName=" + to_username
+        response = requests.post(
+            url, cookies=self.cookies, verify=self.should_verify
+        )
 
         if response.status_code == 204:
-            logging.info("Successfully transferred ownership to %s." % to_username)
+            logging.info(
+                "Successfully transferred ownership to %s." % to_username
+            )
         else:
             logging.error("Failed to transfer ownership to %s." % to_username)
-            raise requests.ConnectionError('Error (%d) transferring  ownership to %s:  %s' %
-                                           (response.status_code, to_username, response.text))
+            raise requests.ConnectionError(
+                "Error (%d) transferring  ownership to %s:  %s"
+                % (response.status_code, to_username, response.text)
+            )
 
 
-class UGXLSWriter (object):
+class UGXLSWriter(object):
     """
     Writes users and groups to an Excel spreadsheet.
     """
+
     def write(self, users_and_groups, filename):
         """
         Writes the content to the given file.
@@ -968,7 +1111,9 @@ class UGXLSWriter (object):
         :type filename: str
         """
         workbook = Workbook()
-        workbook.remove_sheet(workbook.active)  # remove the default sheet since we'll be creating the ones we want.
+        workbook.remove_sheet(
+            workbook.active
+        )  # remove the default sheet since we'll be creating the ones we want.
         self._write_users(workbook, users_and_groups.get_users())
         self._write_groups(workbook, users_and_groups.get_groups())
         if not (filename.endswith("xls") or filename.endswith("xlsx")):
@@ -986,7 +1131,18 @@ class UGXLSWriter (object):
         :return:
         """
         ws = workbook.create_sheet(title="Users")
-        self._write_header(ws, ["Name", "Password", "Display Name", "Email", "Groups", "Visibility", "Created"])
+        self._write_header(
+            ws,
+            [
+                "Name",
+                "Password",
+                "Display Name",
+                "Email",
+                "Groups",
+                "Visibility",
+                "Created",
+            ],
+        )
         cnt = 2  # start after header.
         for user in users:
             ws.cell(column=1, row=cnt, value=user.name)
@@ -1008,7 +1164,17 @@ class UGXLSWriter (object):
         :return:
         """
         ws = workbook.create_sheet(title="Groups")
-        self._write_header(ws, ["Name", "Display Name", "Description", "Groups", "Visibility", "Created"])
+        self._write_header(
+            ws,
+            [
+                "Name",
+                "Display Name",
+                "Description",
+                "Groups",
+                "Visibility",
+                "Created",
+            ],
+        )
         cnt = 2  # start after header.
         for group in groups:
             ws.cell(column=1, row=cnt, value=group.name)
@@ -1029,15 +1195,30 @@ class UGXLSWriter (object):
             worksheet.cell(column=(ccnt + 1), row=1, value=cols[ccnt])
 
 
-class UGXLSReader (object):
+class UGXLSReader(object):
     """
     Reads user and group info from an Excel file that is formatted the same as the UGXLSWriter writes.
     """
 
     required_sheets = ["Users", "Groups"]
     required_columns = {
-        "Users": ["Name", "Password", "Display Name", "Email", "Groups", "Visibility", "Created"],
-        "Groups": ["Name", "Display Name", "Description", "Groups", "Visibility", "Created"]
+        "Users": [
+            "Name",
+            "Password",
+            "Display Name",
+            "Email",
+            "Groups",
+            "Visibility",
+            "Created",
+        ],
+        "Groups": [
+            "Name",
+            "Display Name",
+            "Description",
+            "Groups",
+            "Visibility",
+            "Created",
+        ],
     }
 
     def __init__(self):
@@ -1078,9 +1259,14 @@ class UGXLSReader (object):
             else:
                 sheet = self.workbook.sheet_by_name(required_sheet)
                 header_row = sheet.row_values(rowx=0, start_colx=0)
-                for required_column in UGXLSReader.required_columns[required_sheet]:
+                for required_column in UGXLSReader.required_columns[
+                    required_sheet
+                ]:
                     if required_column not in header_row:
-                        eprint("Error:  missing column %s in sheet %s!" % (required_column, required_sheet))
+                        eprint(
+                            "Error:  missing column %s in sheet %s!"
+                            % (required_column, required_sheet)
+                        )
                         is_valid = False
 
         return is_valid
@@ -1117,16 +1303,29 @@ class UGXLSReader (object):
             display_name = row[indices["Display Name"]]
             email = row[indices["Email"]]
             groups = []
-            if row[indices["Groups"]] is not None and row[indices["Groups"]] != "":
-                groups = ast.literal_eval(row[indices["Groups"]])  # assumes a valid list format, e.g. ["a", "b", ...]
+            if row[indices["Groups"]] is not None and row[
+                indices["Groups"]
+            ] != "":
+                groups = ast.literal_eval(
+                    row[indices["Groups"]]
+                )  # assumes a valid list format, e.g. ["a", "b", ...]
             visibility = row[indices["Visibility"]]
             created = row[indices["Created"]]
 
             try:
-                user = User(name=username, password=password, display_name=display_name, mail=email,
-                            group_names=groups, visibility=visibility, created=created)
+                user = User(
+                    name=username,
+                    password=password,
+                    display_name=display_name,
+                    mail=email,
+                    group_names=groups,
+                    visibility=visibility,
+                    created=created,
+                )
                 # The format should be consistent with only one user per line.
-                self.users_and_groups.add_user(user, duplicate=UsersAndGroups.RAISE_ERROR_ON_DUPLICATE)
+                self.users_and_groups.add_user(
+                    user, duplicate=UsersAndGroups.RAISE_ERROR_ON_DUPLICATE
+                )
             except:
                 eprint("Error reading user with name %s" % username)
 
@@ -1149,12 +1348,24 @@ class UGXLSReader (object):
             created = row[indices["Created"]]
 
             groups = []
-            if row[indices["Groups"]] is not None and row[indices["Groups"]] != "":
-                groups = ast.literal_eval(row[indices["Groups"]])  # assumes a valid list format, e.g. ["a", "b", ...]
+            if row[indices["Groups"]] is not None and row[
+                indices["Groups"]
+            ] != "":
+                groups = ast.literal_eval(
+                    row[indices["Groups"]]
+                )  # assumes a valid list format, e.g. ["a", "b", ...]
             try:
-                group = Group(name=group_name, display_name=display_name, description=description,
-                             group_names=groups, visibility=visibility, created=created)
+                group = Group(
+                    name=group_name,
+                    display_name=display_name,
+                    description=description,
+                    group_names=groups,
+                    visibility=visibility,
+                    created=created,
+                )
                 # The format should be consistent with only one group per line.
-                self.users_and_groups.add_group(group, duplicate=UsersAndGroups.RAISE_ERROR_ON_DUPLICATE)
+                self.users_and_groups.add_group(
+                    group, duplicate=UsersAndGroups.RAISE_ERROR_ON_DUPLICATE
+                )
             except:
                 eprint("Error reading group with name %s" % group_name)

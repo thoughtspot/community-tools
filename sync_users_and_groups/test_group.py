@@ -24,8 +24,11 @@ class TestGroup(unittest.TestCase):
 
     def test_create_group(self):
         """Tests creation of a group."""
-        g = Group(name="somegroup", display_name="Some Group",
-                  description="Just some average group")
+        g = Group(
+            name="somegroup",
+            display_name="Some Group",
+            description="Just some average group",
+        )
 
         self.assertEquals(g.principalTypeEnum, "LOCAL_GROUP")
         self.assertEquals(g.name, "somegroup")
@@ -35,8 +38,12 @@ class TestGroup(unittest.TestCase):
 
     def test_create_non_shareable_group(self):
         """Tests creation of a group with visibility of non-shareable."""
-        g = Group(name="somegroup", display_name="Some Group",
-                  description="Just some average group", visibility=Visibility.NON_SHAREABLE)
+        g = Group(
+            name="somegroup",
+            display_name="Some Group",
+            description="Just some average group",
+            visibility=Visibility.NON_SHAREABLE,
+        )
 
         self.assertEquals(g.principalTypeEnum, "LOCAL_GROUP")
         self.assertEquals(g.name, "somegroup")
@@ -46,8 +53,11 @@ class TestGroup(unittest.TestCase):
 
     def test_group_to_json(self):
         """Tests converting a group to JSON."""
-        g = Group(name="somegroup", display_name="Some Group",
-                  description="Just some average group")
+        g = Group(
+            name="somegroup",
+            display_name="Some Group",
+            description="Just some average group",
+        )
 
         json = g.to_json()
         self.assertTrue('"principalTypeEnum":"LOCAL_GROUP"' in json)
@@ -60,15 +70,21 @@ class TestGroup(unittest.TestCase):
 
     def test_non_shareable_group_to_json(self):
         """Tests converting a group to JSON."""
-        g = Group(name="somegroup", display_name="Some Group",
-                  description="Just some average group", visibility=Visibility.NON_SHAREABLE)
+        g = Group(
+            name="somegroup",
+            display_name="Some Group",
+            description="Just some average group",
+            visibility=Visibility.NON_SHAREABLE,
+        )
 
         json = g.to_json()
         self.assertTrue('"principalTypeEnum":"LOCAL_GROUP"' in json)
         self.assertTrue('"name":"somegroup"' in json)
         self.assertTrue('"displayName":"Some Group"' in json)
         self.assertTrue('"description":"Just some average group"' in json)
-        self.assertTrue('"visibility":"' + Visibility.NON_SHAREABLE + '"' in json)
+        self.assertTrue(
+            '"visibility":"' + Visibility.NON_SHAREABLE + '"' in json
+        )
         self.assertTrue(json[0], "{")
         self.assertTrue(json.endswith("}"))
 
@@ -91,5 +107,5 @@ class TestGroup(unittest.TestCase):
         self.assertEquals(u.groupNames, ["group 1", "group 2"])
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

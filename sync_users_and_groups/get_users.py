@@ -38,22 +38,36 @@ def parse_args():
     :returns: The arguments object.
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument("-t", "--ts_url",
-                        help="URL to Thoughtspot, e.g. https://myserver")
-    parser.add_argument("-u", "--username",
-                        default='tsadmin',
-                        help="Name of the user to log in as.")
-    parser.add_argument("-p", "--password",
-                        default='admin',
-                        help="Password for login of the user to log in as.")
-    parser.add_argument("--disable_ssl", action="store_true",
-                        help="Will ignore SSL errors.")
-    parser.add_argument("-o", "--output_type",
-                        default="xls",
-                        help="Output type, either xls or json")
-    parser.add_argument("-f", "--filename",
-                        default="users_and_groups",
-                        help="Either the name of the json file or root of Excel file names.")
+    parser.add_argument(
+        "-t", "--ts_url", help="URL to Thoughtspot, e.g. https://myserver"
+    )
+    parser.add_argument(
+        "-u",
+        "--username",
+        default="tsadmin",
+        help="Name of the user to log in as.",
+    )
+    parser.add_argument(
+        "-p",
+        "--password",
+        default="admin",
+        help="Password for login of the user to log in as.",
+    )
+    parser.add_argument(
+        "--disable_ssl", action="store_true", help="Will ignore SSL errors."
+    )
+    parser.add_argument(
+        "-o",
+        "--output_type",
+        default="xls",
+        help="Output type, either xls or json",
+    )
+    parser.add_argument(
+        "-f",
+        "--filename",
+        default="users_and_groups",
+        help="Either the name of the json file or root of Excel file names.",
+    )
     args = parser.parse_args()
     return args
 
@@ -83,18 +97,24 @@ def dump_users_and_groups(args):
     Gets users and groups from the server and dumps them in the correct format.
     :param args: The command line arguments.
     """
-    sync = SyncUserAndGroups(tsurl=args.ts_url, username=args.username, password=args.password,
-                             disable_ssl=args.disable_ssl)
+    sync = SyncUserAndGroups(
+        tsurl=args.ts_url,
+        username=args.username,
+        password=args.password,
+        disable_ssl=args.disable_ssl,
+    )
     all_users_and_groups = sync.get_all_users_and_groups()
 
-    print ("writing to %s" % args.filename)
+    print("writing to %s" % args.filename)
 
     if args.output_type == "json":
         with open(args.filename, "w") as outfile:
             outfile.write(all_users_and_groups.to_json())
     else:
         writer = UGXLSWriter()
-        writer.write(users_and_groups=all_users_and_groups, filename=args.filename)
+        writer.write(
+            users_and_groups=all_users_and_groups, filename=args.filename
+        )
 
 
 if __name__ == "__main__":

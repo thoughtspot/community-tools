@@ -28,17 +28,43 @@ class TestUGJSONReader(unittest.TestCase):
         """Creates some JSON for testing."""
         uags = UsersAndGroups()
 
-        uags.add_group(Group(name="Group 1", display_name="This is Group 1",
-                             description="A group for testing.", group_names=[]))
-        uags.add_group(Group(name="Group 2", display_name="This is Group 2",
-                             description="Another group for testing.",
-                             group_names=["Group 1"], visibility=Visibility.NON_SHAREABLE))
+        uags.add_group(
+            Group(
+                name="Group 1",
+                display_name="This is Group 1",
+                description="A group for testing.",
+                group_names=[],
+            )
+        )
+        uags.add_group(
+            Group(
+                name="Group 2",
+                display_name="This is Group 2",
+                description="Another group for testing.",
+                group_names=["Group 1"],
+                visibility=Visibility.NON_SHAREABLE,
+            )
+        )
 
-        uags.add_user(User(name="User1", password="pwd1", display_name="User 1",
-                           mail="User1@company.com", group_names=["Group 1"]))
-        uags.add_user(User(name="User2", password="pwd2", display_name="User 2",
-                           mail="User2@company.com",
-                           group_names=["Group 1", "Group 2"], visibility=Visibility.NON_SHAREABLE))
+        uags.add_user(
+            User(
+                name="User1",
+                password="pwd1",
+                display_name="User 1",
+                mail="User1@company.com",
+                group_names=["Group 1"],
+            )
+        )
+        uags.add_user(
+            User(
+                name="User2",
+                password="pwd2",
+                display_name="User 2",
+                mail="User2@company.com",
+                group_names=["Group 1", "Group 2"],
+                visibility=Visibility.NON_SHAREABLE,
+            )
+        )
 
         return uags.to_json()
 

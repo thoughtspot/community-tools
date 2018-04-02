@@ -28,19 +28,63 @@ class TestUGJSONReader(unittest.TestCase):
 
         uags_out = UsersAndGroups()
 
-        uags_out.add_user(User(name="user1", password="pwd1", display_name="User 1", mail="user1@company.com",
-                               group_names=["Group1"], visibility=Visibility.DEFAULT))
-        uags_out.add_user(User(name="user2", password="pwd2", display_name="User 2", mail="user2@company.com",
-                               group_names=["Group1", "Group2"], visibility=Visibility.DEFAULT))
-        uags_out.add_user(User(name="user3", password="pwd3", display_name="User 3", mail="user3@company.com",
-                               group_names=["Group3"], visibility=Visibility.NON_SHAREABLE))
+        uags_out.add_user(
+            User(
+                name="user1",
+                password="pwd1",
+                display_name="User 1",
+                mail="user1@company.com",
+                group_names=["Group1"],
+                visibility=Visibility.DEFAULT,
+            )
+        )
+        uags_out.add_user(
+            User(
+                name="user2",
+                password="pwd2",
+                display_name="User 2",
+                mail="user2@company.com",
+                group_names=["Group1", "Group2"],
+                visibility=Visibility.DEFAULT,
+            )
+        )
+        uags_out.add_user(
+            User(
+                name="user3",
+                password="pwd3",
+                display_name="User 3",
+                mail="user3@company.com",
+                group_names=["Group3"],
+                visibility=Visibility.NON_SHAREABLE,
+            )
+        )
 
-        uags_out.add_group(Group(name="Group1", display_name="Group 1", description="Test group 1",
-                                 visibility=Visibility.DEFAULT))
-        uags_out.add_group(Group(name="Group2", display_name="Group 2", description="Test group 2",
-                                 group_names=["Group1"], visibility=Visibility.DEFAULT))
-        uags_out.add_group(Group(name="Group3", display_name="Group 3", description="Test group 3",
-                                 group_names=["Group1", "Group2"], visibility=Visibility.NON_SHAREABLE))
+        uags_out.add_group(
+            Group(
+                name="Group1",
+                display_name="Group 1",
+                description="Test group 1",
+                visibility=Visibility.DEFAULT,
+            )
+        )
+        uags_out.add_group(
+            Group(
+                name="Group2",
+                display_name="Group 2",
+                description="Test group 2",
+                group_names=["Group1"],
+                visibility=Visibility.DEFAULT,
+            )
+        )
+        uags_out.add_group(
+            Group(
+                name="Group3",
+                display_name="Group 3",
+                description="Test group 3",
+                group_names=["Group1", "Group2"],
+                visibility=Visibility.NON_SHAREABLE,
+            )
+        )
 
         excel_filename = "test_read_write.xlsx"
         UGXLSWriter().write(uags_out, excel_filename)
@@ -99,4 +143,3 @@ class TestUGJSONReader(unittest.TestCase):
         self.assertEqual("Test group 3", group.description)
         self.assertEqual(["Group1", "Group2"], group.groupNames)
         self.assertEqual(Visibility.NON_SHAREABLE, group.visibility)
-

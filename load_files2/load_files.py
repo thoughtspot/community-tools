@@ -38,7 +38,7 @@ def eprint(*args, **kwargs):
 
 
 def json_dump(j):
-    return json.dumps(j, sort_keys=True, indent = 4, separators = (',', ': '))
+    return json.dumps(j, sort_keys=True, indent=4, separators=(",", ": "))
 
 
 class TSFileLoader(object):
@@ -53,8 +53,8 @@ class TSFileLoader(object):
         :type settings: dict
         """
         self.settings = settings
-        self.cmd = self.get_base_tsload_command() # populate here, so the object can be reused without redoing completely.
-        print (self.cmd)
+        self.cmd = self.get_base_tsload_command()  # populate here, so the object can be reused without redoing completely.
+        print(self.cmd)
 
     def get_base_tsload_command(self):
         """
@@ -65,14 +65,16 @@ class TSFileLoader(object):
         cmd = "cat {filename} | tsload --target_table {table_name}"
         for key in self.settings:
             if key.startswith("tsload"):
-                flag = key.split(".")[1] # get the key after the "tsload." indicator.
+                flag = key.split(".")[
+                    1
+                ]  # get the key after the "tsload." indicator.
                 value = str(self.settings[key])
                 if value == "true":
                     cmd += " --%s" % flag  # indicates a switch flag.  Hopefully not a valid value for something else.
                 elif value == "false":
                     pass  # don't add false flags.
                 else:
-                    cmd += " --%s \"%s\"" % (flag, value)
+                    cmd += ' --%s "%s"' % (flag, value)
 
         print(cmd)
         return cmd
@@ -98,7 +100,9 @@ class TSFileLoader(object):
 
         # TODO add check for empty target flag.  This can override the default.  Support _incremental and _full
 
-        cmd = self.cmd.format(filename=filepath, table_name=table_name)  # TODO add format for file and table names.
+        cmd = self.cmd.format(
+            filename=filepath, table_name=table_name
+        )  # TODO add format for file and table names.
         print(cmd)
         return "success"
 
@@ -120,22 +124,37 @@ class TSLoadManager(object):
 
         self.root_directory = settings.get("root_directory", None)
         if self.root_directory is None or not isdir(self.root_directory):
-            raise Exception("The root_directory %s doesn't exist or it not a valid directory." % self.root_directory)
+            raise Exception(
+                "The root_directory %s doesn't exist or it not a valid directory."
+                % self.root_directory
+            )
 
-        self.data_directory = settings.get("data_directory", self.root_directory + "/data")
+        self.data_directory = settings.get(
+            "data_directory", self.root_directory + "/data"
+        )
         if not isdir(self.data_directory):
-            raise Exception("The data_directory %s doesn't exist or it not a valid directory." % self.root_directory)
+            raise Exception(
+                "The data_directory %s doesn't exist or it not a valid directory."
+                % self.root_directory
+            )
 
-        self.max_simultaneous_loads = int(settings.get("max_simultaneous_loads", "1"))  # might throw an exception.
+        self.max_simultaneous_loads = int(
+            settings.get("max_simultaneous_loads", "1")
+        )  # might throw an exception.
         pass
 
     def load_files(self):
         """
         Manages the loading of files.
         """
-        for f in [join(self.data_directory, f)
-                  for f in listdir(self.data_directory) if isfile(join(self.data_directory, f))]:
-            tsloader = TSFileLoader(self.settings)  # see if I can create a pool and reuse if worth it.
+        for f in [
+            join(self.data_directory, f)
+            for f in listdir(self.data_directory)
+            if isfile(join(self.data_directory, f))
+        ]:
+            tsloader = TSFileLoader(
+                self.settings
+            )  # see if I can create a pool and reuse if worth it.
             print(tsloader.load_file(f))
 
 
@@ -152,9 +171,15 @@ def main():
 
 def parse_args():
     """Parses the arguments from the command line."""
-    parser = argparse.ArgumentParser(epilog="Example:  python load_files.py my_settings.json")
-    parser.add_argument("-f", "--filename", default="settings.json",
-                        help="Name of the file with the settings in JSON.")
+    parser = argparse.ArgumentParser(
+        epilog="Example:  python load_files.py my_settings.json"
+    )
+    parser.add_argument(
+        "-f",
+        "--filename",
+        default="settings.json",
+        help="Name of the file with the settings in JSON.",
+    )
     args = parser.parse_args()
     return args
 

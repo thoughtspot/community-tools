@@ -18,13 +18,19 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 
+
 class TestUser(unittest.TestCase):
     """Tests the User class."""
 
     def test_create_user(self):
         """Tests creation of a new user."""
-        u = User(name="someuser", password="mysecretpwd", mail="myemail@company.com",
-                 display_name="Some User", created="1234")
+        u = User(
+            name="someuser",
+            password="mysecretpwd",
+            mail="myemail@company.com",
+            display_name="Some User",
+            created="1234",
+        )
 
         self.assertEquals(u.principalTypeEnum, "LOCAL_USER")
         self.assertEquals(u.name, "someuser")
@@ -36,8 +42,13 @@ class TestUser(unittest.TestCase):
 
     def test_create_non_shareable_user(self):
         """Tests creation of a new user."""
-        u = User(name="someuser", password="mysecretpwd", mail="myemail@company.com",
-                 display_name="Some User", visibility=Visibility.NON_SHAREABLE)
+        u = User(
+            name="someuser",
+            password="mysecretpwd",
+            mail="myemail@company.com",
+            display_name="Some User",
+            visibility=Visibility.NON_SHAREABLE,
+        )
 
         self.assertEquals(u.principalTypeEnum, "LOCAL_USER")
         self.assertEquals(u.name, "someuser")
@@ -48,8 +59,13 @@ class TestUser(unittest.TestCase):
 
     def test_user_to_json(self):
         """Tests converting a user to JSON."""
-        u = User(name="someuser", password="mysecretpwd", mail="myemail@company.com",
-                 display_name="Some User", created="1234")
+        u = User(
+            name="someuser",
+            password="mysecretpwd",
+            mail="myemail@company.com",
+            display_name="Some User",
+            created="1234",
+        )
 
         json = u.to_json()
         self.assertTrue('"principalTypeEnum":"LOCAL_USER"' in json)
@@ -64,8 +80,13 @@ class TestUser(unittest.TestCase):
 
     def test_non_shareable_user_to_json(self):
         """Tests converting a non-shareable user to JSON."""
-        u = User(name="someuser", password="mysecretpwd", mail="myemail@company.com",
-                 display_name="Some User", visibility=Visibility.NON_SHAREABLE)
+        u = User(
+            name="someuser",
+            password="mysecretpwd",
+            mail="myemail@company.com",
+            display_name="Some User",
+            visibility=Visibility.NON_SHAREABLE,
+        )
 
         json = u.to_json()
         self.assertTrue('"principalTypeEnum":"LOCAL_USER"' in json)
@@ -73,7 +94,9 @@ class TestUser(unittest.TestCase):
         self.assertTrue('"password":"mysecretpwd"' in json)
         self.assertTrue('"mail":"myemail@company.com"' in json)
         self.assertTrue('"displayName":"Some User"' in json)
-        self.assertTrue('"visibility":"' + Visibility.NON_SHAREABLE + '"' in json)
+        self.assertTrue(
+            '"visibility":"' + Visibility.NON_SHAREABLE + '"' in json
+        )
         self.assertTrue(json[0], "{")
         self.assertTrue(json.endswith("}"))
 
@@ -95,5 +118,5 @@ class TestUser(unittest.TestCase):
         self.assertEquals(u.groupNames, ["group 1", "group 2"])
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

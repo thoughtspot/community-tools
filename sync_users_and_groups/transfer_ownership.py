@@ -38,18 +38,23 @@ def parse_args():
     :returns: The arguments object.
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument("--ts_url",
-                        help="URL to Thoughtspot, e.g. https://myserver")
-    parser.add_argument("--username",
-                        default='tsadmin',
-                        help="Name of the user to log in as.")
-    parser.add_argument("--password",
-                        default='admin',
-                        help="Password for login of the user to log in as.")
-    parser.add_argument("--from_user",
-                        help="Name of the user to transfer content from.")
-    parser.add_argument("--to_user",
-                        help="Name of the user to transfer content to.")
+    parser.add_argument(
+        "--ts_url", help="URL to Thoughtspot, e.g. https://myserver"
+    )
+    parser.add_argument(
+        "--username", default="tsadmin", help="Name of the user to log in as."
+    )
+    parser.add_argument(
+        "--password",
+        default="admin",
+        help="Password for login of the user to log in as.",
+    )
+    parser.add_argument(
+        "--from_user", help="Name of the user to transfer content from."
+    )
+    parser.add_argument(
+        "--to_user", help="Name of the user to transfer content to."
+    )
     args = parser.parse_args()
     return args
 
@@ -62,8 +67,7 @@ def valid_args(args):
     :rtype: bool
     """
     is_valid = True
-    if args.ts_url is None or args.username is None or args.password is None or \
-            args.from_user is None or args.to_user is None:
+    if args.ts_url is None or args.username is None or args.password is None or args.from_user is None or args.to_user is None:
         eprint("Missing required parameters.")
         is_valid = False
 
@@ -75,8 +79,15 @@ def transfer_ownership(args):
     Transfers ownership of all content from the from user to the to user.
     :param args: The command line arguments passed in.
     """
-    xfer = TransferOwnershipApi(tsurl=args.ts_url, username=args.username, password=args.password, disable_ssl=True)
-    xfer.transfer_ownership(from_username=args.from_user, to_username=args.to_user)
+    xfer = TransferOwnershipApi(
+        tsurl=args.ts_url,
+        username=args.username,
+        password=args.password,
+        disable_ssl=True,
+    )
+    xfer.transfer_ownership(
+        from_username=args.from_user, to_username=args.to_user
+    )
 
 
 if __name__ == "__main__":

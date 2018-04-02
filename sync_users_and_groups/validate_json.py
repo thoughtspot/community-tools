@@ -18,9 +18,8 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 
-with open(sys.argv[1],"r") as infile:
+with open(sys.argv[1], "r") as infile:
     json_data = infile.read()
     obj = json.loads(json_data)
 
-print ("valid JSON")
-
+print("valid JSON")

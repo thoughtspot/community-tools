@@ -55,23 +55,27 @@ def parse_args():
     :return: An args dictionary with command line arguments.
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument("-f", "--filename",
-                        help="path to file with records to delete")
-    parser.add_argument("-t", "--table",
-                        help="name of the table to delete records from")
-    parser.add_argument("-d", "--database",
-                        help="database to delete from")
-    parser.add_argument("-s", "--schema",
-                        default="falcon_default_schema",
-                        help="schema to delete from")
-    parser.add_argument("-p", "--separator",
-                        default="|",
-                        help="separator to use in data")
+    parser.add_argument(
+        "-f", "--filename", help="path to file with records to delete"
+    )
+    parser.add_argument(
+        "-t", "--table", help="name of the table to delete records from"
+    )
+    parser.add_argument("-d", "--database", help="database to delete from")
+    parser.add_argument(
+        "-s",
+        "--schema",
+        default="falcon_default_schema",
+        help="schema to delete from",
+    )
+    parser.add_argument(
+        "-p", "--separator", default="|", help="separator to use in data"
+    )
     args = parser.parse_args()
     return args
 
 
-# description of the tables in the database.  
+# description of the tables in the database.
 # { table1 : { column_name : type, ... }, table2 : { column_name : type, ...} }
 descriptions = {}
 
@@ -101,7 +105,11 @@ def read_descriptions(args):
     :param args: Command line arguments.
     """
 
-    table_list = check_output('echo "show tables %s;" | tql' % args.database, shell=True).split("\n")
+    table_list = check_output(
+        'echo "show tables %s;" | tql' % args.database, shell=True
+    ).split(
+        "\n"
+    )
     for table in table_list:
         table_details = table.split("|")
         if len(table_details) >= 2:
@@ -116,8 +124,13 @@ def read_descriptions(args):
             if table is None:
                 table = {}
 
-            column_list = check_output('echo "show table %s.%s.%s;" | tql' % (args.database, schema_name, table_name),
-                                       shell=True).split("\n")
+            column_list = check_output(
+                'echo "show table %s.%s.%s;" | tql'
+                % (args.database, schema_name, table_name),
+                shell=True,
+            ).split(
+                "\n"
+            )
             for column in column_list:
                 column_details = column.split("|")
                 if len(column_details) >= 2:
@@ -128,7 +141,8 @@ def read_descriptions(args):
             schema[table_name] = table
             descriptions[schema_name] = schema
 
-            # print (descriptions)
+
+# print (descriptions)
 
 
 def generate_deletes(args):
@@ -147,11 +161,13 @@ def generate_deletes(args):
         return
 
     tmpfile = "/tmp/deleteme"
-    with open(args.filename, 'rb') as valuefile:
-        filereader = csv.DictReader(valuefile, delimiter='|', quotechar='"')
+    with open(args.filename, "rb") as valuefile:
+        filereader = csv.DictReader(valuefile, delimiter="|", quotechar='"')
         with open(tmpfile, "w") as deletefile:
             for values in filereader:
-                delete_stmt = "DELETE FROM %s.%s.%s WHERE " % (args.database, args.schema, args.table)
+                delete_stmt = "DELETE FROM %s.%s.%s WHERE " % (
+                    args.database, args.schema, args.table
+                )
 
                 first = True
                 for key in values.keys():
@@ -173,7 +189,9 @@ def generate_deletes(args):
     subprocess.call("cat %s | tql" % tmpfile, shell=True)
 
     finish = time.time()
-    print("Executed %d deletes in %s seconds." % (nbr_deletes, (finish-start)))
+    print(
+        "Executed %d deletes in %s seconds." % (nbr_deletes, (finish - start))
+    )
 
 
 def eprint(*args, **kwargs):

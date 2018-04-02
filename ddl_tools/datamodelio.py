@@ -18,6 +18,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 import re
 import sys
 import xlrd  # reading Excel
+
 # import datetime -- used by TsloadWriter, but commented out for now.
 import csv
 import os
@@ -40,7 +41,7 @@ def list_to_string(a_list, quote=False):
     if quote:
         string = ", ".join('"{0}"'.format(v) for v in a_list)
     else:
-        string = ", ".join('{0}'.format(v) for v in a_list)
+        string = ", ".join("{0}".format(v) for v in a_list)
 
     return string
 
@@ -62,7 +63,12 @@ class DDLParser(object):
 
     # TODO: capture primary keys, foreign keys, and relationships.
 
-    def __init__(self, database_name, schema_name=DatamodelConstants.DEFAULT_SCHEMA, parse_keys=False):
+    def __init__(
+        self,
+        database_name,
+        schema_name=DatamodelConstants.DEFAULT_SCHEMA,
+        parse_keys=False,
+    ):
         """
         Creates a new DDL parser.
         :param database_name: Name of the database to create.
@@ -133,8 +139,8 @@ class DDLParser(object):
         :param buff: The buffer being read.
         :return: str
         """
-        nbr_open = buff.count('(')
-        nbr_close = buff.count(')')
+        nbr_open = buff.count("(")
+        nbr_close = buff.count(")")
         return nbr_open > 0 and nbr_open == nbr_close
 
     def parse_create_table(self, buff):
@@ -144,7 +150,9 @@ class DDLParser(object):
         :type buff: str
         :return: 
         """
-        buff = buff.replace("[", "\"").replace("]", "\"")  # for SQL Server quotes
+        buff = buff.replace("[", '"').replace(
+            "]", '"'
+        )  # for SQL Server quotes
         table_name = self.get_table_name(buff)
         columns = self.get_columns(buff)
 
@@ -161,9 +169,9 @@ class DDLParser(object):
         :rtype: str
         """
         # The table name (and maybe a schema) are before the opening (
-        tn = buff[0:buff.find('(')].rstrip()
+        tn = buff[0:buff.find("(")].rstrip()
         # split on spaces and assume last one is table name (and maybe schema)
-        tn = tn.split(' ')[-1]
+        tn = tn.split(" ")[-1]
         tn = tn.split(".")[-1]
         tn = self.strip_quotes(tn)
         return tn
@@ -177,7 +185,7 @@ class DDLParser(object):
         :return: The line without quotes.
         :rtype: str
         """
-        return line.replace("'", "").replace("`", "").replace("\"", "")
+        return line.replace("'", "").replace("`", "").replace('"', "")
 
     def get_columns(self, buff):
         """
@@ -189,7 +197,7 @@ class DDLParser(object):
         """
         # The fields will be between the ( ).
         columns = []
-        buff = buff[buff.find('(') + 1:buff.rfind(')')].strip()
+        buff = buff[buff.find("(") + 1:buff.rfind(")")].strip()
 
         # think all DBs use commas for field separators
         # need to find the commas that are not inside of parents.
@@ -201,13 +209,13 @@ class DDLParser(object):
 
             if open_paren:
                 field_buff += c
-                if c == ')':
+                if c == ")":
                     open_paren = False
-            elif c == '(':
+            elif c == "(":
                 field_buff += c
                 open_paren = True
             else:
-                if c == ',':
+                if c == ",":
                     raw_fields.append(field_buff)
                     field_buff = ""
                 else:
@@ -227,17 +235,19 @@ class DDLParser(object):
                 had_quote = True
                 name = rf[1:rf.find(rf[0], 1)]
             else:
-                name = rf[0:rf.find(' ')]
+                name = rf[0:rf.find(" ")]
 
             # The type comes after the name and goes up to the first of a
             #   space, close paren, or comma.  Assuming no space in type.
-            start_idx = len(name) + (3 if had_quote else 1)  # extra 1 for space
-            if rfl.find(')') > 0:  # type with ()
-                data_type = rf[start_idx:rf.find(')') + 1]
+            start_idx = len(name) + (
+                3 if had_quote else 1
+            )  # extra 1 for space
+            if rfl.find(")") > 0:  # type with ()
+                data_type = rf[start_idx:rf.find(")") + 1]
             else:
                 # either next space or comma.
-                space_end_idx = rf.find(' ', start_idx)
-                comma_end_idx = rf.find(',', start_idx)
+                space_end_idx = rf.find(" ", start_idx)
+                comma_end_idx = rf.find(",", start_idx)
                 if space_end_idx == -1:  # not found
                     if comma_end_idx == -1:  # neither found
                         end_idx = len(rf)  # end of line
@@ -250,7 +260,11 @@ class DDLParser(object):
                 data_type = rf[start_idx:end_idx]
 
             # print ("  adding %s as %s" % (name, data_type))
-            columns.append(Column(column_name=name, column_type=self.convert_type(data_type)))
+            columns.append(
+                Column(
+                    column_name=name, column_type=self.convert_type(data_type)
+                )
+            )
 
         return columns
 
@@ -263,10 +277,10 @@ class DDLParser(object):
         :return: A ThoughtSpot data type.
         :rtype: str
         """
-        if ')' in data_type:
-            t = data_type[0:data_type.find(')') + 1]
+        if ")" in data_type:
+            t = data_type[0:data_type.find(")") + 1]
         elif " " in data_type:
-            t = data_type[0:data_type.find(' ') + 1]
+            t = data_type[0:data_type.find(" ") + 1]
         else:
             t = data_type
 
@@ -285,12 +299,14 @@ class DDLParser(object):
         elif "blob" in t or "binary" in t:
             new_t = "UNKNOWN"
         elif "number" in t:  # support for NUMBER(1), NUMBER(1,1)
-            if ')' in t:
-                numsize = t[t.find('(') + 1:t.find(')')]
+            if ")" in t:
+                numsize = t[t.find("(") + 1:t.find(")")]
                 if "," in numsize:
                     first_num, second_num = numsize.split(",")
                     if second_num.strip() == "0":
-                        if first_num == "*" or int(first_num) > 9:  # Support Oracle Number(*,n)
+                        if first_num == "*" or int(
+                            first_num
+                        ) > 9:  # Support Oracle Number(*,n)
                             new_t = "BIGINT"
                         else:
                             new_t = "INT"
@@ -300,8 +316,7 @@ class DDLParser(object):
                     new_t = "INT"
             else:
                 new_t = "BIGINT"
-        elif "decimal" in t or "numeric" in t or \
-             "float" in t or "double" in t or "money" in t or "real" in t:
+        elif "decimal" in t or "numeric" in t or "float" in t or "double" in t or "money" in t or "real" in t:
             new_t = "DOUBLE"
         elif "datetime" in t:
             new_t = "DATETIME"
@@ -323,13 +338,13 @@ class DDLParser(object):
             new_t = "VARCHAR(0)"
         elif "char" in t:
             new_t = "VARCHAR(0)"
-            # nbytes = 0
-            # if ')' in t:
-            #     nbytes = t[t.find('(') + 1:t.find(')')]
-            #     nbytes = re.sub("[^0-9]", "", nbytes)
-            #     if nbytes == "":
-            #         nbytes = 0
-            # new_t = "VARCHAR(%s)" % nbytes
+        # nbytes = 0
+        # if ')' in t:
+        #     nbytes = t[t.find('(') + 1:t.find(')')]
+        #     nbytes = re.sub("[^0-9]", "", nbytes)
+        #     if nbytes == "":
+        #         nbytes = 0
+        # new_t = "VARCHAR(%s)" % nbytes
         else:
             new_t = "UNKNOWN"
 
@@ -352,7 +367,9 @@ class DDLParser(object):
             l = self.clean_line(line)
 
             if not create_or_update:  # looking for CREATE TABLE or UPDATE TABLE statement.
-                if l.lower().find("create table") >= 0 or l.lower().find("update table") >= 0:
+                if l.lower().find("create table") >= 0 or l.lower().find(
+                    "update table"
+                ) >= 0:
                     create_or_update = True
                     buff = l
                     if self.is_complete_create(buff):
@@ -378,8 +395,8 @@ class DDLParser(object):
         :rtype: str
         """
         l = line.strip()
-        l = re.sub(' +', ' ', l)
-        l = re.sub('\t+', ' ', l)
+        l = re.sub(" +", " ", l)
+        l = re.sub("\t+", " ", l)
         return l
 
 
@@ -391,7 +408,13 @@ class TQLWriter:
     Writes TQL from a data model.
     """
 
-    def __init__(self, uppercase=False, lowercase=False, camelcase=False, create_db=False):
+    def __init__(
+        self,
+        uppercase=False,
+        lowercase=False,
+        camelcase=False,
+        create_db=False,
+    ):
         """
         Creates a new TQLWriter to write database models to TQL.
         :param uppercase: Converts all names to uppercase.
@@ -421,8 +444,10 @@ class TQLWriter:
 
         if self.lowercase:
             return string.lower()
+
         elif self.uppercase:
             return string.upper()
+
         elif self.camelcase:
             return TQLWriter.to_camel(string)
 
@@ -442,7 +467,7 @@ class TQLWriter:
         results = newval[0].upper()
         idx = 1
         while idx < len(newval):
-            if newval[idx] != '_':
+            if newval[idx] != "_":
                 results += newval[idx]
                 idx += 1
             else:
@@ -499,9 +524,9 @@ class TQLWriter:
         table_name = self.to_case(table.table_name)
         schema_name = self.to_case(table.schema_name)
 
-        outfile.write('\n')
+        outfile.write("\n")
         outfile.write('DROP TABLE "%s"."%s";\n' % (schema_name, table_name))
-        outfile.write('\n')
+        outfile.write("\n")
         outfile.write('CREATE TABLE "%s"."%s" (\n' % (schema_name, table_name))
 
         first = True
@@ -514,23 +539,29 @@ class TQLWriter:
                 column_name = column_name.upper()
 
             if first:
-                outfile.write('    "%s" %s\n' % (column_name, column.column_type))
+                outfile.write(
+                    '    "%s" %s\n' % (column_name, column.column_type)
+                )
                 first = False
             else:
-                outfile.write('   ,"%s" %s\n' % (column_name, column.column_type))
+                outfile.write(
+                    '   ,"%s" %s\n' % (column_name, column.column_type)
+                )
 
         if len(table.primary_key) != 0:
             key = list_to_string(table.primary_key, quote=True)
-            outfile.write('   ,CONSTRAINT PRIMARY KEY (%s)\n' % key)
+            outfile.write("   ,CONSTRAINT PRIMARY KEY (%s)\n" % key)
 
         if table.shard_key is not None:
             key = list_to_string(table.shard_key.shard_keys, quote=True)
-            outfile.write(') PARTITION BY HASH(%d) KEY(%s);' %
-                          (table.shard_key.number_shards, key))
+            outfile.write(
+                ") PARTITION BY HASH(%d) KEY(%s);"
+                % (table.shard_key.number_shards, key)
+            )
         else:
-            outfile.write(');\n')
+            outfile.write(");\n")
 
-        outfile.write('\n')
+        outfile.write("\n")
 
     def write_foreign_keys(self, table, outfile):
         """
@@ -546,8 +577,18 @@ class TQLWriter:
             to_table = self.to_case(fk.to_table)
             to_key_str = list_to_string(fk.to_keys, quote=True)
 
-            outfile.write('ALTER TABLE "%s"."%s" ADD CONSTRAINT "%s" FOREIGN KEY (%s) REFERENCES "%s"."%s" (%s);\n' %
-                          (schema_name, from_table, fk.name, from_key_str, schema_name, to_table, to_key_str))
+            outfile.write(
+                'ALTER TABLE "%s"."%s" ADD CONSTRAINT "%s" FOREIGN KEY (%s) REFERENCES "%s"."%s" (%s);\n'
+                % (
+                    schema_name,
+                    from_table,
+                    fk.name,
+                    from_key_str,
+                    schema_name,
+                    to_table,
+                    to_key_str,
+                )
+            )
 
     def write_relationships(self, table, outfile):
         """
@@ -561,8 +602,17 @@ class TQLWriter:
             from_table = self.to_case(rel.from_table)
             to_table = self.to_case(rel.to_table)
 
-            outfile.write('ALTER TABLE "%s"."%s" ADD RELATIONSHIP "%s" WITH "%s"."%s" AS %s;\n' %
-                          (schema_name, from_table, rel.name, schema_name, to_table, rel.conditions))
+            outfile.write(
+                'ALTER TABLE "%s"."%s" ADD RELATIONSHIP "%s" WITH "%s"."%s" AS %s;\n'
+                % (
+                    schema_name,
+                    from_table,
+                    rel.name,
+                    schema_name,
+                    to_table,
+                    rel.conditions,
+                )
+            )
 
 
 # -------------------------------------------------------------------------------------------------------------------
@@ -605,7 +655,10 @@ class XLSWriter:
         ws.title = "Columns"
 
         # Write the header row.
-        self._write_header(ws=ws, cols=["Database", "Schema", "Table", "Column", "Name", "Type"])
+        self._write_header(
+            ws=ws,
+            cols=["Database", "Schema", "Table", "Column", "Name", "Type"],
+        )
 
         # Write the data.
         row_cnt = 1
@@ -614,9 +667,18 @@ class XLSWriter:
             for column in table:
                 col_idx += 1
                 row_cnt += 1
-                self._write_row(ws=ws, row_cnt=row_cnt, cols=[database.database_name, table.schema_name,
-                                                              table.table_name, col_idx, column.column_name,
-                                                              column.column_type])
+                self._write_row(
+                    ws=ws,
+                    row_cnt=row_cnt,
+                    cols=[
+                        database.database_name,
+                        table.schema_name,
+                        table.table_name,
+                        col_idx,
+                        column.column_name,
+                        column.column_type,
+                    ],
+                )
 
     def _write_tables_worksheet(self, database):
         """
@@ -626,14 +688,29 @@ class XLSWriter:
         """
 
         ws = self.workbook.create_sheet(title="Tables")
-        self._write_header(ws=ws, cols=["Database", "Schema", "Table", "Updated", "Update Type", "# Rows", "# Columns",
-                                        "Primary Key", "Shard Key", "# Shards", "RLS Column"])
+        self._write_header(
+            ws=ws,
+            cols=[
+                "Database",
+                "Schema",
+                "Table",
+                "Updated",
+                "Update Type",
+                "# Rows",
+                "# Columns",
+                "Primary Key",
+                "Shard Key",
+                "# Shards",
+                "RLS Column",
+            ],
+        )
         # Write the data.
         row_cnt = 1
         for table in database:
             row_cnt += 1
             lookup_formula = "=COUNTIFS(Columns!A:A,Tables!A%d, Columns!B:B,Tables!B%d, Columns!C:C,Tables!C%d)" % (
-                row_cnt, row_cnt, row_cnt)
+                row_cnt, row_cnt, row_cnt
+            )
 
             primary_key = ""
             if table.primary_key is not None:
@@ -646,9 +723,23 @@ class XLSWriter:
                 number_shards = table.shard_key.number_shards
 
             # TODO add support for update frequency so that it's remembered during development.
-            self._write_row(ws, row_cnt, [database.database_name, table.schema_name, table.table_name,
-                                          "daily", "partial", "", lookup_formula,
-                                          primary_key, shard_key, number_shards, ""])
+            self._write_row(
+                ws,
+                row_cnt,
+                [
+                    database.database_name,
+                    table.schema_name,
+                    table.table_name,
+                    "daily",
+                    "partial",
+                    "",
+                    lookup_formula,
+                    primary_key,
+                    shard_key,
+                    number_shards,
+                    "",
+                ],
+            )
 
     def _write_foreign_keys_worksheet(self, database):
         """
@@ -658,7 +749,18 @@ class XLSWriter:
         """
         ws = self.workbook.create_sheet(title="Foreign Keys")
         # Assuming relationships can only be within a single schema.
-        self._write_header(ws, ["Name", "Database", "Schema", "From Table", "From Columns", "To Table", "To Columns"])
+        self._write_header(
+            ws,
+            [
+                "Name",
+                "Database",
+                "Schema",
+                "From Table",
+                "From Columns",
+                "To Table",
+                "To Columns",
+            ],
+        )
 
         row_cnt = 0
         for table in database:
@@ -667,8 +769,19 @@ class XLSWriter:
             for fk in table.foreign_keys_iter():
                 from_column = list_to_string(fk.from_keys)
                 to_column = list_to_string(fk.to_keys)
-                self._write_row(ws, row_cnt, [fk.name, database.database_name, table.schema_name,
-                                              fk.from_table, from_column, fk.to_table, to_column])
+                self._write_row(
+                    ws,
+                    row_cnt,
+                    [
+                        fk.name,
+                        database.database_name,
+                        table.schema_name,
+                        fk.from_table,
+                        from_column,
+                        fk.to_table,
+                        to_column,
+                    ],
+                )
 
     def _write_relationships_worksheet(self, database):
         """
@@ -678,15 +791,35 @@ class XLSWriter:
         """
         ws = self.workbook.create_sheet(title="Relationships")
         # Assuming relationships can only be within a single schema.
-        self._write_header(ws, ["Name", "Database", "Schema", "From Table", "To Table", "Conditions"])
+        self._write_header(
+            ws,
+            [
+                "Name",
+                "Database",
+                "Schema",
+                "From Table",
+                "To Table",
+                "Conditions",
+            ],
+        )
 
         row_cnt = 0
         for table in database:
             row_cnt += 1
 
             for rel in table.relationships_iter():
-                self._write_row(ws, row_cnt, [rel.name, database.database_name, table.schema_name,
-                                              rel.from_table, rel.to_table, rel.conditions])
+                self._write_row(
+                    ws,
+                    row_cnt,
+                    [
+                        rel.name,
+                        database.database_name,
+                        table.schema_name,
+                        rel.from_table,
+                        rel.to_table,
+                        rel.conditions,
+                    ],
+                )
 
     @staticmethod
     def _write_header(ws, cols):
@@ -697,7 +830,8 @@ class XLSWriter:
         """
         for ccnt in range(0, len(cols)):
             ws.cell(column=(ccnt + 1), row=1, value=cols[ccnt])
-            # TODO add formatting to distinguish the header.
+
+    # TODO add formatting to distinguish the header.
 
     @staticmethod
     def _write_row(ws, row_cnt, cols):
@@ -734,10 +868,36 @@ class XLSReader:
     required_sheets = ["Columns", "Tables", "Foreign Keys", "Relationships"]
     required_columns = {
         "Columns": ["Database", "Schema", "Table", "Column", "Name", "Type"],
-        "Tables": ["Database", "Schema", "Table", "Updated", "Update Type", "# Rows", "# Columns",
-                   "Primary Key", "Shard Key", "# Shards", "RLS Column"],
-        "Foreign Keys": ["Name", "Database", "Schema", "From Table", "From Columns", "To Table", "To Columns"],
-        "Relationships": ["Name", "Database", "Schema", "From Table", "To Table", "Conditions"]
+        "Tables": [
+            "Database",
+            "Schema",
+            "Table",
+            "Updated",
+            "Update Type",
+            "# Rows",
+            "# Columns",
+            "Primary Key",
+            "Shard Key",
+            "# Shards",
+            "RLS Column",
+        ],
+        "Foreign Keys": [
+            "Name",
+            "Database",
+            "Schema",
+            "From Table",
+            "From Columns",
+            "To Table",
+            "To Columns",
+        ],
+        "Relationships": [
+            "Name",
+            "Database",
+            "Schema",
+            "From Table",
+            "To Table",
+            "Conditions",
+        ],
     }
 
     def __init__(self):
@@ -777,9 +937,14 @@ class XLSReader:
             else:
                 sheet = self.workbook.sheet_by_name(required_sheet)
                 header_row = sheet.row_values(rowx=0, start_colx=0)
-                for required_column in XLSReader.required_columns[required_sheet]:
+                for required_column in XLSReader.required_columns[
+                    required_sheet
+                ]:
                     if required_column not in header_row:
-                        eprint("Error:  missing column %s in sheet %s!" % (required_column, required_sheet))
+                        eprint(
+                            "Error:  missing column %s in sheet %s!"
+                            % (required_column, required_sheet)
+                        )
                         is_valid = False
 
         return is_valid
@@ -835,28 +1000,36 @@ class XLSReader:
             if pk == "":
                 pk = None
             else:
-                pk = [x.strip() for x in pk.split(',')]
+                pk = [x.strip() for x in pk.split(",")]
 
             sk_name = row[indices["Shard Key"]].strip()
             sk_nbr_shards = row[indices["# Shards"]]
 
-            if (sk_name == "" and sk_nbr_shards != "") or (sk_name != "" and sk_nbr_shards == ""):
-                eprint("ERROR:  %s need to provide both a shard key name and number of shards." % row[indices["Table"]])
+            if (sk_name == "" and sk_nbr_shards != "") or (
+                sk_name != "" and sk_nbr_shards == ""
+            ):
+                eprint(
+                    "ERROR:  %s need to provide both a shard key name and number of shards."
+                    % row[indices["Table"]]
+                )
 
             if sk_name == "":
                 sk = None
             else:
-                sk = [x.strip() for x in sk_name.split(',')]
+                sk = [x.strip() for x in sk_name.split(",")]
 
             shard_key = None
             if sk_name != "" and sk_nbr_shards != "":
-                shard_key = ShardKey(shard_keys=sk, number_shards=sk_nbr_shards)
+                shard_key = ShardKey(
+                    shard_keys=sk, number_shards=sk_nbr_shards
+                )
 
-            table = Table(table_name=row[indices["Table"]],
-                          schema_name=row[indices["Schema"]],
-                          primary_key=pk,
-                          shard_key=None
-                          )
+            table = Table(
+                table_name=row[indices["Table"]],
+                schema_name=row[indices["Schema"]],
+                primary_key=pk,
+                shard_key=None,
+            )
             database.add_table(table)
 
     def _read_columns_from_workbook(self):
@@ -873,15 +1046,26 @@ class XLSReader:
             database_name = row[indices["Database"]]
             database = self.databases.get(database_name, None)
             if database is None:
-                eprint("ERROR:  Database %s from the Columns tab is not known." % database_name)
+                eprint(
+                    "ERROR:  Database %s from the Columns tab is not known."
+                    % database_name
+                )
 
             else:
                 table_name = row[indices["Table"]]
                 table = database.get_table(table_name)
                 if table is None:
-                    eprint("ERROR:  Table %s from the Columns tab is not known." % table_name)
+                    eprint(
+                        "ERROR:  Table %s from the Columns tab is not known."
+                        % table_name
+                    )
                 else:
-                    table.add_column(Column(column_name=row[indices["Name"]], column_type=row[indices["Type"]]))
+                    table.add_column(
+                        Column(
+                            column_name=row[indices["Name"]],
+                            column_type=row[indices["Type"]],
+                        )
+                    )
 
     def _read_foreign_keys_from_workbook(self):
         """
@@ -898,28 +1082,38 @@ class XLSReader:
             database_name = row[indices["Database"]]
             database = self.databases.get(database_name, None)
             if database is None:
-                eprint("ERROR:  Database %s from the Foreign Keys tab is not known." % database_name)
+                eprint(
+                    "ERROR:  Database %s from the Foreign Keys tab is not known."
+                    % database_name
+                )
 
             else:
                 table_name = row[indices["From Table"]]
                 table = database.get_table(table_name)
                 if table is None:
-                    eprint("ERROR:  Table %s from the Foreign Keys tab is not known." % table_name)
+                    eprint(
+                        "ERROR:  Table %s from the Foreign Keys tab is not known."
+                        % table_name
+                    )
 
                 else:
                     key_name = row[indices["Name"]]
                     if key_name is None:
-                        eprint("ERROR:  Table %s from the Foreign Keys tab is missing a FK name." % table_name)
+                        eprint(
+                            "ERROR:  Table %s from the Foreign Keys tab is missing a FK name."
+                            % table_name
+                        )
 
                     from_keys = row[indices["From Columns"]]
                     from_keys = [x.strip() for x in from_keys.split(",")]
                     to_keys = row[indices["To Columns"]]
                     to_keys = [x.strip() for x in to_keys.split(",")]
-                    table.add_foreign_key(name=key_name,
-                                          from_keys=from_keys,
-                                          to_table=row[indices["To Table"]],
-                                          to_keys=to_keys
-                                          )
+                    table.add_foreign_key(
+                        name=key_name,
+                        from_keys=from_keys,
+                        to_table=row[indices["To Table"]],
+                        to_keys=to_keys,
+                    )
 
     def _read_relationships_from_workbook(self):
         """
@@ -935,16 +1129,23 @@ class XLSReader:
             database_name = row[indices["Database"]]
             database = self.databases.get(database_name, None)
             if database is None:
-                eprint("ERROR:  Database %s from the Relationships tab is not known." % database_name)
+                eprint(
+                    "ERROR:  Database %s from the Relationships tab is not known."
+                    % database_name
+                )
 
             else:
                 table_name = row[indices["From Table"]]
                 table = database.get_table(table_name)
                 if table is None:
-                    eprint("ERROR:  Table %s from the Relationships tab is not known." % table_name)
-                table.add_relationship(to_table=row[indices["To Table"]],
-                                       conditions=row[indices["Conditions"]]
-                                       )
+                    eprint(
+                        "ERROR:  Table %s from the Relationships tab is not known."
+                        % table_name
+                    )
+                table.add_relationship(
+                    to_table=row[indices["To Table"]],
+                    conditions=row[indices["Conditions"]],
+                )
 
 
 # -------------------------------------------------------------------------------------------------------------------
@@ -967,7 +1168,7 @@ class TsloadWriter:
             "skip_second_fraction": "",
             "source_data_format": "",
             "null_value": "",
-            "has_header_row": ""
+            "has_header_row": "",
         }
         if default_flags is not None:
             self._default_flags.update(default_flags)
@@ -1002,22 +1203,26 @@ class TsloadWriter:
         """
         flags = self._default_flags.copy()
 
-        flags['target_database'] = database_name
-        flags['target_schema'] = table.schema_name
-        flags['target_table'] = table.table_name
-        flags['source_file'] = table.table_name + '.csv'
+        flags["target_database"] = database_name
+        flags["target_schema"] = table.schema_name
+        flags["target_table"] = table.table_name
+        flags["source_file"] = table.table_name + ".csv"
 
-        if not os.path.isfile(flags['source_file']):
+        if not os.path.isfile(flags["source_file"]):
             return flags
 
         # todo get default flags from csv
 
-        with open(flags['source_file']) as csv_file:
+        with open(flags["source_file"]) as csv_file:
             csv_reader = csv.DictReader(csv_file)
 
             for column in table:
-                if column.column_type == 'DATE' and flags.get('date_format', None) is None:
-                    flags['date_format'] = TsloadWriter._get_date_format(column.column_name, csv_reader)
+                if column.column_type == "DATE" and flags.get(
+                    "date_format", None
+                ) is None:
+                    flags["date_format"] = TsloadWriter._get_date_format(
+                        column.column_name, csv_reader
+                    )
 
         return flags
 
@@ -1033,13 +1238,30 @@ class TsloadWriter:
         """
         # TODO Add logic to determine the actual flag value.
 
-        patterns = ['%Y', '%b %d, %Y', '%b %d, %Y', '%B %d, %Y', '%m/%d/%Y', '%Y/%m/%d', '%m/%d/%y', '%m-%d-%y',
-                    '%m-%d-%Y',
-                    '%Y-%m-%d', '%y/%m/%d', '%y-%m-%d', '%d/%m/%y', '%d/%m/%Y', '%d-%m-%y', '%d-%m-%Y', '%d%B%y',
-                    '%d%b%y',
-                    '%d%B%Y', '%d%b%Y']  # all the formats the date
+        patterns = [
+            "%Y",
+            "%b %d, %Y",
+            "%b %d, %Y",
+            "%B %d, %Y",
+            "%m/%d/%Y",
+            "%Y/%m/%d",
+            "%m/%d/%y",
+            "%m-%d-%y",
+            "%m-%d-%Y",
+            "%Y-%m-%d",
+            "%y/%m/%d",
+            "%y-%m-%d",
+            "%d/%m/%y",
+            "%d/%m/%Y",
+            "%d-%m-%y",
+            "%d-%m-%Y",
+            "%d%B%y",
+            "%d%b%y",
+            "%d%B%Y",
+            "%d%b%Y",
+        ]  # all the formats the date
 
-        date_format = '%y/%m/%d'
+        date_format = "%y/%m/%d"
 
         # parse = []
 

@@ -32,6 +32,7 @@ def eprint(*args, **kwargs):
     """
     print(*args, file=sys.stderr, **kwargs)
 
+
 # -------------------------------------------------------------------------------------------------------------------
 
 
@@ -40,6 +41,7 @@ class DatamodelConstants(object):
     Constants for working with data models.
     """
     DEFAULT_SCHEMA = "falcon_default_schema"
+
 
 # -------------------------------------------------------------------------------------------------------------------
 
@@ -50,8 +52,19 @@ class Column(object):
     """
 
     # Valid column types in ThoughtSpot.
-    VALID_TYPES = ["VARCHAR", "DOUBLE", "FLOAT", "BOOL", "INT", "BIGINT",
-                   "DATE", "DATETIME", "TIMESTAMP", "TIME", "UNKNOWN"]
+    VALID_TYPES = [
+        "VARCHAR",
+        "DOUBLE",
+        "FLOAT",
+        "BOOL",
+        "INT",
+        "BIGINT",
+        "DATE",
+        "DATETIME",
+        "TIMESTAMP",
+        "TIME",
+        "UNKNOWN",
+    ]
 
     def __init__(self, column_name, column_type):
         """
@@ -65,9 +78,13 @@ class Column(object):
         assert column_type is not None
 
         self.column_name = column_name
-        if column_type not in Column.VALID_TYPES and not column_type.startswith("VARCHAR"):
+        if column_type not in Column.VALID_TYPES and not column_type.startswith(
+            "VARCHAR"
+        ):
             raise ValueError("%s is not a valid column type." % column_type)
+
         self.column_type = column_type
+
 
 # -------------------------------------------------------------------------------------------------------------------
 
@@ -112,6 +129,7 @@ class ForeignKey(object):
         else:
             self.name = name
 
+
 # -------------------------------------------------------------------------------------------------------------------
 
 
@@ -144,6 +162,7 @@ class GenericRelationship(object):
 
         self.conditions = conditions
 
+
 # -------------------------------------------------------------------------------------------------------------------
 
 
@@ -171,6 +190,7 @@ class ShardKey(object):
 
         self.number_shards = number_shards
 
+
 # -------------------------------------------------------------------------------------------------------------------
 
 
@@ -179,7 +199,13 @@ class Table(object):
     Table for holding columns and relationships.
     """
 
-    def __init__(self, table_name, schema_name=DatamodelConstants.DEFAULT_SCHEMA, primary_key=None, shard_key=None):
+    def __init__(
+        self,
+        table_name,
+        schema_name=DatamodelConstants.DEFAULT_SCHEMA,
+        primary_key=None,
+        shard_key=None,
+    ):
         """
         Creates a new table.
         :param table_name: Name of the table.
@@ -205,7 +231,7 @@ class Table(object):
         self.shard_key = shard_key
 
         self.columns = OrderedDict()  # Preserve order of columns in tables, since this matters in ThoughtSpot.
-        self.foreign_keys = OrderedDict()   # Foreign key relationships.
+        self.foreign_keys = OrderedDict()  # Foreign key relationships.
         self.relationships = OrderedDict()  # Relationships with other tables.
 
     def add_column(self, column):
@@ -282,9 +308,19 @@ class Table(object):
         elif isinstance(primary_key, list):
             self.primary_key.extend(primary_key)
         else:
-            raise ValueError("Primary keys must be a string or list instead of %s." % type(primary_key))
+            raise ValueError(
+                "Primary keys must be a string or list instead of %s."
+                % type(primary_key)
+            )
 
-    def add_foreign_key(self, foreign_key=None, from_keys=None, to_table=None, to_keys=None, name=None):
+    def add_foreign_key(
+        self,
+        foreign_key=None,
+        from_keys=None,
+        to_table=None,
+        to_keys=None,
+        name=None,
+    ):
         """
         Adds a foreign key to the table.  This can either be a created ForeignKey object, or the details of the key, 
         which will be created.
@@ -299,10 +335,19 @@ class Table(object):
             if isinstance(foreign_key, ForeignKey):
                 self.foreign_keys[foreign_key.name] = foreign_key
             else:
-                raise ValueError("The foreign key must be of type ForeignKey, but got %s" % type(foreign_key))
+                raise ValueError(
+                    "The foreign key must be of type ForeignKey, but got %s"
+                    % type(foreign_key)
+                )
+
         else:
-            fk = ForeignKey(from_table=self.table_name, from_keys=from_keys,
-                            to_table=to_table, to_keys=to_keys, name=name)
+            fk = ForeignKey(
+                from_table=self.table_name,
+                from_keys=from_keys,
+                to_table=to_table,
+                to_keys=to_keys,
+                name=name,
+            )
             self.foreign_keys[fk.name] = fk
 
     def get_foreign_key(self, fk_name):
@@ -324,7 +369,10 @@ class Table(object):
         return iter(self.foreign_keys.values())
 
     # def __init__(self, from_table, from_keys, to_table, to_keys, name=None, conditions=None):
-    def add_relationship(self, relationship=None, to_table=None, name=None, conditions=None):
+
+    def add_relationship(
+        self, relationship=None, to_table=None, name=None, conditions=None
+    ):
         """
         Adds a foreign key to the table.  This can either be a created ForeignKey object, or the details of the key, 
         which will be created.
@@ -338,10 +386,18 @@ class Table(object):
             if isinstance(relationship, GenericRelationship):
                 self.relationships[relationship.name] = relationship
             else:
-                raise ValueError("The relationship must be of type GenericRelationship, but got %s" %
-                                 type(relationship))
+                raise ValueError(
+                    "The relationship must be of type GenericRelationship, but got %s"
+                    % type(relationship)
+                )
+
         else:
-            rel = GenericRelationship(from_table=self.table_name, to_table=to_table, name=name, conditions=conditions)
+            rel = GenericRelationship(
+                from_table=self.table_name,
+                to_table=to_table,
+                name=name,
+                conditions=conditions,
+            )
             self.relationships[rel.name] = rel
 
     def get_relationship(self, rel_name):
@@ -361,6 +417,7 @@ class Table(object):
         :rtype: iter
         """
         return iter(self.relationships.values())
+
 
 # -------------------------------------------------------------------------------------------------------------------
 
@@ -422,6 +479,7 @@ class ValidationResult:
         """
         for issue in self.issues:
             eprint(issue[1] + ":  " + issue[0])
+
 
 # -------------------------------------------------------------------------------------------------------------------
 
@@ -525,6 +583,7 @@ class Database(object):
         """
         return DatabaseValidator(self).validate()
 
+
 # -------------------------------------------------------------------------------------------------------------------
 
 
@@ -559,7 +618,9 @@ class DatabaseValidator:
 
         return self.validation_results
 
-    def _add_validation_issue(self, table, issue, level=ValidationResult.ERROR):
+    def _add_validation_issue(
+        self, table, issue, level=ValidationResult.ERROR
+    ):
         """
         Adds a formatted validation message.
         :param table: The table being validated.
@@ -567,8 +628,11 @@ class DatabaseValidator:
         :param issue: The issue to add.
         :type issue: str
         """
-        self.validation_results.add_issue("database %s, table %s:  %s" % (self.database.database_name, table.table_name, issue),
-                                          level=level)
+        self.validation_results.add_issue(
+            "database %s, table %s:  %s"
+            % (self.database.database_name, table.table_name, issue),
+            level=level,
+        )
 
     def _validate_column_types(self, table):
         """
@@ -578,8 +642,11 @@ class DatabaseValidator:
         """
         for column in table.columns.values():
             if column.column_type == "UNKNOWN":
-                self._add_validation_issue(table=table, issue="column %s is of type UNKNOWN." % column.column_name,
-                                           level=ValidationResult.WARNING)
+                self._add_validation_issue(
+                    table=table,
+                    issue="column %s is of type UNKNOWN." % column.column_name,
+                    level=ValidationResult.WARNING,
+                )
 
     def _validate_primary_key(self, table):
         """
@@ -590,8 +657,11 @@ class DatabaseValidator:
         pks = table.primary_key
         for pk in pks:
             if table.get_column(pk) is None:
-                self._add_validation_issue(table=table,
-                                           issue="column %s in primary key does not exist in the the table." % pk)
+                self._add_validation_issue(
+                    table=table,
+                    issue="column %s in primary key does not exist in the the table."
+                    % pk,
+                )
 
     def _validate_shard_keys(self, table):
         """
@@ -606,12 +676,18 @@ class DatabaseValidator:
         if sks is not None:
             for sk in sks.shard_keys:
                 if table.get_column(sk) is None:
-                    self._add_validation_issue(table=table,
-                                               issue="column %s in shard key does not exist in the the table." % sk)
+                    self._add_validation_issue(
+                        table=table,
+                        issue="column %s in shard key does not exist in the the table."
+                        % sk,
+                    )
 
                 if pks != [] and sk not in pks:
-                    self._add_validation_issue(table=table,
-                                               issue="column %s in shard key not in primary key %s" % (sk, pks))
+                    self._add_validation_issue(
+                        table=table,
+                        issue="column %s in shard key not in primary key %s"
+                        % (sk, pks),
+                    )
 
     def _validate_foreign_keys(self, table):
         """
@@ -624,22 +700,28 @@ class DatabaseValidator:
             to_table = self.database.get_table(fk.to_table)
             # make sure the other table exists in the database.
             if to_table is None:
-                self._add_validation_issue(table=table,
-                                           issue="table %s doesn't exist for foreign key %s" %
-                                           (fk.to_table, fk.name))
+                self._add_validation_issue(
+                    table=table,
+                    issue="table %s doesn't exist for foreign key %s"
+                    % (fk.to_table, fk.name),
+                )
             else:
                 # The foreign keys need to match the primary key of the other table.
 
                 # match number of columns in from and to
                 if len(fk.from_keys) != len(fk.to_keys):
-                    self._add_validation_issue(table=table,
-                                               issue="FK %s doesn't have the matching column count from and to keys" %
-                                               fk.name)
+                    self._add_validation_issue(
+                        table=table,
+                        issue="FK %s doesn't have the matching column count from and to keys"
+                        % fk.name,
+                    )
                 # verify to keys match number of columns in primary key of other table.
                 if len(fk.to_keys) != len(to_table.primary_key):
-                    self._add_validation_issue(table=table,
-                                               issue="FK %s doesn't match number of columns in primary key %s" %
-                                               (fk.name, to_table.primary_key))
+                    self._add_validation_issue(
+                        table=table,
+                        issue="FK %s doesn't match number of columns in primary key %s"
+                        % (fk.name, to_table.primary_key),
+                    )
                 # verify to keys match types of columns in primary key of other table.
                 for col_cnt in range(0, len(fk.from_keys)):
                     from_name = fk.from_keys[col_cnt]
@@ -648,38 +730,66 @@ class DatabaseValidator:
                     to_col = to_table.get_column(fk.to_keys[col_cnt])
 
                     if to_name not in to_table.primary_key:
-                        self._add_validation_issue(table=table,
-                                                   issue="foreign key %s column %s isn't in primary key for %s" %
-                                                   (fk.name, to_name, to_table.table_name))
+                        self._add_validation_issue(
+                            table=table,
+                            issue="foreign key %s column %s isn't in primary key for %s"
+                            % (fk.name, to_name, to_table.table_name),
+                        )
 
                     missing_column = False
                     if from_col is None:
-                        self._add_validation_issue(table=table,
-                                                   issue="foreign key %s missing from_column %s from table %s" %
-                                                         (fk.name, from_name, table.table_name))
+                        self._add_validation_issue(
+                            table=table,
+                            issue="foreign key %s missing from_column %s from table %s"
+                            % (fk.name, from_name, table.table_name),
+                        )
                         missing_column = True
 
                     if to_col is None:
-                        self._add_validation_issue(table=table,
-                                                   issue="foreign key %s missing to_column %s from table %s" %
-                                                                      (fk.name, to_name, table.table_name))
+                        self._add_validation_issue(
+                            table=table,
+                            issue="foreign key %s missing to_column %s from table %s"
+                            % (fk.name, to_name, table.table_name),
+                        )
                         missing_column = True
 
                     if not missing_column:
-                        if (not from_col.column_type.startswith("VARCHAR")) and \
-                            (from_col.column_type != to_col.column_type):
-                            self._add_validation_issue(table=table,
-                                                       issue="foreign key %s column %s type %s doesn't match type %s for %s column %s" %
-                                                       (fk.name, to_name, from_col.column_type,
-                                                       to_col.column_type, to_table.table_name,
-                                                       to_col.column_name))
+                        if (
+                            not from_col.column_type.startswith("VARCHAR")
+                        ) and (
+                            from_col.column_type != to_col.column_type
+                        ):
+                            self._add_validation_issue(
+                                table=table,
+                                issue="foreign key %s column %s type %s doesn't match type %s for %s column %s"
+                                % (
+                                    fk.name,
+                                    to_name,
+                                    from_col.column_type,
+                                    to_col.column_type,
+                                    to_table.table_name,
+                                    to_col.column_name,
+                                ),
+                            )
 
-                        elif (from_col.column_type.startswith("VARCHAR") and not to_col.column_type.startswith("VARCHAR") or \
-                              to_col.column_type.startswith("VARCHAR") and not from_col.column_type.startswith("VARCHAR")):
-                            self._add_validation_issue(table=table,
-                                                       issue="foreign key %s column %s type %s doesn't match type %s for %s column %s" %
-                                                       (fk.name, to_name, from_col.column_type,
-                                                        to_col.column_type, to_table.table_name, to_col.column_name))
+                        elif (
+                            from_col.column_type.startswith("VARCHAR")
+                            and not to_col.column_type.startswith("VARCHAR")
+                            or to_col.column_type.startswith("VARCHAR")
+                            and not from_col.column_type.startswith("VARCHAR")
+                        ):
+                            self._add_validation_issue(
+                                table=table,
+                                issue="foreign key %s column %s type %s doesn't match type %s for %s column %s"
+                                % (
+                                    fk.name,
+                                    to_name,
+                                    from_col.column_type,
+                                    to_col.column_type,
+                                    to_table.table_name,
+                                    to_col.column_name,
+                                ),
+                            )
 
     def _validate_relationships(self, table):
         """
@@ -689,11 +799,17 @@ class DatabaseValidator:
         """
         for rel in table.relationships_iter():
             if rel.from_table != table.table_name:
-                self._add_validation_issue(table=table, issue="from table %s doesn't exist in relationship %s." %
-                                           (table.table_name, rel.name))
+                self._add_validation_issue(
+                    table=table,
+                    issue="from table %s doesn't exist in relationship %s."
+                    % (table.table_name, rel.name),
+                )
 
             to_table = self.database.get_table(rel.to_table)
             # make sure the other table exists in the database.
             if to_table is None:
-                self._add_validation_issue(table=table, issue="to table %s doesn't exist in relationship %s." %
-                                                              (to_table, rel.name))
+                self._add_validation_issue(
+                    table=table,
+                    issue="to table %s doesn't exist in relationship %s."
+                    % (to_table, rel.name),
+                )

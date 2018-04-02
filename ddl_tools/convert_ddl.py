@@ -38,7 +38,7 @@ def main():
 
     database = None
     if valid_args(args):
-        print (args)
+        print(args)
 
         if args.from_ddl:
             print("Reading DDL ...")
@@ -72,33 +72,56 @@ def main():
 def parse_args():
     """Parses the arguments from the command line."""
     parser = argparse.ArgumentParser()
-    parser.add_argument("--from_ddl",
-                        help="will attempt to convert DDL from the infile")
-    parser.add_argument("--to_tql",
-                        help="will convert to TQL to the outfile")
-    parser.add_argument("--from_excel",
-                        help="convert from the given Excel file")
-    parser.add_argument("--to_excel",
-                        help="will convert to Excel and write to the outfile.")
-    parser.add_argument("--to_tsload",
-                        help="will generate the tsload commands and write it to the outfile.")
-    parser.add_argument("-d", "--database",
-                        help="name of ThoughtSpot database")
-    parser.add_argument("-s", "--schema",
-                        default='falcon_default_schema',
-                        help="name of ThoughtSpot schema")
-    parser.add_argument("-c", "--create_db",
-                        action="store_true",
-                        help="generate create database and schema statements")
-    parser.add_argument("-l", "--lowercase", action="store_true",
-                        help="create table and column names in lowercase")
-    parser.add_argument("-u", "--uppercase", action="store_true",
-                        help="create table and column names in uppercase")
-    parser.add_argument("--camelcase", action="store_true",
-                        help="converts table names and columns names with _ to camel case, " +
-                             "e.g. my_table becomes MyTable.")
-    parser.add_argument("-v", "--validate", action="store_true",
-                        help="validate the database")
+    parser.add_argument(
+        "--from_ddl", help="will attempt to convert DDL from the infile"
+    )
+    parser.add_argument("--to_tql", help="will convert to TQL to the outfile")
+    parser.add_argument(
+        "--from_excel", help="convert from the given Excel file"
+    )
+    parser.add_argument(
+        "--to_excel", help="will convert to Excel and write to the outfile."
+    )
+    parser.add_argument(
+        "--to_tsload",
+        help="will generate the tsload commands and write it to the outfile.",
+    )
+    parser.add_argument(
+        "-d", "--database", help="name of ThoughtSpot database"
+    )
+    parser.add_argument(
+        "-s",
+        "--schema",
+        default="falcon_default_schema",
+        help="name of ThoughtSpot schema",
+    )
+    parser.add_argument(
+        "-c",
+        "--create_db",
+        action="store_true",
+        help="generate create database and schema statements",
+    )
+    parser.add_argument(
+        "-l",
+        "--lowercase",
+        action="store_true",
+        help="create table and column names in lowercase",
+    )
+    parser.add_argument(
+        "-u",
+        "--uppercase",
+        action="store_true",
+        help="create table and column names in uppercase",
+    )
+    parser.add_argument(
+        "--camelcase",
+        action="store_true",
+        help="converts table names and columns names with _ to camel case, "
+        + "e.g. my_table becomes MyTable.",
+    )
+    parser.add_argument(
+        "-v", "--validate", action="store_true", help="validate the database"
+    )
     args = parser.parse_args()
     return args
 
@@ -151,7 +174,10 @@ def read_excel(args):
         return None
 
     if len(databases) > 1:
-        eprint("WARNING:  multiple databases read.  Only using %s" % databases.values()[0].database_name)
+        eprint(
+            "WARNING:  multiple databases read.  Only using %s"
+            % databases.values()[0].database_name
+        )
 
     return databases.values()[0]
 
@@ -163,7 +189,9 @@ def write_tql(args, database):
     :param database: The database to write.
     :type database: Database
     """
-    writer = TQLWriter(args.uppercase, args.lowercase, args.camelcase, args.create_db)
+    writer = TQLWriter(
+        args.uppercase, args.lowercase, args.camelcase, args.create_db
+    )
     writer.write_tql(database, args.to_tql)
 
 
