@@ -67,6 +67,7 @@ class TestAllUsersAndGroups(unittest.TestCase):
         self.assertIsNone(auag.get_group("noone"))
 
     # noinspection PyUnresolvedReferences
+
     def test_to_json(self):
         """Tests converting to JSON"""
         auag = UsersAndGroups()
@@ -96,7 +97,9 @@ class TestAllUsersAndGroups(unittest.TestCase):
         results = auag.is_valid()
         self.assertTupleEqual((results.result, results.issues), (True, []))
 
-        auag.add_user(User("user3", group_names=["group3"]))  # group3 doesn't exist.
+        auag.add_user(
+            User("user3", group_names=["group3"])
+        )  # group3 doesn't exist.
 
         results = auag.is_valid()
         self.assertFalse(results.result)

@@ -30,11 +30,12 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 # Helper functions. ----------------------------------------------------------------------
 
+
 def public_props(obj):
     """
     Returns any property that doesn't start with an _
     """
-    return (name for name in vars(obj).keys() if not name.startswith('_'))
+    return (name for name in vars(obj).keys() if not name.startswith("_"))
 
 
 def obj_to_json(obj):
@@ -69,12 +70,21 @@ def obj_to_json(obj):
 
 # Class to represent users.  --------------------------------------------------
 
+
 class User(object):
     """
     Represents a user to TS.
     """
 
-    def __init__(self, name, password=None, mail=None, display_name=None, description=None, group_names=None):
+    def __init__(
+        self,
+        name,
+        password=None,
+        mail=None,
+        display_name=None,
+        description=None,
+        group_names=None,
+    ):
         """
         Creates a new user object.
         :param name: The name of the user.  This is the login name.
@@ -125,12 +135,15 @@ class User(object):
 
 # Class to represent groups.  --------------------------------------------------
 
+
 class Group(object):
     """
     Represents a group to TS.
     """
 
-    def __init__(self, name, display_name=None, description=None, group_names=None):
+    def __init__(
+        self, name, display_name=None, description=None, group_names=None
+    ):
         """
         Creates a new group object.
         :param name: The name of the group.
@@ -210,6 +223,7 @@ class UsersAndGroups(object):
         else:
             if duplicate == UsersAndGroups.RAISE_ERROR_ON_DUPLICATE:
                 raise Exception("Duplicate user %s" % u)
+
             elif duplicate == UsersAndGroups.IGNORE_ON_DUPLICATE:
                 pass  # keep the old one.
             elif duplicate == UsersAndGroups.OVERWRITE_ON_DUPLICATE:
@@ -273,6 +287,7 @@ class UsersAndGroups(object):
         else:
             if duplicate == UsersAndGroups.RAISE_ERROR_ON_DUPLICATE:
                 raise Exception("Duplicate group %s" % g)
+
             elif duplicate == UsersAndGroups.OVERWRITE_ON_DUPLICATE:
                 self.groups[g.name] = g
             elif duplicate == UsersAndGroups.UPDATE_ON_DUPLICATE:
@@ -369,16 +384,20 @@ class UsersAndGroups(object):
         for user in self.users.values():
             for parent_group in user.groupNames:
                 if parent_group not in self.groups:
-                    issue = "user group %s for user %s does not exist" % (parent_group, user.name)
-                    print (issue)
+                    issue = "user group %s for user %s does not exist" % (
+                        parent_group, user.name
+                    )
+                    print(issue)
                     issues.append(issue)
                     valid = False
 
         for group in self.groups.values():
             for parent_group in group.groupNames:
                 if parent_group not in self.groups:
-                    issue = "parent group %s for group %s does not exist" % (parent_group, group.name)
-                    print (issue)
+                    issue = "parent group %s for group %s does not exist" % (
+                        parent_group, group.name
+                    )
+                    print(issue)
                     issues.append(issue)
                     valid = False
 
@@ -423,20 +442,23 @@ class UGJsonReader(object):
         auag = UsersAndGroups()
         for value in json_list:
             if str(value["principalTypeEnum"]).endswith("_USER"):
-                user = User(name=value.get("name", None),
-                            display_name=value.get("displayName", None),
-                            mail=value.get("mail", None),
-                            group_names=value.get("groupNames", None)
-                            )
+                user = User(
+                    name=value.get("name", None),
+                    display_name=value.get("displayName", None),
+                    mail=value.get("mail", None),
+                    group_names=value.get("groupNames", None),
+                )
                 auag.add_user(user)
             else:
-                group = Group(name=value.get("name", None),
-                              display_name=value.get("displayName", None),
-                              description=value.get("description", None),
-                              group_names=value.get("groupNames", None)
-                              )
+                group = Group(
+                    name=value.get("name", None),
+                    display_name=value.get("displayName", None),
+                    description=value.get("description", None),
+                    group_names=value.get("groupNames", None),
+                )
                 auag.add_group(group)
         return auag
+
 
 # Class to sync users and groups with ThoughtSpot.  --------------------------------------------------
 
@@ -452,7 +474,14 @@ class SyncUserAndGroups(object):
     SYNC_ALL_URL = SERVER_URL + "/tspublic/v1/user/sync"
     UPDATE_PASSWORD_URL = SERVER_URL + "/tspublic/v1/user/updatepassword"
 
-    def __init__(self, tsurl, username, password, disable_ssl=False, global_password=None):
+    def __init__(
+        self,
+        tsurl,
+        username,
+        password,
+        disable_ssl=False,
+        global_password=None,
+    ):
         """
         Creates a new sync object and logs into ThoughtSpot
         :param tsurl: Root ThoughtSpot URL, e.g. http://some-company.com/
@@ -476,7 +505,9 @@ class SyncUserAndGroups(object):
 
         url = SyncUserAndGroups.LOGIN_URL.format(tsurl=self.tsurl)
         response = requests.post(
-            url, data={'username': self.username, 'password': self.password}, verify=self.should_verify
+            url,
+            data={"username": self.username, "password": self.password},
+            verify=self.should_verify,
         )
 
         if response.status_code == httplib.OK:
@@ -484,7 +515,10 @@ class SyncUserAndGroups(object):
             logging.info("Successfully logged in as %s" % self.username)
         else:
             logging.error("Failed to log in as %s" % self.username)
-            raise requests.ConnectionError('Error logging in to TS (%d)' % response.status_code, response.text)
+            raise requests.ConnectionError(
+                "Error logging in to TS (%d)" % response.status_code,
+                response.text,
+            )
 
     def is_authenticated(self):
         """
@@ -504,16 +538,22 @@ class SyncUserAndGroups(object):
             self.login()
 
         url = SyncUserAndGroups.GET_ALL_URL.format(tsurl=self.tsurl)
-        response = requests.get(url, cookies=self.cookies, verify=self.should_verify)
+        response = requests.get(
+            url, cookies=self.cookies, verify=self.should_verify
+        )
         if response.status_code == httplib.OK:
             logging.info("Successfully got users and groups.")
             json_list = json.loads(response.text)
             reader = UGJsonReader()
             auag = reader.parse_json(json_list=json_list)
             return auag
+
         else:
             logging.error("Failed to get users and groups.")
-            raise requests.ConnectionError('Error getting users and groups (%d)' % response.status_code, response.text)
+            raise requests.ConnectionError(
+                "Error getting users and groups (%d)" % response.status_code,
+                response.text,
+            )
 
     def sync_users_and_groups(self, users_and_groups, applyChanges=True):
         """
@@ -544,25 +584,31 @@ class SyncUserAndGroups(object):
             out.write(json_str)
 
         params = {
-            "principals": (tmp_file, open(tmp_file, "rb"), 'text/json'),
+            "principals": (tmp_file, open(tmp_file, "rb"), "text/json"),
             # "principals": (None, json.dumps(json_str), 'application/json'),
-            "applyChanges": json.dumps(applyChanges)
+            "applyChanges": json.dumps(applyChanges),
         }
         if self.global_password is not None:
             params["password"] = json.dumps(self.global_password)
 
-        response = requests.post(url, files=params, cookies=self.cookies, verify=self.should_verify)
+        response = requests.post(
+            url, files=params, cookies=self.cookies, verify=self.should_verify
+        )
 
         if response.status_code == httplib.OK:
             logging.info("Successfully synced users and groups.")
-            print (response.text.encode("utf-8"))
+            print(response.text.encode("utf-8"))
             return response
+
         else:
             logging.error("Failed synced users and groups.")
-            print (response.text.encode("utf-8"))
+            print(response.text.encode("utf-8"))
             with open("ts_users_and_groups.json", "w") as outfile:
                 outfile.write(json_str.encode("utf-8"))
-            raise requests.ConnectionError('Error syncing users and groups (%d)' % response.status_code, response.text)
+            raise requests.ConnectionError(
+                "Error syncing users and groups (%d)" % response.status_code,
+                response.text,
+            )
 
     def update_user_password(self, userid, currentpassword, password):
         """
@@ -580,32 +626,39 @@ class SyncUserAndGroups(object):
         url = SyncUserAndGroups.UPDATE_PASSWORD_URL.format(tsurl=self.tsurl)
         params = {
             "userid": userid,
-            "currentpassword": {"password": [currentpassword], "empty": "false"},
-            "password": {"password": [password], "empty": "false"}
+            "currentpassword": {
+                "password": [currentpassword], "empty": "false"
+            },
+            "password": {"password": [password], "empty": "false"},
         }
 
         params = json.dumps(params)
         print(params)
 
-        return   # TODO add after 4.4 is released.
+        return  # TODO add after 4.4 is released.
 
-        response = requests.post(url, data=params, cookies=self.cookies, verify=self.should_verify)
+        response = requests.post(
+            url, data=params, cookies=self.cookies, verify=self.should_verify
+        )
 
         if response.status_code == httplib.OK:
             logging.info("Successfully updated password for %s." % userid)
         else:
             logging.error("Failed to update password for %s." % userid)
-            raise requests.ConnectionError('Error (%d) updating user password for %s:  %s' %
-                                           (response.status_code, userid, response.text))
+            raise requests.ConnectionError(
+                "Error (%d) updating user password for %s:  %s"
+                % (response.status_code, userid, response.text)
+            )
 
 
 # Class to write users and groups to an Excel document.  --------------------------------------------------
 
 
-class UGXLSWriter (object):
+class UGXLSWriter(object):
     """
     Writes users and groups to an Excel spreadsheet.
     """
+
     def write(self, users_and_groups, filename):
         """
         Writes the content to the given file.
@@ -615,7 +668,9 @@ class UGXLSWriter (object):
         :type filename: str
         """
         workbook = Workbook()
-        workbook.remove_sheet(workbook.active)  # remove the default sheet since we'll be creating the ones we want.
+        workbook.remove_sheet(
+            workbook.active
+        )  # remove the default sheet since we'll be creating the ones we want.
         self._write_users(workbook, users_and_groups.get_users())
         self._write_groups(workbook, users_and_groups.get_groups())
         workbook.save(filename + ".xlsx")
@@ -630,7 +685,17 @@ class UGXLSWriter (object):
         :return:
         """
         ws = workbook.create_sheet(title="Users")
-        self._write_header(ws, ["Name", "Password", "Display Name", "Email", "Description", "Groups"])
+        self._write_header(
+            ws,
+            [
+                "Name",
+                "Password",
+                "Display Name",
+                "Email",
+                "Description",
+                "Groups",
+            ],
+        )
         cnt = 2  # start after header.
         for user in users:
             ws.cell(column=1, row=cnt, value=user.name)
@@ -651,7 +716,9 @@ class UGXLSWriter (object):
         :return:
         """
         ws = workbook.create_sheet(title="Groups")
-        self._write_header(ws, ["Name", "Display Name", "Description", "Groups"])
+        self._write_header(
+            ws, ["Name", "Display Name", "Description", "Groups"]
+        )
         cnt = 2  # start after header.
         for group in groups:
             ws.cell(column=1, row=cnt, value=group.name)

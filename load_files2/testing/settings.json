@@ -17,5 +17,4 @@
   "tsload.date_format": "%M/%d/%y",
   "tsload.date_time_format": "%M/%d/%y %H:%M:%s",
   "tsload.boolean_representation": "True_False",
-  "tsload.format_file": "somefile.xx"
 }

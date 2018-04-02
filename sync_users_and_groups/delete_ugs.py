@@ -29,8 +29,12 @@ def main():
     """Main function for the script."""
     args = parse_args()
     if valid_args(args):
-        sync = SyncUserAndGroups(tsurl=args.ts_url, username=args.username, password=args.password,
-                                 disable_ssl=args.disable_ssl)
+        sync = SyncUserAndGroups(
+            tsurl=args.ts_url,
+            username=args.username,
+            password=args.password,
+            disable_ssl=args.disable_ssl,
+        )
         if args.users is not None:
             delete_users(args, sync)
         if args.user_file is not None:
@@ -47,24 +51,40 @@ def parse_args():
     :returns: The arguments object.
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument("-t", "--ts_url",
-                        help="URL to ThoughtSpot, e.g. https://myserver")
-    parser.add_argument("-u", "--username",
-                        default='tsadmin',
-                        help="Name of the user to log in as.")
-    parser.add_argument("-p", "--password",
-                        default='admin',
-                        help="Password for login of the user to log in as.")
-    parser.add_argument("--disable_ssl", action="store_true",
-                        help="Will ignore SSL errors.")
-    parser.add_argument("--users",
-                        help="List of comma separated users.  Use quotes if there are spaces.")
-    parser.add_argument("--groups",
-                        help="List of comma separated groups.  Use quotes if there are spaces.")
-    parser.add_argument("--user_file",
-                        help="File containing list of users to delete.  One user per line, optionally quoted.")
-    parser.add_argument("--group_file",
-                        help="File containing list of groups to delete.  One user per line, optionally quoted.")
+    parser.add_argument(
+        "-t", "--ts_url", help="URL to ThoughtSpot, e.g. https://myserver"
+    )
+    parser.add_argument(
+        "-u",
+        "--username",
+        default="tsadmin",
+        help="Name of the user to log in as.",
+    )
+    parser.add_argument(
+        "-p",
+        "--password",
+        default="admin",
+        help="Password for login of the user to log in as.",
+    )
+    parser.add_argument(
+        "--disable_ssl", action="store_true", help="Will ignore SSL errors."
+    )
+    parser.add_argument(
+        "--users",
+        help="List of comma separated users.  Use quotes if there are spaces.",
+    )
+    parser.add_argument(
+        "--groups",
+        help="List of comma separated groups.  Use quotes if there are spaces.",
+    )
+    parser.add_argument(
+        "--user_file",
+        help="File containing list of users to delete.  One user per line, optionally quoted.",
+    )
+    parser.add_argument(
+        "--group_file",
+        help="File containing list of groups to delete.  One user per line, optionally quoted.",
+    )
 
     args = parser.parse_args()
     return args

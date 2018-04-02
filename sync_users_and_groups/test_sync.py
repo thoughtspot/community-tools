@@ -34,29 +34,74 @@ class TestSyncUsersAndGroups(unittest.TestCase):
         """
         auag = UsersAndGroups()
 
-        auag.add_group(Group(name="Group 1", display_name="This is Group 1",
-                             description="A group for testing.", group_names=[], visibility=Visibility.DEFAULT))
-        auag.add_group(Group(name="Group 2", display_name="This is Group 2",
-                             description="Another group for testing.",
-                             group_names=["Group 1"], visibility=Visibility.NON_SHAREABLE))
+        auag.add_group(
+            Group(
+                name="Group 1",
+                display_name="This is Group 1",
+                description="A group for testing.",
+                group_names=[],
+                visibility=Visibility.DEFAULT,
+            )
+        )
+        auag.add_group(
+            Group(
+                name="Group 2",
+                display_name="This is Group 2",
+                description="Another group for testing.",
+                group_names=["Group 1"],
+                visibility=Visibility.NON_SHAREABLE,
+            )
+        )
         # Testing for ability to handle embedded quotes.
-        auag.add_group(Group(name='Group "3"', display_name='This is Group "3"',
-                             description='Another "group" for testing.',
-                             group_names=["Group 1"], visibility=Visibility.NON_SHAREABLE))
+        auag.add_group(
+            Group(
+                name='Group "3"',
+                display_name='This is Group "3"',
+                description='Another "group" for testing.',
+                group_names=["Group 1"],
+                visibility=Visibility.NON_SHAREABLE,
+            )
+        )
 
-        auag.add_user(User(name="User1", password="pwd1", display_name="User 1",
-                           mail="User1@company.com", group_names=["Group 1"]))
-        auag.add_user(User(name="User2", password="pwd2", display_name="User 2",
-                           mail="User2@company.com", group_names=["Group 1", "Group 2"],
-                           visibility=Visibility.NON_SHAREABLE))
+        auag.add_user(
+            User(
+                name="User1",
+                password="pwd1",
+                display_name="User 1",
+                mail="User1@company.com",
+                group_names=["Group 1"],
+            )
+        )
+        auag.add_user(
+            User(
+                name="User2",
+                password="pwd2",
+                display_name="User 2",
+                mail="User2@company.com",
+                group_names=["Group 1", "Group 2"],
+                visibility=Visibility.NON_SHAREABLE,
+            )
+        )
 
         # Testing for ability to handle embedded quotes.
-        auag.add_user(User(name='User "3"', password='pwd2', display_name='User "3"',
-                           mail='User2@company.com', group_names=['Group "3"']))
+        auag.add_user(
+            User(
+                name='User "3"',
+                password="pwd2",
+                display_name='User "3"',
+                mail="User2@company.com",
+                group_names=['Group "3"'],
+            )
+        )
 
         print(auag)
 
-        sync = SyncUserAndGroups(tsurl=TS_URL, username=TS_USER, password=TS_PASSWORD, disable_ssl=True)
+        sync = SyncUserAndGroups(
+            tsurl=TS_URL,
+            username=TS_USER,
+            password=TS_PASSWORD,
+            disable_ssl=True,
+        )
         sync.sync_users_and_groups(auag, remove_deleted=True)
 
     def test_syncing_user_and_groups(self):
@@ -64,7 +109,12 @@ class TestSyncUsersAndGroups(unittest.TestCase):
         Tests adding users and groups to ThoughtSpot.
         """
 
-        sync = SyncUserAndGroups(tsurl=TS_URL, username=TS_USER, password=TS_PASSWORD, disable_ssl=True)
+        sync = SyncUserAndGroups(
+            tsurl=TS_URL,
+            username=TS_USER,
+            password=TS_PASSWORD,
+            disable_ssl=True,
+        )
         auag = sync.get_all_users_and_groups()
 
         group1 = auag.get_group("Group 1")
@@ -90,7 +140,9 @@ class TestSyncUsersAndGroups(unittest.TestCase):
         user2 = auag.get_user("User2")
         self.assertEqual("User2", user2.name)
         self.assertEqual("User 2", user2.displayName)
-        self.assertEqual(sorted(["All", "Group 1", "Group 2"]), sorted(user2.groupNames))
+        self.assertEqual(
+            sorted(["All", "Group 1", "Group 2"]), sorted(user2.groupNames)
+        )
         self.assertEqual(Visibility.NON_SHAREABLE, user2.visibility)
 
     def test_syncing_user_and_groups_without_password(self):
@@ -100,19 +152,48 @@ class TestSyncUsersAndGroups(unittest.TestCase):
 
         auag = UsersAndGroups()
 
-        auag.add_group(Group(name="Group 1", display_name="This is Group 1",
-                             description="A group for testing.", group_names=[]))
-        auag.add_group(Group(name="Group 2", display_name="This is Group 2",
-                             description="Another group for testing.", group_names=["Group 1"]))
+        auag.add_group(
+            Group(
+                name="Group 1",
+                display_name="This is Group 1",
+                description="A group for testing.",
+                group_names=[],
+            )
+        )
+        auag.add_group(
+            Group(
+                name="Group 2",
+                display_name="This is Group 2",
+                description="Another group for testing.",
+                group_names=["Group 1"],
+            )
+        )
 
-        auag.add_user(User(name="User1", password="pwd1", display_name="User 1",
-                           group_names=["Group 1"]))
-        auag.add_user(User(name="User2", password="pwd2", display_name="User 2",
-                           group_names=["Group 1", "Group 2"]))
+        auag.add_user(
+            User(
+                name="User1",
+                password="pwd1",
+                display_name="User 1",
+                group_names=["Group 1"],
+            )
+        )
+        auag.add_user(
+            User(
+                name="User2",
+                password="pwd2",
+                display_name="User 2",
+                group_names=["Group 1", "Group 2"],
+            )
+        )
 
         # only works on Bill's AWS instance.
-        sync = SyncUserAndGroups(tsurl=TS_URL, username=TS_USER, password=TS_PASSWORD,
-                                 global_password="foo", disable_ssl=True)
+        sync = SyncUserAndGroups(
+            tsurl=TS_URL,
+            username=TS_USER,
+            password=TS_PASSWORD,
+            global_password="foo",
+            disable_ssl=True,
+        )
         sync.sync_users_and_groups(auag)
 
     def test_duplicate_users(self):
@@ -126,44 +207,56 @@ class TestSyncUsersAndGroups(unittest.TestCase):
             auag.add_user(User(name="user1"))
 
         # create with overwrite.
-        auag.add_user(User(name="user2", mail="user2@foo.com", group_names=["group2"]),
-                      duplicate=UsersAndGroups.OVERWRITE_ON_DUPLICATE)
+        auag.add_user(
+            User(name="user2", mail="user2@foo.com", group_names=["group2"]),
+            duplicate=UsersAndGroups.OVERWRITE_ON_DUPLICATE,
+        )
         u = auag.get_user("user2")
         self.assertEqual(u.name, "user2")
         self.assertEqual(u.mail, "user2@foo.com")
         self.assertEqual(u.groupNames, ["group2"])
 
-        auag.add_user(User(name="user2", mail="user2@bar.com", group_names=["group3"]),
-                      duplicate=UsersAndGroups.OVERWRITE_ON_DUPLICATE)
+        auag.add_user(
+            User(name="user2", mail="user2@bar.com", group_names=["group3"]),
+            duplicate=UsersAndGroups.OVERWRITE_ON_DUPLICATE,
+        )
         u = auag.get_user("user2")
         self.assertEqual(u.name, "user2")
         self.assertEqual(u.mail, "user2@bar.com")
         self.assertEqual(u.groupNames, ["group3"])
 
         # create with update.
-        auag.add_user(User(name="user3", mail="user3@foo.com", group_names=["group2"]),
-                      duplicate=UsersAndGroups.UPDATE_ON_DUPLICATE)
+        auag.add_user(
+            User(name="user3", mail="user3@foo.com", group_names=["group2"]),
+            duplicate=UsersAndGroups.UPDATE_ON_DUPLICATE,
+        )
         u = auag.get_user("user3")
         self.assertEqual(u.name, "user3")
         self.assertEqual(u.mail, "user3@foo.com")
         self.assertEqual(u.groupNames, ["group2"])
 
-        auag.add_user(User(name="user3", mail="user3@bar.com", group_names=["group3"]),
-                      duplicate=UsersAndGroups.UPDATE_ON_DUPLICATE)
+        auag.add_user(
+            User(name="user3", mail="user3@bar.com", group_names=["group3"]),
+            duplicate=UsersAndGroups.UPDATE_ON_DUPLICATE,
+        )
         u = auag.get_user("user3")
         self.assertEqual(u.mail, "user3@bar.com")
         self.assertEqual(u.groupNames, ["group3", "group2"])
 
         # create with ignore.
-        auag.add_user(User(name="user4", mail="user4@foo.com", group_names=["group2"]),
-                      duplicate=UsersAndGroups.IGNORE_ON_DUPLICATE)
+        auag.add_user(
+            User(name="user4", mail="user4@foo.com", group_names=["group2"]),
+            duplicate=UsersAndGroups.IGNORE_ON_DUPLICATE,
+        )
         u = auag.get_user("user4")
         self.assertEqual(u.name, "user4")
         self.assertEqual(u.mail, "user4@foo.com")
         self.assertEqual(u.groupNames, ["group2"])
 
-        auag.add_user(User(name="user4", mail="user4@bar.com", group_names=["group3"]),
-                      duplicate=UsersAndGroups.IGNORE_ON_DUPLICATE)
+        auag.add_user(
+            User(name="user4", mail="user4@bar.com", group_names=["group3"]),
+            duplicate=UsersAndGroups.IGNORE_ON_DUPLICATE,
+        )
         u = auag.get_user("user4")
         self.assertEqual(u.name, "user4")
         self.assertEqual(u.mail, "user4@foo.com")
@@ -180,27 +273,35 @@ class TestSyncUsersAndGroups(unittest.TestCase):
             auag.add_group(Group(name="group1"))
 
         # create with overwrite.
-        auag.add_group(Group(name="group2", group_names=["group2"]),
-                       duplicate=UsersAndGroups.OVERWRITE_ON_DUPLICATE)
+        auag.add_group(
+            Group(name="group2", group_names=["group2"]),
+            duplicate=UsersAndGroups.OVERWRITE_ON_DUPLICATE,
+        )
         u = auag.get_group("group2")
         self.assertEqual(u.name, "group2")
         self.assertEqual(u.groupNames, ["group2"])
 
-        auag.add_group(Group(name="group2", group_names=["group3"]),
-                       duplicate=UsersAndGroups.OVERWRITE_ON_DUPLICATE)
+        auag.add_group(
+            Group(name="group2", group_names=["group3"]),
+            duplicate=UsersAndGroups.OVERWRITE_ON_DUPLICATE,
+        )
         u = auag.get_group("group2")
         self.assertEqual(u.name, "group2")
         self.assertEqual(u.groupNames, ["group3"])
 
         # create with update.
-        auag.add_group(Group(name="group3", group_names=["group2"]),
-                       duplicate=UsersAndGroups.OVERWRITE_ON_DUPLICATE)
+        auag.add_group(
+            Group(name="group3", group_names=["group2"]),
+            duplicate=UsersAndGroups.OVERWRITE_ON_DUPLICATE,
+        )
         u = auag.get_group("group3")
         self.assertEqual(u.name, "group3")
         self.assertEqual(u.groupNames, ["group2"])
 
-        auag.add_group(Group(name="group3", group_names=["group3"]),
-                       duplicate=UsersAndGroups.UPDATE_ON_DUPLICATE)
+        auag.add_group(
+            Group(name="group3", group_names=["group3"]),
+            duplicate=UsersAndGroups.UPDATE_ON_DUPLICATE,
+        )
         u = auag.get_group("group3")
         self.assertEqual(u.groupNames, ["group2", "group3"])
 
@@ -209,7 +310,12 @@ class TestSyncUsersAndGroups(unittest.TestCase):
         Tests updating groups that are non-shareable.
         """
         self.create_common_users_and_groups()
-        sync = SyncUserAndGroups(tsurl=TS_URL, username=TS_USER, password=TS_PASSWORD, disable_ssl=True)
+        sync = SyncUserAndGroups(
+            tsurl=TS_URL,
+            username=TS_USER,
+            password=TS_PASSWORD,
+            disable_ssl=True,
+        )
         auag = sync.get_all_users_and_groups()
 
         # Change Group 1 and Group 2 and verify change took.
@@ -223,10 +329,15 @@ class TestSyncUsersAndGroups(unittest.TestCase):
 
         # verify changes
         auag = sync.get_all_users_and_groups()
-        self.assertEqual(auag.get_group("Group 1").visibility, Visibility.NON_SHAREABLE)
-        self.assertEqual(auag.get_group("Group 2").visibility, Visibility.DEFAULT)
-        self.assertEqual(auag.get_group('Group "3"').visibility, Visibility.NON_SHAREABLE)
-
+        self.assertEqual(
+            auag.get_group("Group 1").visibility, Visibility.NON_SHAREABLE
+        )
+        self.assertEqual(
+            auag.get_group("Group 2").visibility, Visibility.DEFAULT
+        )
+        self.assertEqual(
+            auag.get_group('Group "3"').visibility, Visibility.NON_SHAREABLE
+        )
 
     def test_getting_all(self):
         """
@@ -235,7 +346,12 @@ class TestSyncUsersAndGroups(unittest.TestCase):
 
         self.create_common_users_and_groups()
 
-        sync = SyncUserAndGroups(tsurl=TS_URL, username=TS_USER, password=TS_PASSWORD, disable_ssl=True)
+        sync = SyncUserAndGroups(
+            tsurl=TS_URL,
+            username=TS_USER,
+            password=TS_PASSWORD,
+            disable_ssl=True,
+        )
         auag = sync.get_all_users_and_groups()
 
         # There are four constant users, tsadmin, guest, su, system
@@ -248,11 +364,19 @@ class TestSyncUsersAndGroups(unittest.TestCase):
         Tests updating a user password.
         """
 
-        sync = SyncUserAndGroups(tsurl=TS_URL, username=TS_USER, password=TS_PASSWORD, disable_ssl=True)
+        sync = SyncUserAndGroups(
+            tsurl=TS_URL,
+            username=TS_USER,
+            password=TS_PASSWORD,
+            disable_ssl=True,
+        )
         auag = UsersAndGroups()
-        auag.add_user(User(name="userx", display_name="User X", password="password1"))
-        sync.update_user_password(userid="userx", currentpassword="password1", password="password2")
-
+        auag.add_user(
+            User(name="userx", display_name="User X", password="password1")
+        )
+        sync.update_user_password(
+            userid="userx", currentpassword="password1", password="password2"
+        )
 
     def test_add_and_remove_privilege(self):
         """
@@ -261,5 +385,12 @@ class TestSyncUsersAndGroups(unittest.TestCase):
 
         self.create_common_users_and_groups()
 
-        sgp = SetGroupPrivilegesAPI(tsurl=TS_URL, username=TS_USER, password=TS_PASSWORD, disable_ssl=True)
-        sgp.add_privilege(groups=["Group 1", "Group 2"], privilege=Privileges.CAN_USE_SPOTIQ)
+        sgp = SetGroupPrivilegesAPI(
+            tsurl=TS_URL,
+            username=TS_USER,
+            password=TS_PASSWORD,
+            disable_ssl=True,
+        )
+        sgp.add_privilege(
+            groups=["Group 1", "Group 2"], privilege=Privileges.CAN_USE_SPOTIQ
+        )

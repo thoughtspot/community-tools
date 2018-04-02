@@ -1,6 +1,5 @@
 import unittest
-from datamodel import ShardKey, ForeignKey, GenericRelationship, Column, Table, \
-    Database, DatamodelConstants, DatabaseValidator
+from datamodel import ShardKey, ForeignKey, GenericRelationship, Column, Table, Database, DatamodelConstants, DatabaseValidator
 
 # -------------------------------------------------------------------------------------------------------------------
 
@@ -23,6 +22,7 @@ class TestColumn(unittest.TestCase):
         self.assertEqual(col3.column_type, "DATETIME")
 
     # noinspection PyTypeChecker
+
     def test_create_column_without_parameters(self):
         """Tests creating columns with missing parameters."""
         with self.assertRaises(AssertionError):
@@ -35,6 +35,7 @@ class TestColumn(unittest.TestCase):
         with self.assertRaises(ValueError):
             Column(column_name="column_1", column_type="bit")
 
+
 # -------------------------------------------------------------------------------------------------------------------
 
 
@@ -43,46 +44,88 @@ class TestForeignKey(unittest.TestCase):
 
     def test_creating_FK_with_all_paramenters_and_single_key(self):
         """Tests creating a foreign key with a single key column and no defaults."""
-        fk = ForeignKey(from_table="tableA", from_keys="colA", to_table="tableB", to_keys="colB", name="TestFK")
+        fk = ForeignKey(
+            from_table="tableA",
+            from_keys="colA",
+            to_table="tableB",
+            to_keys="colB",
+            name="TestFK",
+        )
 
         self.assertEquals(fk.from_table, "tableA")
-        self.assertEquals(fk.from_keys,  ["colA"])
+        self.assertEquals(fk.from_keys, ["colA"])
         self.assertEquals(fk.to_table, "tableB")
-        self.assertEquals(fk.to_keys,  ["colB"])
+        self.assertEquals(fk.to_keys, ["colB"])
         self.assertEquals(fk.name, "TestFK")
 
     def test_creating_FK_with_no_name_and_single_key(self):
         """Tests creating a foreign key with a single key column and no defaults."""
-        fk = ForeignKey(from_table="tableA", from_keys="colA", to_table="tableB", to_keys="colB")
+        fk = ForeignKey(
+            from_table="tableA",
+            from_keys="colA",
+            to_table="tableB",
+            to_keys="colB",
+        )
 
         self.assertEquals(fk.from_table, "tableA")
-        self.assertEquals(fk.from_keys,  ["colA"])
+        self.assertEquals(fk.from_keys, ["colA"])
         self.assertEquals(fk.to_table, "tableB")
-        self.assertEquals(fk.to_keys,  ["colB"])
+        self.assertEquals(fk.to_keys, ["colB"])
         self.assertEquals(fk.name, "FK_tableA_to_tableB")
 
     def test_creating_fk_with_missing_parameters(self):
 
         with self.assertRaises(AssertionError):
-            ForeignKey(from_table=None, from_keys="colA", to_table="tableB", to_keys="colB")
+            ForeignKey(
+                from_table=None,
+                from_keys="colA",
+                to_table="tableB",
+                to_keys="colB",
+            )
         with self.assertRaises(AssertionError):
-            ForeignKey(from_table="tableA", from_keys=None, to_table="tableB", to_keys="colB")
+            ForeignKey(
+                from_table="tableA",
+                from_keys=None,
+                to_table="tableB",
+                to_keys="colB",
+            )
         with self.assertRaises(AssertionError):
-            ForeignKey(from_table="tableA", from_keys="colA", to_table=None, to_keys="colB")
+            ForeignKey(
+                from_table="tableA",
+                from_keys="colA",
+                to_table=None,
+                to_keys="colB",
+            )
         with self.assertRaises(AssertionError):
-            ForeignKey(from_table="tableA", from_keys="colA", to_table="tableB", to_keys=None)
+            ForeignKey(
+                from_table="tableA",
+                from_keys="colA",
+                to_table="tableB",
+                to_keys=None,
+            )
 
     def test_creating_fk_with_compound_keys(self):
         """Tests creating a foreign key that uses more than one column."""
 
-        fk = ForeignKey(from_table="tableA", from_keys=["colA", "colB"], to_table="tableB", to_keys=["colA", "colB"])
+        fk = ForeignKey(
+            from_table="tableA",
+            from_keys=["colA", "colB"],
+            to_table="tableB",
+            to_keys=["colA", "colB"],
+        )
         self.assertEqual(fk.from_keys, ["colA", "colB"])
         self.assertEqual(fk.to_keys, ["colA", "colB"])
 
     def test_creating_fk_with_mismatched_key_columns(self):
         """Tests creating a foreign key that uses more than one column."""
         with self.assertRaises(AssertionError):
-            ForeignKey(from_table="tableA", from_keys="colA", to_table="tableB", to_keys=["colA", "colB"])
+            ForeignKey(
+                from_table="tableA",
+                from_keys="colA",
+                to_table="tableB",
+                to_keys=["colA", "colB"],
+            )
+
 
 # -------------------------------------------------------------------------------------------------------------------
 
@@ -95,24 +138,34 @@ class TestGenericRelationship(unittest.TestCase):
 
     def test_create_rel_with_name(self):
         """Tests creation with a specific name."""
-        gr = GenericRelationship(from_table="tableA", to_table="tableB", name="REL_test", conditions="col1 = col2")
+        gr = GenericRelationship(
+            from_table="tableA",
+            to_table="tableB",
+            name="REL_test",
+            conditions="col1 = col2",
+        )
         self.assertEqual("REL_test", gr.name)
 
     def test_create_rel_default_name(self):
         """Tests creation with a default name."""
-        gr = GenericRelationship(from_table="tableA", to_table="tableB", conditions="col1 = col2")
+        gr = GenericRelationship(
+            from_table="tableA", to_table="tableB", conditions="col1 = col2"
+        )
         self.assertEqual(gr.name, "REL_tableA_to_tableB")
 
     def test_set_conditions(self):
         """Tests setting conditions in the model."""
         the_condition = "tableA.colA > tableB.colB"
-        gr = GenericRelationship(from_table="tableA", to_table="tableB", conditions=the_condition)
+        gr = GenericRelationship(
+            from_table="tableA", to_table="tableB", conditions=the_condition
+        )
         self.assertEqual(gr.conditions, the_condition)
+
 
 # -------------------------------------------------------------------------------------------------------------------
 
 
-class TestTable (unittest.TestCase):
+class TestTable(unittest.TestCase):
     """Tests the Table class"""
 
     def test_create_table_no_errors(self):
@@ -121,6 +174,7 @@ class TestTable (unittest.TestCase):
         self.assertEqual(table.table_name, "Table1")
 
     # noinspection PyTypeChecker
+
     def test_create_table_with_errors(self):
         """Test creating a table with invalid values."""
         with self.assertRaises(AssertionError):
@@ -134,7 +188,9 @@ class TestTable (unittest.TestCase):
         table = Table(table_name="Table1", primary_key="column_1")
         self.assertEqual(table.primary_key, ["column_1"])
 
-        table = Table(table_name="Table2", primary_key=["column_1", "column_2"])
+        table = Table(
+            table_name="Table2", primary_key=["column_1", "column_2"]
+        )
         self.assertEqual(table.primary_key, ["column_1", "column_2"])
 
     def test_create_table_with_schema(self):
@@ -155,7 +211,9 @@ class TestTable (unittest.TestCase):
         table = Table(table_name="Table", schema_name="test")
         table.add_column(Column(column_name="column_1", column_type="INT"))
         table.add_column(Column(column_name="column_2", column_type="DOUBLE"))
-        table.add_column(Column(column_name="column_3", column_type="DATETIME"))
+        table.add_column(
+            Column(column_name="column_3", column_type="DATETIME")
+        )
         table.add_column(Column(column_name="column_4", column_type="BOOL"))
 
         return table
@@ -201,9 +259,18 @@ class TestTable (unittest.TestCase):
     def test_add_foreign_key(self):
         """Tests adding foreign keys."""
         table = Table(table_name="table1", primary_key="pk1")
-        table.add_foreign_key(ForeignKey(name="fk1", from_table="table1", from_keys="col1",
-                                         to_table="table2", to_keys="col2"))
-        table.add_foreign_key(name="fk2", from_keys="col3", to_table="table3", to_keys="col4")
+        table.add_foreign_key(
+            ForeignKey(
+                name="fk1",
+                from_table="table1",
+                from_keys="col1",
+                to_table="table2",
+                to_keys="col2",
+            )
+        )
+        table.add_foreign_key(
+            name="fk2", from_keys="col3", to_table="table3", to_keys="col4"
+        )
 
         fk = table.foreign_keys["fk1"]
         self.assertEquals("table1", fk.from_table)
@@ -219,9 +286,19 @@ class TestTable (unittest.TestCase):
     def test_add_relationship(self):
         """Tests adding relationships."""
         table = Table(table_name="table1", primary_key="pk1")
-        table.add_relationship(GenericRelationship(from_table="table1", to_table="table2",
-                                                   conditions="table1.col1 = table2.col2", name="rel1"))
-        table.add_relationship(to_table="table3", conditions="table1.col1 = table3.col3", name="rel2")
+        table.add_relationship(
+            GenericRelationship(
+                from_table="table1",
+                to_table="table2",
+                conditions="table1.col1 = table2.col2",
+                name="rel1",
+            )
+        )
+        table.add_relationship(
+            to_table="table3",
+            conditions="table1.col1 = table3.col3",
+            name="rel2",
+        )
 
         rel = table.get_relationship("rel1")
         self.assertEqual("rel1", rel.name)
@@ -234,10 +311,11 @@ class TestTable (unittest.TestCase):
         rel = table.get_relationship("foo")
         self.assertIsNone(rel)
 
+
 # -------------------------------------------------------------------------------------------------------------------
 
 
-class TestDatabase (unittest.TestCase):
+class TestDatabase(unittest.TestCase):
     """Tests the Database class."""
 
     @staticmethod
@@ -255,7 +333,10 @@ class TestDatabase (unittest.TestCase):
         self.assertEqual(database.get_table("table1").table_name, "table1")
         self.assertEqual(database.get_table("table1").schema_name, "schema1")
         self.assertEqual(database.get_table("table2").table_name, "table2")
-        self.assertEqual(database.get_table("table2").schema_name, DatamodelConstants.DEFAULT_SCHEMA)
+        self.assertEqual(
+            database.get_table("table2").schema_name,
+            DatamodelConstants.DEFAULT_SCHEMA,
+        )
 
     def test_get_table_names(self):
         """Tests getting table names from the database."""
@@ -297,6 +378,7 @@ class TestDatabase (unittest.TestCase):
             self.assertEqual("table%d" % cnt, t.table_name)
             cnt += 1
 
+
 # -------------------------------------------------------------------------------------------------------------------
 
 
@@ -306,16 +388,25 @@ class TestDatabaseValidator(unittest.TestCase):
     def test_valid_database(self):
         """Tests a good database to make sure there are no false positives."""
         good_db = Database(database_name="good_db")
-        table1 = Table(table_name="table1", primary_key=["col1", "col2"],
-                       shard_key=ShardKey(shard_keys="col1", number_shards=128))
+        table1 = Table(
+            table_name="table1",
+            primary_key=["col1", "col2"],
+            shard_key=ShardKey(shard_keys="col1", number_shards=128),
+        )
         table1.add_column(Column(column_name="col1", column_type="INT"))
         table1.add_column(Column(column_name="col2", column_type="INT"))
         good_db.add_table(table1)
 
-        table2 = Table(table_name="table2", primary_key=["col3", "col4"],
-                       shard_key=ShardKey(shard_keys="col3", number_shards=128))
-        table2.add_foreign_key(from_keys=["col3", "col4"],
-                               to_table="table1", to_keys=["col1", "col2"])
+        table2 = Table(
+            table_name="table2",
+            primary_key=["col3", "col4"],
+            shard_key=ShardKey(shard_keys="col3", number_shards=128),
+        )
+        table2.add_foreign_key(
+            from_keys=["col3", "col4"],
+            to_table="table1",
+            to_keys=["col1", "col2"],
+        )
         table2.add_column(Column(column_name="col3", column_type="INT"))
         table2.add_column(Column(column_name="col4", column_type="INT"))
         good_db.add_table(table2)
@@ -330,8 +421,9 @@ class TestDatabaseValidator(unittest.TestCase):
         # TODO add bad database tests.
         pass
 
+
 # -------------------------------------------------------------------------------------------------------------------
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

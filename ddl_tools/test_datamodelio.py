@@ -25,7 +25,9 @@ class TestDDLParser(unittest.TestCase):
         """Tests converting various types of columns."""
         self.assertEqual("BIGINT", DDLParser.convert_type("integer"))
         self.assertEqual("INT", DDLParser.convert_type("rowversion"))
-        self.assertEqual("VARCHAR(0)", DDLParser.convert_type("uniqueidentifier"))
+        self.assertEqual(
+            "VARCHAR(0)", DDLParser.convert_type("uniqueidentifier")
+        )
         self.assertEqual("INT", DDLParser.convert_type("serial"))
         self.assertEqual("BOOL", DDLParser.convert_type("bit"))
         self.assertEqual("UNKNOWN", DDLParser.convert_type("blob"))
@@ -140,20 +142,32 @@ class TestTQLWriter(unittest.TestCase):
         :rtype: Database
         """
         database = Database(database_name="database2")
-        table1 = Table(table_name="table1", primary_key="col1", shard_key=ShardKey("col1", 128))
+        table1 = Table(
+            table_name="table1",
+            primary_key="col1",
+            shard_key=ShardKey("col1", 128),
+        )
         table1.add_column(Column(column_name="col1", column_type="INT"))
         table1.add_column(Column(column_name="Col2", column_type="DOUBLE"))
         table1.add_column(Column(column_name="COL3", column_type="FLOAT"))
         database.add_table(table1)
 
-        table2 = Table(table_name="table2", primary_key=["col4", "Col5"], shard_key=ShardKey(["col4", "Col5"], 96))
+        table2 = Table(
+            table_name="table2",
+            primary_key=["col4", "Col5"],
+            shard_key=ShardKey(["col4", "Col5"], 96),
+        )
         table2.add_column(Column(column_name="col4", column_type="VARCHAR(0)"))
         table2.add_column(Column(column_name="Col5", column_type="DATE"))
         table2.add_column(Column(column_name="COL6", column_type="BOOL"))
         database.add_table(table2)
 
-        table2.add_foreign_key(from_keys="Col5", to_table="table1", to_keys="COL3")
-        table1.add_relationship(to_table="table2", conditions='("table1"."col1" == "table2."COL6")')
+        table2.add_foreign_key(
+            from_keys="Col5", to_table="table1", to_keys="COL3"
+        )
+        table1.add_relationship(
+            to_table="table2", conditions='("table1"."col1" == "table2."COL6")'
+        )
 
         return database
 
@@ -174,10 +188,18 @@ class TestTQLWriter(unittest.TestCase):
         self.assertIn('PARTITION BY HASH(128) KEY("col1")', tql)
         self.assertIn('PARTITION BY HASH(96) KEY("col4", "Col5")', tql)
 
-        self.assertIn('ALTER TABLE "falcon_default_schema"."table2" ADD CONSTRAINT "FK_table2_to_table1" ' +
-                      'FOREIGN KEY ("Col5") ' + 'REFERENCES "falcon_default_schema"."table1" ("COL3");', tql)
-        self.assertIn('ALTER TABLE "falcon_default_schema"."table1" ADD RELATIONSHIP "REL_table1_to_table2" '
-                      'WITH "falcon_default_schema"."table2" AS ("table1"."col1" == "table2."COL6");', tql)
+        self.assertIn(
+            'ALTER TABLE "falcon_default_schema"."table2" ADD CONSTRAINT "FK_table2_to_table1" '
+            + 'FOREIGN KEY ("Col5") '
+            + 'REFERENCES "falcon_default_schema"."table1" ("COL3");',
+            tql,
+        )
+        self.assertIn(
+            'ALTER TABLE "falcon_default_schema"."table1" ADD RELATIONSHIP "REL_table1_to_table2" '
+            'WITH "falcon_default_schema"."table2" AS ("table1"."col1" == "table2."COL6");',
+            tql,
+        )
+
 
 # -------------------------------------------------------------------------------------------------------------------
 
@@ -189,26 +211,39 @@ class TestXLSWriter(unittest.TestCase):
         """Test writing to Excel.  Only test is existance.  Checks shoudl be made for validity."""
         database = Database(database_name="xdb")
 
-        table = Table(table_name="table1", schema_name="s1", primary_key="column_1",
-                      shard_key=ShardKey("column_1", 128))
+        table = Table(
+            table_name="table1",
+            schema_name="s1",
+            primary_key="column_1",
+            shard_key=ShardKey("column_1", 128),
+        )
         table.add_column(Column(column_name="column_1", column_type="INT"))
         table.add_column(Column(column_name="column_2", column_type="DOUBLE"))
         table.add_column(Column(column_name="column_3", column_type="FLOAT"))
         database.add_table(table)
 
-        table = Table(table_name="table2", schema_name="s1", primary_key="column_1")
+        table = Table(
+            table_name="table2", schema_name="s1", primary_key="column_1"
+        )
         table.add_column(Column(column_name="column_1", column_type="INT"))
-        table.add_column(Column(column_name="column_2", column_type="DATETIME"))
+        table.add_column(
+            Column(column_name="column_2", column_type="DATETIME")
+        )
         table.add_column(Column(column_name="column_3", column_type="BOOL"))
         table.add_column(Column(column_name="column_4", column_type="DOUBLE"))
-        table.add_foreign_key(from_keys="column_1", to_table="table_1", to_keys="column_1")
-        table.add_relationship(to_table="table1", conditions="table2.column_4 = table1.column_2")
+        table.add_foreign_key(
+            from_keys="column_1", to_table="table_1", to_keys="column_1"
+        )
+        table.add_relationship(
+            to_table="table1", conditions="table2.column_4 = table1.column_2"
+        )
         database.add_table(table)
 
         writer = XLSWriter()
         writer.write_database(database, "test_excel")
 
-        # TODO Add read of the file to spot check creation.
+
+# TODO Add read of the file to spot check creation.
 
 # -------------------------------------------------------------------------------------------------------------------
 
@@ -270,6 +305,7 @@ class TestXLSReader(unittest.TestCase):
         self.assertEqual(fk.to_table, "table4")
         self.assertEqual(fk.to_keys, ["column_1", "column_3"])
 
+
 # -------------------------------------------------------------------------------------------------------------------
 
 
@@ -281,23 +317,35 @@ class TestTsloadWriter(unittest.TestCase):
         # todo Create the csv file.
         database = Database(database_name="xdb")
 
-        table = Table(table_name="table1", schema_name="s1", primary_key="column_1",
-                      shard_key=ShardKey("column_1", 128))
+        table = Table(
+            table_name="table1",
+            schema_name="s1",
+            primary_key="column_1",
+            shard_key=ShardKey("column_1", 128),
+        )
         table.add_column(Column(column_name="column_1", column_type="INT"))
         table.add_column(Column(column_name="column_2", column_type="DOUBLE"))
         table.add_column(Column(column_name="column_3", column_type="FLOAT"))
         table.add_column(Column(column_name="column_3", column_type="DATE"))
         database.add_table(table)
 
-        table = Table(table_name="table2", schema_name="s1", primary_key="column_1",
-                      shard_key=ShardKey("column_1", 128))
+        table = Table(
+            table_name="table2",
+            schema_name="s1",
+            primary_key="column_1",
+            shard_key=ShardKey("column_1", 128),
+        )
         table.add_column(Column(column_name="column_1", column_type="INT"))
         table.add_column(Column(column_name="column_2", column_type="FLOAT"))
         table.add_column(Column(column_name="column_3", column_type="DOUBLE"))
         database.add_table(table)
 
-        table = Table(table_name="table3", schema_name="s1", primary_key="column_1",
-                      shard_key=ShardKey("column_1", 128))
+        table = Table(
+            table_name="table3",
+            schema_name="s1",
+            primary_key="column_1",
+            shard_key=ShardKey("column_1", 128),
+        )
         table.add_column(Column(column_name="column_1", column_type="INT"))
         table.add_column(Column(column_name="column_2", column_type="FLOAT"))
         table.add_column(Column(column_name="column_3", column_type="VARCHAR"))
@@ -310,11 +358,13 @@ class TestTsloadWriter(unittest.TestCase):
             self.assertTrue(line.startswith("tsload "))
             self.assertTrue(line.index('--target_database "xdb"') > 0)
             self.assertTrue(line.index('--target_schema "s1"'))
-            # create a csv files
-            # todo complete for all the other flags
+
+
+# create a csv files
+# todo complete for all the other flags
 
 # -------------------------------------------------------------------------------------------------------------------
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

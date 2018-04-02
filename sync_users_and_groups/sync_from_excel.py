@@ -27,9 +27,15 @@ def main():
     args = parse_args()
     if valid_args(args):
         uags = UGXLSReader().read_from_excel(args.filename)
-        sync = SyncUserAndGroups(tsurl=args.ts_url, username=args.username, password=args.password,
-                                 disable_ssl=args.disable_ssl)
-        sync.sync_users_and_groups(users_and_groups=uags, remove_deleted=args.purge)
+        sync = SyncUserAndGroups(
+            tsurl=args.ts_url,
+            username=args.username,
+            password=args.password,
+            disable_ssl=args.disable_ssl,
+        )
+        sync.sync_users_and_groups(
+            users_and_groups=uags, remove_deleted=args.purge
+        )
 
 
 def get_sheets_and_headers():
@@ -48,27 +54,44 @@ def get_sheets_and_headers():
 
     return header_desc
 
+
 def parse_args():
     """
     Parses the arguments from the command line.
     :returns: The arguments object.
     """
-    parser = argparse.ArgumentParser(description="Loads users and groups into ThoughtSpot from an Excel document.",
-                                     epilog=get_sheets_and_headers())
-    parser.add_argument("-t", "--ts_url",
-                        help="URL to Thoughtspot, e.g. https://myserver")
-    parser.add_argument("-u", "--username",
-                        default='tsadmin',
-                        help="Name of the user to log in as.")
-    parser.add_argument("-p", "--password",
-                        default='admin',
-                        help="Password for login of the user to log in as.")
-    parser.add_argument("--purge", action="store_true",
-                        help="Is set, will delete users not being synced.")
-    parser.add_argument("--disable_ssl", action="store_true",
-                        help="Will ignore SSL errors.")
-    parser.add_argument("-f", "--filename",
-                        help="Either the name of the Excel file name with the users and groups.")
+    parser = argparse.ArgumentParser(
+        description="Loads users and groups into ThoughtSpot from an Excel document.",
+        epilog=get_sheets_and_headers(),
+    )
+    parser.add_argument(
+        "-t", "--ts_url", help="URL to Thoughtspot, e.g. https://myserver"
+    )
+    parser.add_argument(
+        "-u",
+        "--username",
+        default="tsadmin",
+        help="Name of the user to log in as.",
+    )
+    parser.add_argument(
+        "-p",
+        "--password",
+        default="admin",
+        help="Password for login of the user to log in as.",
+    )
+    parser.add_argument(
+        "--purge",
+        action="store_true",
+        help="Is set, will delete users not being synced.",
+    )
+    parser.add_argument(
+        "--disable_ssl", action="store_true", help="Will ignore SSL errors."
+    )
+    parser.add_argument(
+        "-f",
+        "--filename",
+        help="Either the name of the Excel file name with the users and groups.",
+    )
     args = parser.parse_args()
     return args
 
