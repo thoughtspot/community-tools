@@ -54,6 +54,12 @@ def main():
         base_cmd = create_base_command(settings)
         load_files(settings, base_cmd)
 
+        # TODO:
+        # Write the results to a log file.
+        # Send email of results.
+        # Move and archive the loaded files.
+        # Prune archive if settings say so.
+
 
 def parse_args():
     """Parses the arguments from the command line."""
@@ -142,6 +148,8 @@ def load_files(settings, base_cmd):
     )  # might throw an exception if not an int.
     pool = Pool(processes=max_simultaneous_loads)
 
+    # TODO turn off indexing:  From Satyam:  You can call `sage_master_tool PauseUpdates`
+
     # get a list of commands to run in parallel.
     commands = []
     for f in [
@@ -151,9 +159,12 @@ def load_files(settings, base_cmd):
     ]:
         commands.append(update_base_cmd_for_file(settings, base_cmd, f))
 
+    # TODO turn on indexing:  From Satyam:  `sage_master_tool ResumeUpdates`
+
     results = [pool.apply_async(load_a_file, (cmd,)) for cmd in commands]
     for res in results:
         print(res.get())
+
 
 
 def get_directory_settings(settings):
