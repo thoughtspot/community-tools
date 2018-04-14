@@ -526,6 +526,7 @@ class BaseApiInterface(object):
     """
     Provides basic support for calling the ThoughtSpot APIs, particularly for logging in.
     """
+
     SERVER_URL = "{tsurl}/callosum/v1"
 
     def __init__(self, tsurl, username, password, disable_ssl=False):
@@ -543,20 +544,19 @@ class BaseApiInterface(object):
         self.tsurl = tsurl
         self.username = username
         self.password = password
+        self.should_verify = not disable_ssl
         self.cookies = None
-        self.session = requests.Session()
-        if disable_ssl:
-            requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
-            self.session.verify = False
-        self.session.headers = {"X-Requested-By": "ThoughtSpot"}
 
     def login(self):
         """
         Log into the ThoughtSpot server.
         """
+
         url = self.format_url(SyncUserAndGroups.LOGIN_URL)
-        response = self.session.post(
-            url, data={"username": self.username, "password": self.password}
+        response = requests.post(
+            url,
+            data={"username": self.username, "password": self.password},
+            verify=self.should_verify,
         )
 
         if response.status_code == 204:
@@ -600,8 +600,8 @@ class SyncUserAndGroups(BaseApiInterface):
     UPDATE_PASSWORD_URL = "/tspublic/v1/user/updatepassword"
     DELETE_USERS_URL = "/session/user/deleteusers"
     DELETE_GROUPS_URL = "/session/group/deletegroups"
-    USER_METADATA_URL = "/tspublic/v1/metadata/listobjectheaders?type=USER"
-    GROUP_METADATA_URL = "/tspublic/v1/metadata/listobjectheaders?type=USER_GROUP"
+    USER_METADATA_URL = "/metadata/list?type=USER"
+    GROUP_METADATA_URL = "/metadata/list?type=USER_GROUP"
 
     def __init__(
         self,
@@ -637,7 +637,9 @@ class SyncUserAndGroups(BaseApiInterface):
         """
 
         url = self.format_url(SyncUserAndGroups.GET_ALL_URL)
-        response = self.session.get(url, cookies=self.cookies)
+        response = requests.get(
+            url, cookies=self.cookies, verify=self.should_verify
+        )
         if response.status_code == 200:
             logging.info("Successfully got users and groups.")
             json_list = json.loads(response.text)
@@ -692,7 +694,9 @@ class SyncUserAndGroups(BaseApiInterface):
         if self.global_password is not None:
             params["password"] = json.dumps(self.global_password)
 
-        response = self.session.post(url, files=params, cookies=self.cookies)
+        response = requests.post(
+            url, files=params, cookies=self.cookies, verify=self.should_verify
+        )
 
         if response.status_code == 200:
             logging.info("Successfully synced users and groups.")
@@ -719,7 +723,9 @@ class SyncUserAndGroups(BaseApiInterface):
 
         # for each username, get the guid and put in a list.  Log errors for users not found, but don't stop.
         url = self.format_url(SyncUserAndGroups.USER_METADATA_URL)
-        response = self.session.get(url, cookies=self.cookies)
+        response = requests.get(
+            url, cookies=self.cookies, verify=self.should_verify
+        )
         users = {}
         if response.status_code == 200:
             logging.info("Successfully got user metadata.")
@@ -746,8 +752,11 @@ class SyncUserAndGroups(BaseApiInterface):
 
             url = self.format_url(SyncUserAndGroups.DELETE_USERS_URL)
             params = {"ids": json.dumps(user_list)}
-            response = self.session.post(
-                url, data=params, cookies=self.cookies
+            response = requests.post(
+                url,
+                data=params,
+                cookies=self.cookies,
+                verify=self.should_verify,
             )
 
             if response.status_code != 204:
@@ -783,7 +792,9 @@ class SyncUserAndGroups(BaseApiInterface):
 
         # for each groupname, get the guid and put in a list.  Log errors for groups not found, but don't stop.
         url = self.format_url(SyncUserAndGroups.GROUP_METADATA_URL)
-        response = self.session.get(url, cookies=self.cookies)
+        response = requests.get(
+            url, cookies=self.cookies, verify=self.should_verify
+        )
         groups = {}
         if response.status_code == 200:
             logging.info("Successfully got group metadata.")
@@ -810,8 +821,11 @@ class SyncUserAndGroups(BaseApiInterface):
 
             url = self.format_url(SyncUserAndGroups.DELETE_GROUPS_URL)
             params = {"ids": json.dumps(group_list)}
-            response = self.session.post(
-                url, data=params, cookies=self.cookies
+            response = requests.post(
+                url,
+                data=params,
+                cookies=self.cookies,
+                verify=self.should_verify,
             )
 
             if response.status_code != 204:
@@ -863,7 +877,9 @@ class SyncUserAndGroups(BaseApiInterface):
 
         return  # TODO add after 4.4 is released.
 
-        response = self.session.post(url, data=params, cookies=self.cookies)
+        response = requests.post(
+            url, data=params, cookies=self.cookies, verify=self.should_verify
+        )
 
         if response.status_code == 200:
             logging.info("Successfully updated password for %s." % userid)
@@ -894,7 +910,7 @@ class Privileges(object):
 class SetGroupPrivilegesAPI(BaseApiInterface):
 
     # Note that some of these URLs are not part of the public API and subject to change.
-    METADATA_LIST_URL = "/tspublic/v1/metadata/listobjectheaders?type=USER_GROUP"
+    METADATA_LIST_URL = "/metadata/list?type=USER_GROUP"
     METADATA_DETAIL_URL = "/metadata/detail/{guid}?type=USER_GROUP"
 
     ADD_PRIVILEGE_URL = "/tspublic/v1/group/addprivilege"
@@ -926,7 +942,9 @@ class SetGroupPrivilegesAPI(BaseApiInterface):
         url = self.format_url(
             SetGroupPrivilegesAPI.METADATA_LIST_URL
         ) + "&pattern=" + group_name
-        response = self.session.get(url, cookies=self.cookies)
+        response = requests.get(
+            url, cookies=self.cookies, verify=self.should_verify
+        )
         if response.status_code == 200:  # success
             results = json.loads(response.text)
             try:
@@ -937,8 +955,8 @@ class SetGroupPrivilegesAPI(BaseApiInterface):
                     guid=group_id
                 )
                 detail_url = self.format_url(detail_url)
-                detail_response = self.session.get(
-                    detail_url, cookies=self.cookies
+                detail_response = requests.get(
+                    detail_url, cookies=self.cookies, verify=self.should_verify
                 )
                 if detail_response.status_code == 200:  # success
                     privileges = json.loads(detail_response.text)["privileges"]
@@ -977,7 +995,9 @@ class SetGroupPrivilegesAPI(BaseApiInterface):
         url = self.format_url(SetGroupPrivilegesAPI.ADD_PRIVILEGE_URL)
 
         params = {"privilege": privilege, "groupNames": json.dumps(groups)}
-        response = self.session.post(url, files=params, cookies=self.cookies)
+        response = requests.post(
+            url, files=params, cookies=self.cookies, verify=self.should_verify
+        )
 
         if response.status_code == 204:
             logging.info(
@@ -1007,7 +1027,9 @@ class SetGroupPrivilegesAPI(BaseApiInterface):
         url = self.format_url(SetGroupPrivilegesAPI.REMOVE_PRIVILEGE_URL)
 
         params = {"privilege": privilege, "groupNames": json.dumps(groups)}
-        response = self.session.post(url, files=params, cookies=self.cookies)
+        response = requests.post(
+            url, files=params, cookies=self.cookies, verify=self.should_verify
+        )
 
         if response.status_code == 204:
             logging.info(
@@ -1056,7 +1078,9 @@ class TransferOwnershipApi(BaseApiInterface):
 
         url = self.format_url(TransferOwnershipApi.TRANSFER_OWNERSHIP_URL)
         url = url + "?fromUserName=" + from_username + "&toUserName=" + to_username
-        response = self.session.post(url, cookies=self.cookies)
+        response = requests.post(
+            url, cookies=self.cookies, verify=self.should_verify
+        )
 
         if response.status_code == 204:
             logging.info(
@@ -1283,6 +1307,7 @@ class UGXLSReader(object):
                     row[indices["Groups"]]
                 )  # assumes a valid list format, e.g. ["a", "b", ...]
             visibility = row[indices["Visibility"]]
+            created = row[indices["Created"]]
 
             try:
                 user = User(
@@ -1292,6 +1317,7 @@ class UGXLSReader(object):
                     mail=email,
                     group_names=groups,
                     visibility=visibility,
+                    created=created,
                 )
                 # The format should be consistent with only one user per line.
                 self.users_and_groups.add_user(
@@ -1316,6 +1342,7 @@ class UGXLSReader(object):
             display_name = row[indices["Display Name"]]
             description = row[indices["Description"]]
             visibility = row[indices["Visibility"]]
+            created = row[indices["Created"]]
 
             groups = []
             if row[indices["Groups"]] is not None and row[
@@ -1331,6 +1358,7 @@ class UGXLSReader(object):
                     description=description,
                     group_names=groups,
                     visibility=visibility,
+                    created=created,
                 )
                 # The format should be consistent with only one group per line.
                 self.users_and_groups.add_group(
