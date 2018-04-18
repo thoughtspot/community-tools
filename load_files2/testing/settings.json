@@ -1,9 +1,12 @@
 {
   "root_directory": "/Users/bill.back/ThoughtSpot/community-tools/load_files2/testing",
   "data_directory": "/Users/bill.back/ThoughtSpot/community-tools/load_files2/testing/data",
+  "semaphore_filename": "load_now",
   "max_simultaneous_loads": "3",
   "max_archive_days": "14",
-  "success_email": ["email1@addr.com", "email2@addr.com"],
+  "email_from": "bill.back@thoughtspot.com",
+  "email_to": ["email1@addr.com", "email2@addr.com"],
+  "move_files" : "true",
   "filename_extension": ".csv",
   "tsload.target_database": "test_db",
   "tsload.source_data_format": "csv",
