@@ -43,10 +43,11 @@ def main():
         if args.from_ddl:
             print("Reading DDL ...")
             database = read_ddl(args)
-
-        if args.from_excel:
+        elif args.from_excel:
             print("Reading Excel")
             database = read_excel(args)
+        else:
+            database = Database(database_name=args.database)
 
         if args.validate:
             print("Validating database")
@@ -133,12 +134,12 @@ def valid_args(args):
     :return: True if valid, false otherwise.
     """
 
-    # make sure there is a to_ flag since data has to come from somewhere.
-    if args.from_ddl is None and args.from_excel is None:
+    # make sure there is a to_ flag since data has to come from somewhere unless this is just creating blank Excel.
+    if not args.from_ddl and not args.from_excel and not args.to_excel:
         eprint("--from_ddl or --from_excel must be provided as arguments.")
         return False
 
-    if args.from_ddl is not None and args.database is None:
+    if not args.from_ddl and not args.database:
         eprint("--from_ddl requires the --database option.")
         return False
 
