@@ -8,6 +8,8 @@ import time
 from collections import OrderedDict, namedtuple
 from openpyxl import Workbook
 import xlrd  # reading Excel
+import requests.packages.urllib3
+from requests.packages.urllib3.exceptions import InsecureRequestWarning
 
 """
 Copyright 2018 ThoughtSpot
@@ -60,7 +62,7 @@ def obj_to_json(obj):
     first = True
     for name in public_props(obj):
         value = getattr(obj, name)  # don't print empty values
-        if value is None:
+        if not value:
             continue
 
         if first:
@@ -68,7 +70,7 @@ def obj_to_json(obj):
         else:
             json_str += ","
 
-        if value is not None:
+        if value:
             json_str += '"%s":%s' % (name, json.dumps(value))
 
     json_str += "}"
@@ -125,7 +127,7 @@ class User(object):
         self.password = password
         self.mail = mail
         self.created = created
-        if group_names is None:
+        if not group_names:
             self.groupNames = list()
         else:
             self.groupNames = list(group_names)
@@ -194,7 +196,7 @@ class Group(object):
         self.description = description
         self.visibility = visibility
         self.created = created
-        if group_names is None:
+        if not group_names:
             self.groupNames = list()
         else:
             self.groupNames = list(group_names)
@@ -255,7 +257,7 @@ class UsersAndGroups(object):
         :param duplicate: Flag to indicate how to handle duplicates.
         """
         user = self.get_user(u.name)
-        if user is None:
+        if not user:
             self.users[u.name] = u
         else:
             if duplicate == UsersAndGroups.RAISE_ERROR_ON_DUPLICATE:
@@ -319,7 +321,7 @@ class UsersAndGroups(object):
         :param duplicate: Flag for what to do if there is a duplicate entry.
         """
         group = self.get_group(g.name)
-        if group is None:
+        if not group:
             self.groups[g.name] = g
         else:
             if duplicate == UsersAndGroups.RAISE_ERROR_ON_DUPLICATE:
@@ -689,7 +691,7 @@ class SyncUserAndGroups(BaseApiInterface):
             "removeDeleted": json.dumps(remove_deleted),
         }
 
-        if self.global_password is not None:
+        if self.global_password:
             params["password"] = json.dumps(self.global_password)
 
         response = self.session.post(url, files=params, cookies=self.cookies)
@@ -724,7 +726,8 @@ class SyncUserAndGroups(BaseApiInterface):
         if response.status_code == 200:
             logging.info("Successfully got user metadata.")
             json_list = json.loads(response.text)
-            for h in json_list["headers"]:
+            # for h in json_list["headers"]:
+            for h in json_list:
                 name = h["name"]
                 id = h["id"]
                 users[name] = id
@@ -732,7 +735,7 @@ class SyncUserAndGroups(BaseApiInterface):
             user_list = []
             for u in usernames:
                 id = users.get(u, None)
-                if id is None:
+                if not id:
                     eprint(
                         "WARNING:  user %s not found, not attempting to delete this user."
                         % u
@@ -788,7 +791,8 @@ class SyncUserAndGroups(BaseApiInterface):
         if response.status_code == 200:
             logging.info("Successfully got group metadata.")
             json_list = json.loads(response.text)
-            for h in json_list["headers"]:
+            # for h in json_list["headers"]:
+            for h in json_list:
                 name = h["name"]
                 id = h["id"]
                 groups[name] = id
@@ -796,7 +800,7 @@ class SyncUserAndGroups(BaseApiInterface):
             group_list = []
             for u in groupnames:
                 id = groups.get(u, None)
-                if id is None:
+                if not id:
                     eprint(
                         "WARNING:  group %s not found, not attempting to delete this group."
                         % u
@@ -804,7 +808,7 @@ class SyncUserAndGroups(BaseApiInterface):
                 else:
                     group_list.append(id)
 
-            if group_list == []:
+            if not group_list:
                 eprint("No valid groups to delete.")
                 return
 
@@ -930,7 +934,7 @@ class SetGroupPrivilegesAPI(BaseApiInterface):
         if response.status_code == 200:  # success
             results = json.loads(response.text)
             try:
-                group_id = results["headers"][0][
+                group_id = results[0][
                     "id"
                 ]  # should always be present, but might want to add try / catch.
                 detail_url = SetGroupPrivilegesAPI.METADATA_DETAIL_URL.format(
@@ -1181,16 +1185,14 @@ class UGXLSReader(object):
             "Display Name",
             "Email",
             "Groups",
-            "Visibility",
-            "Created",
+            "Visibility"
         ],
         "Groups": [
             "Name",
             "Display Name",
             "Description",
             "Groups",
-            "Visibility",
-            "Created",
+            "Visibility"
         ],
     }
 
@@ -1276,9 +1278,9 @@ class UGXLSReader(object):
             display_name = row[indices["Display Name"]]
             email = row[indices["Email"]]
             groups = []
-            if row[indices["Groups"]] is not None and row[
+            if row[indices["Groups"]] and row[
                 indices["Groups"]
-            ] != "":
+            ]:
                 groups = ast.literal_eval(
                     row[indices["Groups"]]
                 )  # assumes a valid list format, e.g. ["a", "b", ...]
@@ -1318,9 +1320,9 @@ class UGXLSReader(object):
             visibility = row[indices["Visibility"]]
 
             groups = []
-            if row[indices["Groups"]] is not None and row[
+            if row[indices["Groups"]] and row[
                 indices["Groups"]
-            ] != "":
+            ]:
                 groups = ast.literal_eval(
                     row[indices["Groups"]]
                 )  # assumes a valid list format, e.g. ["a", "b", ...]
