@@ -1,9 +1,9 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
 """
-Converts from non-TS DDL to TS DDL.  $ convert_ddl.py --help for more details.
+Loads files in parallel.
 
-Copyright 2017 ThoughtSpot
+Copyright 2018 ThoughtSpot
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
 documentation files (the "Software"), to deal in the Software without restriction, including without limitation the
@@ -20,7 +20,6 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 """
 
 from __future__ import print_function
-import sys
 import argparse
 import os
 from os import listdir
@@ -34,23 +33,19 @@ import tarfile
 import shutil
 import subprocess
 import copy
+import logging
 from multiprocessing import Pool
-from email import MIMEMultipart
-from email import MIMEText
-from email import MIMEBase
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.base import MIMEBase
 from email import encoders
 
-current_datetime = datetime.datetime.now()
-date = str(current_datetime.year)+str(current_datetime.month)+str(current_datetime.day)
+# TODO should be able to delete.
+# current_datetime = datetime.datetime.now()
+# date = str(current_datetime.year)+str(current_datetime.month)+str(current_datetime.day)
 
-
-def eprint(*args, **kwargs):
-    """
-    Prints to standard error similar to regular print.
-    :param args:  Positional arguments.
-    :param kwargs:  Keyword arguments.
-    """
-    print(*args, file=sys.stderr, **kwargs)
+logger = logging.getLogger()
+logger.setLevel(logging.DEBUG)
 
 
 def json_dump(j):
@@ -67,16 +62,18 @@ def load_a_file(cmd):
     """
 
     # fork out to the command and capture the results.
-    print(cmd)
+    logging.debug(cmd)
+    result = "ok"
     try:
         output = subprocess.check_output(
             cmd, stderr=subprocess.STDOUT, shell=True, universal_newlines=True
         )
     except subprocess.CalledProcessError as cpe:
-        # print ("Status : Fail", cpe.returncode, cpe.output)
+        logging.error("Status : Code = %s, Output = %s" % (cpe.returncode, cpe.output))
+        result = "error"
         output = cpe.output
 
-    return output
+    return result, output
 
 
 class Mailer(object):
@@ -90,10 +87,11 @@ class Mailer(object):
         :param settings: Contains settings, including the email server.
         :type settings: dict
         """
-        self.smtp_server = settings.get("email-server", None)
-        self.smtp_port = settings.get("email-port", 25)
+        self.smtp_server = settings.get("email_server", "smtp.gmail.com")
+        self.smtp_port = settings.get("email_port", 25)
+        self.email_password = settings.get("email_password", None)  # if this doesn't exist, may fail on sending.
         if not self.smtp_server:
-            eprint("WARNING:  No email server provided.  Emails will not be sent.")
+            logging.warning("WARNING:  No email server provided.  Emails will not be sent.")
 
     def send_email(self, email_to, email_from, subject, body, attachment_path=None):
 
@@ -111,6 +109,8 @@ class Mailer(object):
             msg.attach(part)
 
         server = smtplib.SMTP(self.smtp_server, self.smtp_port)
+        server.starttls()
+        server.login(email_from, self.email_password)
         server.sendmail(email_from, email_to, msg.as_string())
         server.quit()
 
@@ -141,7 +141,7 @@ class ParallelFileLoader(object):
                 "The data_directory %s doesn't exist or it not a valid directory."
                 % self.data_directory
             )
-        self.loaded_directory = self._get_dir("loaded")
+        self.loaded_directory = self._get_dir("loaded_files")
         self.archive_directory = self._get_dir("archive")
         self.log_directory = self._get_dir("logs")
 
@@ -166,6 +166,10 @@ class ParallelFileLoader(object):
                              for f in listdir(self.data_directory)
                              if isfile(join(self.data_directory, f)) and f.endswith(file_extension)]]
 
+        if not files:
+            logging.debug("No files to load.  Exiting")
+            exit(0)
+
         base_cmd = self._create_base_command()
         commands = []
         for f in files:
@@ -174,24 +178,40 @@ class ParallelFileLoader(object):
         # Turns off indexing.
         subprocess.call("sage_master_tool PauseUpdates", shell=True)
 
-        results = [pool.apply_async(load_a_file, (cmd,)) for cmd in commands]
+        results = []
+        try:
+            results = [pool.apply_async(load_a_file, (cmd,)) for cmd in commands]
+
+            # Write the results to the log file.
+            now = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
+            log_file_name = "load_results_%s.log" % now
+            log_path = self.log_directory + "/" + log_file_name
+
+            had_errors = False
+            with open(log_path, "w") as log_file:
+                # results are a tuple of result = "ok" or "error" and result object.
+                for res in results:
+                    the_res = res.get()
+                    # logging.debug(the_res)
+                    if the_res[0] == "error":
+                        had_errors = True
+                    log_file.write(the_res[1])
+
+            # copy logfile to old directory.
+            to_path = self.loaded_directory + "/" + log_file_name
+            shutil.copy(log_path, to_path)
+
+            # Clean up.
+            self._move_loaded_files(files, now)
+            self._send_results_email(had_errors=had_errors, log_path=log_path)
+            self._delete_old_archives()
+
+        except Exception as ex:
+            logging.error(ex.message)
 
         # Turns on indexing.
         subprocess.call("sage_master_tool ResumeUpdates", shell=True)
 
-        now = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
-        log_file_name = "load_results_%s.log" % now
-        log_path = self.log_directory + "/" + log_file_name
-        with open(log_path, "w") as log_file:
-            for res in results:
-                print(res.get())
-                log_file.write(res.get())
-
-        # copy logfile to old directory.
-        to_path = self.loaded_directory + "/" + log_file_name
-        shutil.copy(log_path, to_path)
-
-        self.move_loaded_files(files, now)
 
     def _create_base_command(self):
         """
@@ -254,15 +274,15 @@ class ParallelFileLoader(object):
 
         cmd = base_cmd.format(
             file_path=file_path, table_name=table_name
-        )  # TODO add format for file and table names.
+        )
 
         cmd = cmd.replace(
             "--empty_target", empty_target
-        )  # simply replace the     default if overridden.
+        )  # simply replace the default if overridden.
 
         return cmd
 
-    def move_loaded_files(self, files, runtime):
+    def _move_loaded_files(self, files, runtime):
         """
         Zips load files and results and moves them to an archived folder.
         :param files: list of files that were loaded.
@@ -271,32 +291,39 @@ class ParallelFileLoader(object):
         :type runtime: str
         """
 
+        do_move = self.settings.get("move_files", "true") == "true"
         for f in files:
-            if self.settings.get("move_files", "true") == "true":
+            if do_move:
+                logging.debug("moving %s" % f)
                 shutil.move(f, self.loaded_directory)
             else:
+                logging.debug("copying %s" % f)
                 shutil.copy(f, self.loaded_directory)
 
         # Zips the archive into a tarball
+        logging.debug("archiving data from %s" % self.loaded_directory)
         with tarfile.open("%s/load_results_%s.tar.gz" % (self.archive_directory, runtime), "w:gz") as tar:
             tar.add(self.loaded_directory, arcname=os.path.basename(self.loaded_directory))
 
         # Removes old archive directory contents.
         shutil.rmtree(self.loaded_directory)
 
-    def delete_old_archives(self):
+    def _delete_old_archives(self):
         """
         Deletes archives after a specified number of days
         """
 
         now = time.time()
+        # convert the date to number of seconds back.
+        seconds_ago = now - int(self.settings.get("max_archive_days", 14)) * 86400
 
-        # Lists out all tar archives in old directory.
-        # TODO:  update this to work.  Right now it won't find any files.
-        for f in os.listdir(self.loaded_directory):
-            f = os.path.join(self.loaded_directory, f)
+        logging.debug("Deleting old archives since %s" % seconds_ago)
+
+        # Lists out all tar archives in archive directory.
+        for f in os.listdir(self.archive_directory):
+            f = os.path.join(self.archive_directory, f)
             # Checks if date of archives in old directory are less than number of specified days old (in seconds).
-            if os.stat(f).st_mtime < now - int(self.settings.get("max_archive_days", None)) * 86400:
+            if os.stat(f).st_mtime < seconds_ago:
                 if os.path.isfile(f):
                     os.remove(f)
 
@@ -311,34 +338,80 @@ class ParallelFileLoader(object):
         """
         full_dir = self.root_directory + "/" + dir_name
         if not os.path.exists(full_dir):
+            logging.debug("creating directory %s" % full_dir)
             os.mkdir(full_dir)
         elif not os.path.isdir(full_dir):
             raise IOError("%s is not a directory." % full_dir)
         return full_dir
 
-    def _send_results_email(self, had_errors):
+    def _send_results_email(self, had_errors, log_path):
         """
         Sends an email with the results file attached.
-        :param had_errors:  True if the load had errors.
-        :type had_errors: bool
+        :param log_path:  Path to the log file.
+        :type log_path: str
         """
 
         # see if there is anyone to email to.  If not just return and don't do anything.
         email_to = self.settings.get("email_to", None)
         if not email_to:
-            print("No email address provided in settings.  To email results add 'email_to' setting.")
+            logging.warning("No email address provided in settings.  To email results add 'email_to' setting.")
             return
 
-        cluster_name = subprocess.check_output("tscli cluster status | grep 'Cluster name' | sed 's/^.*: //'")
+        cluster_name = \
+            subprocess.check_output("/usr/local/scaligent/bin/tscli cluster status | grep 'Cluster name' | sed 's/^.*: //'",
+                                    shell=True).strip()
+        logging.debug("cluster_name == %s" % cluster_name)
 
-        # TODO add some error checking for settings.
-        email_from = self.settings.get("email_from", None)
         subject = "%s loading data for cluster %s" % ("Error" if had_errors else "Success", cluster_name)
         body = "Data load for %s appears to have %s.  See attachment for details." % \
                (cluster_name, "failed" if had_errors else "succeeded")
 
-        # TODO: get path to results.
-        attachment_path = open("/home/admin/load_files2/testing/load_results.log", "rb")
+        # There are two possible approaches to sending email.  Direct from the OS, or using Python libraries.
+        if self.settings.get("email_method", None) == "osmail":
+            logging.debug("Sending email via OS.")
+            self._send_email_via_os(email_to=email_to, subject=subject, body=body, log_path=log_path)
+        else:  # caution - not well tested.
+            logging.debug("Sending email via API.")
+            self._send_email_via_api(email_to=email_to, subject=subject, body=body, log_path=log_path)
+
+    def _send_email_via_os(self, email_to, subject, body, log_path):
+        """
+        Sends an email using the mail on the operating system.
+        :param email_to:  The list of addresses to send the email to.
+        :type email_to: str
+        :param subject:  The subject of the email.
+        :type subject: str
+        :param body: The body of the email.
+        :type body: str
+        :param log_path: The path to the log file, which is sent as an attachment.
+        :type log_path: str
+        """
+
+        # echo "${body}" | mail - s "${subject}" -a ${RESULTS_FILE} ${address}
+        for email in email_to:
+            cmd = '/usr/bin/echo "%s" | /usr/bin/mail -s "%s" -a %s "%s"' % (body, subject, log_path, email)
+            try:
+                logging.debug(cmd)
+                subprocess.call(cmd, shell=True)
+            except Exception as ex:
+                logging.error("Error sending email via OS:  %s" % ex)
+
+    def _send_email_via_api(self, email_to, subject, body, log_path):
+        """
+        Sends an email using the mail on the operating system.
+        :param email_to:  The list of addresses to send the email to.
+        :type email_to: str
+        :param subject:  The subject of the email.
+        :type subject: str
+        :param body: The body of the email.
+        :type body: str
+        :param log_path: The path to the log file, which is sent as an attachment.
+        :type log_path: str
+        """
+        # TODO needs more testing.
+
+        email_from = self.settings.get("email_from", None)
+        attachment_path = open(log_path, "rb")
         mailer = Mailer(settings=self.settings)
         # may need a legit email address.
         mailer.send_email(email_from=email_from, email_to=email_to, subject=subject,
@@ -362,7 +435,7 @@ def main():
         semaphore_name = settings.get("semaphore_filename", None)
         data_directory = settings.get("data_directory", None)
         if not data_directory:
-            eprint("Error:  data directory %s doesn't exist!!" % data_directory)
+            logging.error("Error:  data directory %s doesn't exist!!" % data_directory)
 
         # the existance of a semaphore file means that a semaphore is being used.
         if semaphore_name:
@@ -400,7 +473,7 @@ def valid_args(args):
     """
     # make sure the settings file exists.
     if not isfile(args.filename):
-        eprint("File %s doesn't exist." % args.filename)
+        logging.error("File %s doesn't exist." % args.filename)
         return False
 
     return True
@@ -413,10 +486,16 @@ def read_settings(settings_filename):
     :type settings_filename: str
     :return:  A JSON object with the settings.
     """
-    print("reading settings from %s" % settings_filename)
-    with open(settings_filename, "r") as settings_file:
-        settings = json.load(settings_file)
-        print(json_dump(settings))
+    settings = {}
+    logging.debug("reading settings from %s" % settings_filename)
+    try:
+        with open(settings_filename, "r") as settings_file:
+            settings = json.load(settings_file)
+            logging.debug(json_dump(settings))
+    except Exception as ex:
+        logging.error(ex.message)
+        logging.error("exiting - fix settings file")
+        exit(-1)
 
     return settings
 
