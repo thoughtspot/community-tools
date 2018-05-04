@@ -219,7 +219,7 @@ class ParallelFileLoader(object):
         :return:  A string to use for the command containing two parameters:  {file_path} and {table_name}
         :rtype: str
         """
-        cmd = "cat {file_path} | tsload --target_table {table_name}"
+        cmd = "cat {file_path} | /usr/local/scaligent/bin/tsload --target_table {table_name}"
         for key in self.settings:
             if key.startswith("tsload"):
                 flag = key.split(".")[
