@@ -181,35 +181,37 @@ class ParallelFileLoader(object):
         results = []
         try:
             results = [pool.apply_async(load_a_file, (cmd,)) for cmd in commands]
+
+            # Write the results to the log file.
+            now = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
+            log_file_name = "load_results_%s.log" % now
+            log_path = self.log_directory + "/" + log_file_name
+
+            had_errors = False
+            with open(log_path, "w") as log_file:
+                # results are a tuple of result = "ok" or "error" and result object.
+                for res in results:
+                    the_res = res.get()
+                    # logging.debug(the_res)
+                    if the_res[0] == "error":
+                        had_errors = True
+                    log_file.write(the_res[1])
+
+            # copy logfile to old directory.
+            to_path = self.loaded_directory + "/" + log_file_name
+            shutil.copy(log_path, to_path)
+
+            # Clean up.
+            self._move_loaded_files(files, now)
+            self._send_results_email(had_errors=had_errors, log_path=log_path)
+            self._delete_old_archives()
+
         except Exception as ex:
             logging.error(ex.message)
 
         # Turns on indexing.
         subprocess.call("sage_master_tool ResumeUpdates", shell=True)
 
-        # Write the results to the log file.
-        now = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
-        log_file_name = "load_results_%s.log" % now
-        log_path = self.log_directory + "/" + log_file_name
-
-        had_errors = False
-        with open(log_path, "w") as log_file:
-            # results are a tuple of result = "ok" or "error" and result object.
-            for res in results:
-                the_res = res.get()
-                # logging.debug(the_res)
-                if the_res[0] == "error":
-                    had_errors = True
-                log_file.write(the_res[1])
-
-        # copy logfile to old directory.
-        to_path = self.loaded_directory + "/" + log_file_name
-        shutil.copy(log_path, to_path)
-
-        # Clean up.
-        self._move_loaded_files(files, now)
-        self._send_results_email(had_errors=had_errors, log_path=log_path)
-        self._delete_old_archives()
 
     def _create_base_command(self):
         """
