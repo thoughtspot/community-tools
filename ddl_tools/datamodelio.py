@@ -18,6 +18,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 import re
 import sys
 import xlrd  # reading Excel
+import logging
 
 # import datetime -- used by TsloadWriter, but commented out for now.
 import csv
@@ -66,21 +67,17 @@ class DDLParser(object):
     def __init__(
         self,
         database_name,
-        schema_name=DatamodelConstants.DEFAULT_SCHEMA,
-        parse_keys=False,
+        schema_name=DatamodelConstants.DEFAULT_SCHEMA
     ):
         """
         Creates a new DDL parser.
         :param database_name: Name of the database to create.
         :type database_name: str
         :param schema_name: Name of the schema if not using the default.
-        :param parse_keys: If true, the parser will attempt to parse keys as well. 
-        :type parse_keys: bool
         :type schema_name: str
         """
         self.schema_name = schema_name
         self.database = Database(database_name=database_name)
-        self.parse_keys = parse_keys
 
     def parse_ddl(self, filename):
         """
@@ -90,94 +87,150 @@ class DDLParser(object):
         :rtype: Database
         """
 
-        if filename is None:
-            stream = open(sys.stdin, "r")
-        else:
-            stream = open(filename, "r")
-
         # First read the entire input into memory.  This will allow multiple passes through the data.
-        input_ddl = []
-        for line in stream:
-            input_ddl.append(line)
-
-        self.parse_tables(input_ddl)
-        if self.parse_keys:
-            self.parse_primary_keys(input_ddl)
+        statements = self._get_statements(filename=filename)
+        for stmt in statements:
+            logging.debug(">>> %s" % stmt)
+            lower = stmt.lower()
+            if "create database" in lower:
+                logging.debug("Ignoring create database statement.")
+            elif "create table" in lower:
+                self._parse_create_table(stmt)
+            elif "alter table" in lower:
+                logging.debug("altering a table....")
+                if "primary key" in lower:
+                    logging.debug("adding a primary key:  %s" % stmt)
+                    self._add_primary_key(stmt)
+                elif "foreign" in lower:
+                    # TODO Handle adding foreign key.
+                    logging.debug("adding foreign key:  %s" % stmt)
+                    self._add_foreign_key(stmt)
+                elif "relationship" in lower:
+                    logging.debug("creating a relationship:  %s" % stmt)
+                    self._add_generic_relationship(stmt)
+                elif "hash" in lower:
+                    logging.debug("sharding a table:  %s" % stmt)
+                    self._add_shard_key(stmt)
+                else:
+                    logging.debug("ignoring alter")
+            else:
+                logging.debug("ignoring statement:  %s" % stmt)
 
         return self.database
 
-    def parse_tables(self, input_ddl):
+    def _get_statements(self, filename):
         """
-        Parses the input DDL to convert to a database model.
-        :param input_ddl: The DDL to convert.
-        :type input_ddl: list of str
+        Reads the statements from the file or input stream.
+        :param filename:
+        :return:
         """
-        creating = False
-        buff = ""
-        for line in input_ddl:
-            l = self.clean_line(line)
 
-            if not creating:  # looking for CREATE TABLE statement.
-                if l.lower().find("create table") >= 0:
-                    creating = True
-                    buff = l
-                    if self.is_complete_create(buff):
-                        self.parse_create_table(buff)
-                        buff = ""
-                        creating = False
-            else:  # looking for the end of a create table.
-                buff += l
-                if self.is_complete_create(buff):
-                    self.parse_create_table(buff)
-                    buff = ""
-                    creating = False
+        if filename is None:
+            ddl_file = open(sys.stdin, "r")
+        else:
+            ddl_file = open(filename, "r")
 
-    @staticmethod
-    def is_complete_create(buff):
-        """
-        Returns true if the number of open and close parentheses match.
-        :param buff: The buffer being read.
-        :return: str
-        """
-        nbr_open = buff.count("(")
-        nbr_close = buff.count(")")
-        return nbr_open > 0 and nbr_open == nbr_close
+        statements = []
+        try:
+            stmt_buffer = ""  # line stmt_buffer for reading entire commands.
+            in_comment = False
+            for line in ddl_file:
+                line = self._clean_line(line=line)
+                line = line.partition("--")[0]  # strip off any -- comments.
+                logging.debug(line)
+                if self._should_ignore_line(line=line):
+                    pass
+                else:
+                    # if in a comment, then ignore lines until the comment is gone.
+                    if in_comment:
+                        # get content if done with comment.
+                        if "*/" in line:
+                            in_comment = False
+                            line = line.partition("*/")[2]
+                            stmt_buffer += line
+                        # will ignore lines inside a comment.
 
-    def parse_create_table(self, buff):
+                    elif "/*" in line:
+                        # have an opening for comments.  Read until get to end of the comment.
+                        in_comment = True
+                        before_comment = line.partition("/*")[0]
+                        after_comment = line.partition("/*")[2]
+                        stmt_buffer += before_comment
+
+                        if "*/" in after_comment: # could be a one line comment.
+                            in_comment = False
+                            stmt_buffer += after_comment.partition("*/")[2]
+                    else:
+                        stmt_buffer += line
+
+                    if ";" in stmt_buffer:
+                        # contains end of statement.
+                        parts = stmt_buffer.partition(";")
+                        statements.append(parts[0])
+                        logging.debug("adding statement:  %s" % parts[0])
+                        stmt_buffer = parts[2]
+
+        except Exception as ex:
+            eprint(ex)
+        finally:
+            ddl_file.close()
+
+        statements = [re.sub(" +", " ", stmt) for stmt in statements]
+
+        return statements
+
+    def _should_ignore_line(self, line):
+        """
+        Returns true if a line should be ignored.
+        :param line: The line to test.
+        :type line: str
+        :return: True if should be ignored.
+        """
+        should_ignore = False
+
+        # SQL Server cases.
+        if line.startswith("GO"):
+            should_ignore = True
+
+        return should_ignore
+
+    def _parse_create_table(self, statement):
         """
         Parses a create table statement.
-        :param buff: The buffer read in.
-        :type buff: str
+        :param statement: The statement read in.
+        :type statement: str
         :return: 
         """
-        buff = buff.replace("[", '"').replace(
+        statement = statement.replace("[", '"').replace(
             "]", '"'
         )  # for SQL Server quotes
-        table_name = self.get_table_name(buff)
-        columns = self.get_columns(buff)
-
+        table_name = self._get_table_name(statement)
         table = Table(table_name=table_name, schema_name=self.schema_name)
-        table.add_columns(columns)
+        self._add_columns(table, statement)
+        if "partition by hash" in statement:
+            self._add_hashkey(table, statement)
+
         self.database.add_table(table)
 
-    def get_table_name(self, buff):
+    def _get_table_name(self, statement):
         """
-        Gets the table name from the buffer.
-        :param buff: The line with the create details.
-        :type buff: str
+        Gets the table name from the statement.
+        :param statement: The line with the create details.
+        :type statement: str
         :return: The name of the table.
         :rtype: str
         """
         # The table name (and maybe a schema) are before the opening (
-        tn = buff[0:buff.find("(")].rstrip()
+        tn = statement[0:statement.find("(")].rstrip()
         # split on spaces and assume last one is table name (and maybe schema)
-        tn = tn.split(" ")[-1]
+        tn = tn[13:]  # len("create table ") == 13
+        # tn = tn.split(" ")[-1]
         tn = tn.split(".")[-1]
-        tn = self.strip_quotes(tn)
+        tn = self._strip_quotes(tn)
         return tn
 
     @staticmethod
-    def strip_quotes(line):
+    def _strip_quotes(line):
         """
         Strips off any quotes in the given line.
         :param line: The line to strip quotes from.
@@ -187,48 +240,54 @@ class DDLParser(object):
         """
         return line.replace("'", "").replace("`", "").replace('"', "")
 
-    def get_columns(self, buff):
+    def _add_columns(self, table, statement):
         """
         Get the columns from the table statement.
-        :param buff: The buffer with the create details.
-        :type buff: str
+        :param table: The table to add the columns to.
+        :type table: Table
+        :param statement: The statement with the create details.
+        :type statement: str
         :return: A list of Columns
         :rtype: list
         """
         # The fields will be between the ( ).
         columns = []
-        buff = buff[buff.find("(") + 1:buff.rfind(")")].strip()
+        statement = statement[statement.find("(") + 1:statement.rfind(")")].strip()
 
         # think all DBs use commas for field separators
         # need to find the commas that are not inside of parents.
-        field_buff = ""
+        field_statement = ""
         open_paren = False
         raw_fields = []
 
-        for c in buff:
+        for c in statement:
 
             if open_paren:
-                field_buff += c
+                field_statement += c
                 if c == ")":
                     open_paren = False
             elif c == "(":
-                field_buff += c
+                field_statement += c
                 open_paren = True
             else:
                 if c == ",":
-                    raw_fields.append(field_buff)
-                    field_buff = ""
+                    raw_fields.append(field_statement.strip())
+                    field_statement = ""
                 else:
-                    field_buff += c
+                    field_statement += c
 
-        if field_buff != "":
-            raw_fields.append(field_buff)
+        if field_statement != "":
+            raw_fields.append(field_statement.strip())
 
-        for rf in raw_fields:
+        for rf in raw_fields:  # get rid of any extraneous white space.
             rfl = rf.lower()
+
             # ignore key declarations.
             if "key " in rfl:
-                continue
+                if "primary" in rfl:
+                    pks = rf.partition("(")[2].partition(")")[0].replace(" ", "").replace('"', '').split(",")
+                    table.set_primary_key(pks)
+                continue  # skip other key types and go to next field.
 
             had_quote = False
             if rfl[0] in "\"'`":  # should be a quote or letter
@@ -262,14 +321,14 @@ class DDLParser(object):
             # print ("  adding %s as %s" % (name, data_type))
             columns.append(
                 Column(
-                    column_name=name, column_type=self.convert_type(data_type)
+                    column_name=name, column_type=self._convert_type(data_type)
                 )
             )
 
-        return columns
+        table.add_columns(columns)
 
     @staticmethod
-    def convert_type(data_type):
+    def _convert_type(data_type):
         """
         Converts data types from other databases to ThoughtSpot types.
         :param data_type:  The datatype to convert.
@@ -291,6 +350,8 @@ class DDLParser(object):
         elif "rowversion" in t:  # MS type
             new_t = "INT"
         elif "uniqueidentifier" in t:  # Oracle type
+            new_t = "VARCHAR(0)"
+        elif "sysname" in t: # MS type
             new_t = "VARCHAR(0)"
         elif "serial" in t:  # serial index, Oracle and others
             new_t = "INT"
@@ -350,43 +411,8 @@ class DDLParser(object):
 
         return new_t
 
-    def parse_primary_keys(self, input_ddl):
-        """
-        Parses primary keys (and shard keys for TQL.
-        :param input_ddl: The input DDL to parse from.
-        :type input_ddl: list of str
-        """
-        # read through lines until a CREATE TABLE or ALTER TABLE is found.
-        # next look for either a new CREATE TABLE, a PRIMARY KEY, or PARTITION BY HASH
-        # add the primary key or partition
-
-        # TODO - get this to work.
-        create_or_update = False
-        buff = ""
-        for line in input_ddl:
-            l = self.clean_line(line)
-
-            if not create_or_update:  # looking for CREATE TABLE or UPDATE TABLE statement.
-                if l.lower().find("create table") >= 0 or l.lower().find(
-                    "update table"
-                ) >= 0:
-                    create_or_update = True
-                    buff = l
-                    if self.is_complete_create(buff):
-                        self.parse_create_table(buff)
-                        buff = ""
-                        create_or_update = False
-            else:  # looking for the end of a create table.
-                buff += l
-                if self.is_complete_create(buff):
-                    self.parse_create_table(buff)
-                    buff = ""
-                    create_or_update = False
-
-        pass
-
     @staticmethod
-    def clean_line(line):
+    def _clean_line(line):
         """
         Removes unwanted characters from the input line.
         :param line:  The line to clean up.
@@ -394,13 +420,146 @@ class DDLParser(object):
         :return: The cleaned up line.
         :rtype: str
         """
-        l = line.strip()
-        l = re.sub(" +", " ", l)
-        l = re.sub("\t+", " ", l)
-        return l
+        new_line = line.strip()
+        new_line = re.sub(" +", " ", new_line)
+        new_line = re.sub("\t+", " ", new_line)
+        return new_line
 
+    @staticmethod
+    def _clean_name(name):
+        """
+        Strips out everything except names from a string.  If there are commas, those are left, but spaces, quotes, etc.
+        are removed.
+        :param name: The name to clean up.
+        :return: The cleaned name.
+        """
+        cn = name.replace(" ", "")
+        cn = cn.replace("\t", "")
+        cn = cn.replace("\"", "")
+        cn = cn.replace("'", "")
+        cn = cn.replace("[", "")
+        cn = cn.replace("]", "")
+        return cn
 
-# -------------------------------------------------------------------------------------------------------------------
+    @staticmethod
+    def _add_hashkey(table, statement):
+        """
+        Reads the statement for a hashkey and adds to the table if it exists.  These will only be TQL hashkeys.
+        :param table: The table to add the hashkey to, if it exists.
+        :type table: Table
+        :param statement: The create table statement.
+        :type statement: str
+        """
+        try:
+            pattern = re.compile("create table.*partition by hash \((.*)\) key \((.*)\)", re.IGNORECASE)
+            matches = pattern.search(statement.lower())
+            number_shards = int(matches.group(1))
+            shard_keys = matches.group(2)
+            shard_keys = [DDLParser._clean_name(key) for key in shard_keys.split(",")]
+            table.shard_key = ShardKey(shard_keys=shard_keys, number_shards=number_shards)
+        except Exception as ex:
+            eprint('Error "%s" extracting hash key from: %s' % (ex, statement))
+
+    # -------------------------------------------------------------------------------------------------------------------
+
+    @staticmethod
+    def _extract_name(start_of_name):
+        """
+        Extracts a name from some text.  It assumes the name is at the start of the string and may or may not
+        be enclosed in quotes.  If not in quotes, then the first token to the string is selected.  If in quotes, then the
+        text between quotes is selected.
+        :param start_of_name: String that has the start of the name.  This can be a quote or not.
+        :type start_of_name: str
+        :return: The name of the extraced from the text.
+        """
+        if start_of_name[0] == '"':
+            return start_of_name[1:].split('"')[0]
+
+        if start_of_name[0] == "'":
+            return start_of_name[1:].split("'")[0]
+
+        return start_of_name.split(" ")[0]
+
+    def _add_primary_key(self, statement):
+        """
+        Adds primary keys that are created with an alter table statement.
+        :param statement: The alter table statement.
+        :type statement: str
+
+        primary keys can come in multiple patterns:
+          TQL:  alter table .... primary key (keys...)
+          SQL Server:  alter table .... primary key ... (keys...)
+        """
+        logging.debug("Trying to extract primary key from %s" % statement)
+        try:
+            pattern = re.compile("alter table (.*) .*primary key.*\((.*)\)", re.IGNORECASE)
+            matches = pattern.search(statement)
+            if not matches:
+                eprint("Possible parsing error: unable to extract primary key from %s." % statement)
+                return
+
+            table_name = DDLParser._extract_name(matches.group(1))
+            primary_key = matches.group(2)
+            primary_keys = [DDLParser._clean_name(key) for key in primary_key.split(",")]
+
+            table = self.database.get_table(table_name=table_name)
+            if table:
+                table.set_primary_key(primary_key=primary_keys)
+            else:
+                logging.error("Attempting to add a primary key to table %s, which is not in the database." % table_name)
+        except Exception as ex:
+            eprint('Error "%s" extracting primary key from: %s' % (ex, statement) )
+
+    def _add_foreign_key(self, statement):
+        """
+        Adds foreign keys that are created with an alter table statement.
+        :param statement: The alter table statement.
+        :type statement: str
+        """
+        try:
+            # table_name = DDLParser._extract_name(matches.group(1))
+            table_name = ""
+            table = self.database.get_table(table_name=table_name)
+            if table:
+                pass
+            else:
+                logging.error("Attempting to add a foreign key to table %s, which is not in the database." % table_name)
+        except Exception as ex:
+            eprint('Error "%s" extracting foreign key from: %s' % (ex, statement) )
+
+    def _add_generic_relationship(self, statement):
+        """
+        Adds generic relationships that are created with an ALTER TABLE statement.  Should only be TQL.
+        :param statement: The alter table statement.
+        :type statement: str
+        """
+        try:
+            # table_name = DDLParser._extract_name(matches.group(1))
+            table_name = ""
+            table = self.database.get_table(table_name=table_name)
+            if table:
+                pass
+            else:
+                logging.error("Attempting to add a generic relationship to table %s, which is not in the database." % table_name)
+        except Exception as ex:
+            eprint('Error "%s" extracting generic relationship from: %s' % (ex, statement) )
+
+    def _add_shard_key(self, statement):
+        """
+        Adds generic relationships that are created with an ALTER TABLE statement.  Should only be TQL.
+        :param statement: The alter table statement.
+        :type statement: str
+        """
+        try:
+            # table_name = DDLParser._extract_name(matches.group(1))
+            table_name = ""
+            table = self.database.get_table(table_name=table_name)
+            if table:
+                pass
+            else:
+                logging.error("Attempting to add a shard key to table %s, which is not in the database." % table_name)
+        except Exception as ex:
+            eprint('Error "%s" extracting shard key from: %s' % (ex, statement) )
 
 
 class TQLWriter:
@@ -1019,7 +1178,7 @@ class XLSReader:
                 sk = [x.strip() for x in sk_name.split(",")]
 
             shard_key = None
-            if sk_name != "" and sk_nbr_shards != "":
+            if sk_name and sk_nbr_shards:
                 shard_key = ShardKey(
                     shard_keys=sk, number_shards=sk_nbr_shards
                 )
@@ -1028,7 +1187,7 @@ class XLSReader:
                 table_name=row[indices["Table"]],
                 schema_name=row[indices["Schema"]],
                 primary_key=pk,
-                shard_key=None,
+                shard_key=shard_key
             )
             database.add_table(table)
 
