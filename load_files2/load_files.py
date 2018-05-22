@@ -2,17 +2,13 @@
 
 """
 Loads files in parallel.
-
 Copyright 2018 ThoughtSpot
-
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
 documentation files (the "Software"), to deal in the Software without restriction, including without limitation the
 rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
 permit persons to whom the Software is furnished to do so, subject to the following conditions:
-
 The above copyright notice and this permission notice shall be included in all copies or substantial portions
 of the Software.
-
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
 TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
@@ -33,6 +29,7 @@ import tarfile
 import shutil
 import subprocess
 import copy
+import psutil
 import logging
 from multiprocessing import Pool
 from email.mime.multipart import MIMEMultipart
@@ -151,7 +148,9 @@ class ParallelFileLoader(object):
         """
         Loads the files based on the settings used when created.
         """
-
+        if self._already_running():
+            return
+        
         file_extension = self.settings.get(
             "filename_extension", ".csv"
         )   # default to .csv if none provided.
@@ -205,14 +204,17 @@ class ParallelFileLoader(object):
             self._move_loaded_files(files, now)
             self._send_results_email(had_errors=had_errors, log_path=log_path)
             self._delete_old_archives()
-
+	  
         except Exception as ex:
             logging.error(ex.message)
 
         # Turns on indexing.
         subprocess.call("sage_master_tool ResumeUpdates", shell=True)
-
-
+        # remove loading file.
+        loading = self.data_directory + '/load_file'
+        if os.path.isfile(loading):
+            os.remove(loading)
+     
     def _create_base_command(self):
         """
         Creates the base tsload command based on the settings.
@@ -416,13 +418,31 @@ class ParallelFileLoader(object):
         # may need a legit email address.
         mailer.send_email(email_from=email_from, email_to=email_to, subject=subject,
                           body=body, attachment_path=attachment_path)
-
-
+                          
+    def _already_running(self):
+       	"""  
+       	loading is a flag that indicates the process is running. Needed to avoid 
+      	two copies running at once
+      	"""        
+        loading = self.data_directory + '/load_file'
+        already_running = False
+        if os.path.isfile(loading):
+            logging.warning ("load file process")
+            with open(loading, 'r') as loading_file:
+                other_pid = loading_file.readline()
+                if psutil.pid_exists(int(other_pid)):
+                    already_running = True
+                    
+        if not already_running:
+            with open(loading, 'w') as loading_file:    
+                loading_file.write(str(os.getpid()))
+                   
+        return already_running 
+    
 def main():
     """
     Loads files using tsload based on the settings in the settings file.
     """
-
     args = parse_args()
     if valid_args(args):
 
@@ -445,7 +465,7 @@ def main():
             else:
                 # Should be OK to remove the semaphore since already know to load.
                 os.remove(semaphore_path)
-
+                
         loader = ParallelFileLoader(settings=settings)
         loader.load_files()
 
@@ -502,3 +522,4 @@ def read_settings(settings_filename):
 
 if __name__ == "__main__":
     main()
+
