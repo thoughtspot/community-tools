@@ -204,12 +204,13 @@ class ParallelFileLoader(object):
             self._move_loaded_files(files, now)
             self._send_results_email(had_errors=had_errors, log_path=log_path)
             self._delete_old_archives()
-	  
+
         except Exception as ex:
             logging.error(ex.message)
 
         # Turns on indexing.
         subprocess.call("sage_master_tool ResumeUpdates", shell=True)
+
         # remove loading file.
         loading = self.data_directory + '/load_file'
         if os.path.isfile(loading):
@@ -420,10 +421,12 @@ class ParallelFileLoader(object):
                           body=body, attachment_path=attachment_path)
                           
     def _already_running(self):
-       	"""  
-       	loading is a flag that indicates the process is running. Needed to avoid 
-      	two copies running at once
-      	"""        
+        """
+        Checks to see if there is already a running process doing loads.  This prevents having two load managers from
+        running at once and also provides failover since it checks for failure.
+        :return: True if there is a process already running.
+        :rtype: bool
+        """
         loading = self.data_directory + '/load_file'
         already_running = False
         if os.path.isfile(loading):
@@ -438,7 +441,8 @@ class ParallelFileLoader(object):
                 loading_file.write(str(os.getpid()))
                    
         return already_running 
-    
+
+
 def main():
     """
     Loads files using tsload based on the settings in the settings file.
