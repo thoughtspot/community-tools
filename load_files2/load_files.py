@@ -256,8 +256,7 @@ class ParallelFileLoader(object):
         # table names are the name of the file, minus:
         # - .extension
         # - _incremental or _full
-        # - ?? do we somehow allow timestamps?  Easier if not.  Maybe add as a future enhancement.  One option would
-        #      be to just to provide a pattern, or maybe a strip flag for _ and -.
+        # - -xxx, usually used for table names.
 
         # remove the extension.
         table_name = table_name.split(self.settings.get("filename_extension", ""))[0]
@@ -265,6 +264,9 @@ class ParallelFileLoader(object):
         # take off . in case it's not included in the extension.  That would be an invalid table name.
         if table_name.endswith("."):
             table_name = table_name[:-1]
+
+        # remove anything after a hyphen.
+        table_name = table_name.split("-")[0]
 
         # handle _full and _incremental.  MUST be last thing before the extension.
         empty_target = self.settings.get("settings.empty_target", "")
