@@ -204,12 +204,13 @@ class ParallelFileLoader(object):
             self._move_loaded_files(files, now)
             self._send_results_email(had_errors=had_errors, log_path=log_path)
             self._delete_old_archives()
-	  
+
         except Exception as ex:
             logging.error(ex.message)
 
         # Turns on indexing.
         subprocess.call("sage_master_tool ResumeUpdates", shell=True)
+
         # remove loading file.
         loading = self.data_directory + '/load_file'
         if os.path.isfile(loading):
@@ -255,8 +256,7 @@ class ParallelFileLoader(object):
         # table names are the name of the file, minus:
         # - .extension
         # - _incremental or _full
-        # - ?? do we somehow allow timestamps?  Easier if not.  Maybe add as a future enhancement.  One option would
-        #      be to just to provide a pattern, or maybe a strip flag for _ and -.
+        # - -xxx, usually used for table names.
 
         # remove the extension.
         table_name = table_name.split(self.settings.get("filename_extension", ""))[0]
@@ -264,6 +264,9 @@ class ParallelFileLoader(object):
         # take off . in case it's not included in the extension.  That would be an invalid table name.
         if table_name.endswith("."):
             table_name = table_name[:-1]
+
+        # remove anything after a hyphen.
+        table_name = table_name.split("-")[0]
 
         # handle _full and _incremental.  MUST be last thing before the extension.
         empty_target = self.settings.get("settings.empty_target", "")
@@ -420,10 +423,12 @@ class ParallelFileLoader(object):
                           body=body, attachment_path=attachment_path)
                           
     def _already_running(self):
-       	"""  
-       	loading is a flag that indicates the process is running. Needed to avoid 
-      	two copies running at once
-      	"""        
+        """
+        Checks to see if there is already a running process doing loads.  This prevents having two load managers from
+        running at once and also provides failover since it checks for failure.
+        :return: True if there is a process already running.
+        :rtype: bool
+        """
         loading = self.data_directory + '/load_file'
         already_running = False
         if os.path.isfile(loading):
@@ -438,7 +443,8 @@ class ParallelFileLoader(object):
                 loading_file.write(str(os.getpid()))
                    
         return already_running 
-    
+
+
 def main():
     """
     Loads files using tsload based on the settings in the settings file.
