@@ -30,7 +30,9 @@ The following assumptions are made about the DDL being read:
 import argparse
 from datamodel import Database, eprint
 from datamodelio import DDLParser, TQLWriter, XLSWriter, XLSReader, TsloadWriter
+# import logging
 
+# logging.basicConfig(level=logging.DEBUG)
 
 def main():
     """Main function for the script."""
@@ -139,7 +141,7 @@ def valid_args(args):
         eprint("--from_ddl or --from_excel must be provided as arguments.")
         return False
 
-    if not args.from_ddl and not args.database:
+    if args.from_ddl and not args.database:
         eprint("--from_ddl requires the --database option.")
         return False
 

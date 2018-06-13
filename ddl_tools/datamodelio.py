@@ -54,15 +54,13 @@ class DDLParser(object):
     """
     Parses DDL from various formats and creates a DataModel object that can be used for writing data.
     The following assumptions are made about the DDL being read:
+    * Statements end with a semi-colon (;).
     * CREATE TABLE occur together on a single line, not split across lines.
     * CREATE TABLE statements will not occur inside of a comment block.
     * Delimiters, such as commas, will not be part of the table or column name.
     * Comment characters, such as #, --, or /* */ will not be part of a column name.
     * CREATE TABLE will have (....) with no embedded, unbalanced parentheses.
-    
     """
-
-    # TODO: capture primary keys, foreign keys, and relationships.
 
     def __init__(
         self,
@@ -102,7 +100,6 @@ class DDLParser(object):
                     logging.debug("adding a primary key:  %s" % stmt)
                     self._add_primary_key(stmt)
                 elif "foreign" in lower:
-                    # TODO Handle adding foreign key.
                     logging.debug("adding foreign key:  %s" % stmt)
                     self._add_foreign_key(stmt)
                 elif "relationship" in lower:
@@ -161,12 +158,12 @@ class DDLParser(object):
                             in_comment = False
                             stmt_buffer += after_comment.partition("*/")[2]
                     else:
-                        stmt_buffer += line
+                        stmt_buffer += " " + line
 
                     if ";" in stmt_buffer:
                         # contains end of statement.
                         parts = stmt_buffer.partition(";")
-                        statements.append(parts[0])
+                        statements.append(parts[0].strip())
                         logging.debug("adding statement:  %s" % parts[0])
                         stmt_buffer = parts[2]
 
@@ -301,8 +298,9 @@ class DDLParser(object):
             start_idx = len(name) + (
                 3 if had_quote else 1
             )  # extra 1 for space
-            if rfl.find(")") > 0:  # type with ()
-                data_type = rf[start_idx:rf.find(")") + 1]
+            close_paren_idx = rfl.find(")", start_idx)
+            if close_paren_idx > 0:  # type with ()
+                data_type = rf[start_idx:close_paren_idx + 1]
             else:
                 # either next space or comma.
                 space_end_idx = rf.find(" ", start_idx)
@@ -428,12 +426,14 @@ class DDLParser(object):
     @staticmethod
     def _clean_name(name):
         """
-        Strips out everything except names from a string.  If there are commas, those are left, but spaces, quotes, etc.
-        are removed.
+        Strips out everything except names from a string.  If there are commas, those are left, but quotes, etc.
+        are removed.  Also remove database or schema names.
         :param name: The name to clean up.
         :return: The cleaned name.
         """
-        cn = name.replace(" ", "")
+        name = name.split(".")
+        name = name[len(name)-1]
+        cn = name.strip()
         cn = cn.replace("\t", "")
         cn = cn.replace("\"", "")
         cn = cn.replace("'", "")
@@ -461,6 +461,17 @@ class DDLParser(object):
             eprint('Error "%s" extracting hash key from: %s' % (ex, statement))
 
     # -------------------------------------------------------------------------------------------------------------------
+    @staticmethod
+    def _extract_table_name(potential_name):
+        """
+        Extracts a table name.  It's possible that the name has a schema and other characters.
+        :param potential_name: The value that has the table name.
+        :return:  The table name.
+        """
+        # check for database, schema, etc.  Assume table is last in a dot separated list.
+        table_name = DDLParser._extract_name(potential_name)
+        table_name = table_name.split(".")[-1]
+        return DDLParser._clean_name(table_name)
 
     @staticmethod
     def _extract_name(start_of_name):
@@ -480,26 +491,47 @@ class DDLParser(object):
 
         return start_of_name.split(" ")[0]
 
+    @staticmethod
+    def _get_matches(statement, patterns, expect_matches=1):
+        """
+        Returns a list of the matches in a statement based on a set of patterns.  The patterns will be tested one
+        at a time and the first one that returns the expected number of matches is returned.
+        :param statement: The statement to check for matches.
+        :type statement: str
+        :param patterns: List of patterns to use for matching.  Should be in order of preference since the first
+        match will be returned.
+        :type patterns: list of str
+        :param expect_matches: number of matches being looked for.  Only matches with those many will be returned.
+        :return: Either a tuple of matches or None if no appropriate match is found.
+        :rtype: tuple
+        """
+        for p in patterns:
+            match = re.match(p, statement, re.IGNORECASE)
+            if match:
+                if len(match.groups()) == expect_matches:
+                    return match.groups()
+
+        return None
+
     def _add_primary_key(self, statement):
         """
         Adds primary keys that are created with an alter table statement.
-        :param statement: The alter table statement.
-        :type statement: str
-
         primary keys can come in multiple patterns:
           TQL:  alter table .... primary key (keys...)
           SQL Server:  alter table .... primary key ... (keys...)
+        :param statement: The alter table statement.
+        :type statement: str
         """
         logging.debug("Trying to extract primary key from %s" % statement)
         try:
-            pattern = re.compile("alter table (.*) .*primary key.*\((.*)\)", re.IGNORECASE)
-            matches = pattern.search(statement)
+            patterns = ["alter table (.*) .*primary key.*\((.*)\)"]
+            matches = DDLParser._get_matches(patterns=patterns, statement=statement, expect_matches=2)
             if not matches:
                 eprint("Possible parsing error: unable to extract primary key from %s." % statement)
                 return
 
-            table_name = DDLParser._extract_name(matches.group(1))
-            primary_key = matches.group(2)
+            table_name = DDLParser._extract_table_name(matches[0])
+            primary_key = matches[1]
             primary_keys = [DDLParser._clean_name(key) for key in primary_key.split(",")]
 
             table = self.database.get_table(table_name=table_name)
@@ -513,36 +545,92 @@ class DDLParser(object):
     def _add_foreign_key(self, statement):
         """
         Adds foreign keys that are created with an alter table statement.
+        primary keys can come in multiple patterns:
+          with name:  alter table <table-name> add constraint <constraint-name> foreign key (<key-name>) references <table-name> (<key-name>);
+          without name:  alter table <table-name> add constraint foreign key (<key-name>) references <table-name> (<key-name>);
         :param statement: The alter table statement.
         :type statement: str
         """
         try:
-            # table_name = DDLParser._extract_name(matches.group(1))
-            table_name = ""
-            table = self.database.get_table(table_name=table_name)
-            if table:
-                pass
-            else:
-                logging.error("Attempting to add a foreign key to table %s, which is not in the database." % table_name)
+            # There can be multiple foreign key constraints in a single add constraint command, so need to split
+            # and test each sub-pattern.
+            constraints = re.split("constraint", statement, flags=re.IGNORECASE)
+            patterns = ["alter table (.*) add.*"]
+            matches = DDLParser._get_matches(patterns=patterns, statement=statement, expect_matches=1)
+            table_name = DDLParser._clean_name(matches[0])
+            for idx in range(1,len(constraints)):
+                # gets rid of unnecessary commas and semi-colons if they exist.
+                constraint = constraints[idx].strip().strip(",").strip(";").strip()
+
+                # There can either be a name or not.  If there is, the matches change.
+                patterns = ["(.*) foreign key *\((.*)\) references *(.*) \((.*)\)"]
+                matches = DDLParser._get_matches(patterns=patterns, statement=constraint, expect_matches=4)
+                if matches:
+                    constraint_name = DDLParser._clean_name(matches[0])
+                    # from_columns = DDLParser._clean_name(matches[1])
+                    from_columns = [DDLParser._clean_name(k) for k in matches[1].split(",")]
+                    to_table = DDLParser._extract_table_name(matches[2])
+                    # to_columns = DDLParser._clean_name(matches[3])
+                    to_columns = [DDLParser._clean_name(k) for k in matches[3].split(",")]
+                else:
+                    patterns = ["foreign key *\((.*)\) references *(.*) \((.*)\)"]
+                    matches = DDLParser._get_matches(patterns=patterns, statement=constraint, expect_matches=3)
+                    if not matches:
+                        eprint("Possible parsing error: unable to extract foreign key from %s." % statement)
+                        return
+                    else:
+                        constraint_name = None
+                        # from_columns = DDLParser._clean_name(matches[0])
+                        from_columns = [DDLParser._clean_name(k) for k in matches[0].split(",")]
+                        to_table = DDLParser._extract_table_name(matches[1])
+                        # to_columns = DDLParser._clean_name(matches[2])
+                        to_columns = [DDLParser._clean_name(k) for k in matches[2].split(",")]
+
+                table = self.database.get_table(table_name=table_name)
+                if table:
+                    table.add_foreign_key(from_keys=from_columns, to_table=to_table, to_keys=to_columns, name=constraint_name)
+                else:
+                    logging.error("Attempting to add a foreign key to table %s, which is not in the database." % table_name)
         except Exception as ex:
             eprint('Error "%s" extracting foreign key from: %s' % (ex, statement) )
 
     def _add_generic_relationship(self, statement):
         """
         Adds generic relationships that are created with an ALTER TABLE statement.  Should only be TQL.
+        Format for the statement is:
+            with name:  alter table <table-name add relationship <relationship-name> with <table-name> as <condition>
+            without name:  alter table <table-name add relationship with <table-name> as <condition>
         :param statement: The alter table statement.
         :type statement: str
         """
         try:
-            # table_name = DDLParser._extract_name(matches.group(1))
-            table_name = ""
+            # There can either be a name or not.  If there is, the matches change.
+            patterns = ["alter table (.*) add relationship (.*) with (.*) as (.*)"]
+            matches = DDLParser._get_matches(patterns=patterns, statement=statement, expect_matches=4)
+            if matches:
+                table_name = DDLParser._extract_table_name(matches[0])
+                constraint_name = DDLParser._clean_name(matches[1])
+                to_table = DDLParser._extract_table_name(matches[2])
+                conditions = matches[3]
+            else:
+                patterns = ["alter table (.*) add relationship with (.*) as (.*)"]
+                matches = DDLParser._get_matches(patterns=patterns, statement=statement, expect_matches=3)
+                if not matches:
+                    eprint("Possible parsing error: unable to extract primary key from %s." % statement)
+                    return
+                else:
+                    table_name = DDLParser._extract_table_name(matches[0])
+                    constraint_name = None
+                    to_table = DDLParser._extract_table_name(matches[1])
+                    conditions = matches[2]
+
             table = self.database.get_table(table_name=table_name)
             if table:
-                pass
+                table.add_relationship(to_table=to_table, name=constraint_name, conditions=conditions)
             else:
-                logging.error("Attempting to add a generic relationship to table %s, which is not in the database." % table_name)
+                logging.error("Attempting to add a relationship to table %s, which is not in the database." % table_name)
         except Exception as ex:
-            eprint('Error "%s" extracting generic relationship from: %s' % (ex, statement) )
+            eprint('Error "%s" extracting relationship from: %s' % (ex, statement) )
 
     def _add_shard_key(self, statement):
         """
@@ -637,18 +725,22 @@ class TQLWriter:
 
         return results
 
-    def write_tql(self, database, filename=None):
+    def write_tql(self, database, filename=None, outfile=None):
         """
         Main function to write the Database to TQL.
         :param database: The database object to convert.
         :type database: Database
         :param filename: File to write to or STDOUT is not set.  The caller is expected to close the output stream.
+        :type filename: str
+        :param outfile: Output file handler / stream.  If provided the filename is ignored.  It's expected that either
+        the filename or outfile will be provided.
         """
 
-        if filename is None:
-            outfile = open(sys.stdout, "w")
-        else:
-            outfile = open(filename, "w")
+        if not outfile:
+            if not filename:
+                outfile = open(sys.stdout, "w")
+            else:
+                outfile = open(filename, "w")
 
         db_name = self.to_case(database.database_name)
 
@@ -921,11 +1013,10 @@ class XLSWriter:
             ],
         )
 
-        row_cnt = 0
+        row_cnt = 1
         for table in database:
-            row_cnt += 1
-
             for fk in table.foreign_keys_iter():
+                row_cnt += 1
                 from_column = list_to_string(fk.from_keys)
                 to_column = list_to_string(fk.to_keys)
                 self._write_row(
@@ -962,7 +1053,7 @@ class XLSWriter:
             ],
         )
 
-        row_cnt = 0
+        row_cnt = 1
         for table in database:
             row_cnt += 1
 
@@ -1370,7 +1461,7 @@ class TsloadWriter:
         if not os.path.isfile(flags["source_file"]):
             return flags
 
-        # todo get default flags from csv
+        # TODO get default flags from csv
 
         with open(flags["source_file"]) as csv_file:
             csv_reader = csv.DictReader(csv_file)
