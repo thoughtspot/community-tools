@@ -101,6 +101,7 @@ class User(object):
         group_names=None,
         visibility=Visibility.DEFAULT,
         created=None,
+        id=None
     ):
         """
         Creates a new user object.
@@ -118,6 +119,8 @@ class User(object):
         :type visibility: str
         :param created: Epoch time when the user was created.
         :type created: str
+        :param id: GUID from TS for the user.  Optional and not used for synching.
+        :type created: str
         :return: Returns a new user object populated with the passed in values.
         :rtype: User
         """
@@ -132,6 +135,7 @@ class User(object):
         else:
             self.groupNames = list(group_names)
         self.visibility = visibility
+        self.id = id
 
     def add_group(self, group_name):
         """
@@ -488,6 +492,7 @@ class UGJsonReader(object):
                     group_names=value.get("groupNames", None),
                     visibility=value.get("visibility", None),
                     created=value.get("created", None),
+                    id=value.get("id", None)
                 )
                 auag.add_user(user)
             else:
@@ -655,6 +660,39 @@ class SyncUserAndGroups(BaseApiInterface):
             )
 
     @api_call
+    def get_user_metadata(self):
+        """
+        Returns a list of User objects based on the metadata.
+        :return: A list of user objects.
+        :rtype: list of User
+        """
+        url = self.format_url(SyncUserAndGroups.USER_METADATA_URL)
+        response = self.session.get(url, cookies=self.cookies)
+        users = []
+        if response.status_code == 200:
+            logging.info("Successfully got user metadata.")
+            json_list = json.loads(response.text)
+            for value in json_list:
+                user = User(
+                    name=value.get("name", None),
+                    display_name=value.get("displayName", None),
+                    mail=value.get("mail", None),
+                    group_names=value.get("groupNames", None),
+                    visibility=value.get("visibility", None),
+                    created=value.get("created", None),
+                    id=value.get("id", None)
+                )
+                users.append(user)
+            return users
+
+        else:
+            logging.error("Failed to get user metadata.")
+            raise requests.ConnectionError(
+                "Error getting user metadata (%d)" % response.status_code,
+                response.text,
+                )
+
+    @api_call
     def sync_users_and_groups(
         self, users_and_groups, apply_changes=True, remove_deleted=False
     ):
@@ -726,7 +764,6 @@ class SyncUserAndGroups(BaseApiInterface):
         if response.status_code == 200:
             logging.info("Successfully got user metadata.")
             json_list = json.loads(response.text)
-            # for h in json_list["headers"]:
             for h in json_list:
                 name = h["name"]
                 id = h["id"]
@@ -1118,6 +1155,7 @@ class UGXLSWriter(object):
                 "Groups",
                 "Visibility",
                 "Created",
+                "ID"
             ],
         )
         cnt = 2  # start after header.
@@ -1129,6 +1167,7 @@ class UGXLSWriter(object):
             ws.cell(column=5, row=cnt, value=json.dumps(user.groupNames))
             ws.cell(column=6, row=cnt, value=user.visibility)
             ws.cell(column=7, row=cnt, value=user.created)
+            ws.cell(column=8, row=cnt, value=user.id)
             cnt += 1
 
     def _write_groups(self, workbook, groups):
