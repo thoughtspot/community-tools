@@ -1,0 +1,11 @@
+*.pyc
+.idea/
+user_mgmt/mgmt/*.pyc 
+user_mgmt/mgmt/*.json
+user_mgmt/mgmt/*.xlsx
+user_mgmt/mgmt/*.csv
+user_mgmt/*.log
+user_mgmt/*.json
+user_mgmt/*.xlsx
+user_mgmt/*.csv
+
