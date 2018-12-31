@@ -13,7 +13,19 @@ of each script.
 
 Loads one or more files from a given directory using ThoughtSpot's `tsload` and then moves to an archive location.
 
+### Loads Data into Default DBNAME & SCHEMANAME
 usage:  `load_files`
+
+### Loads Data into user input DBNAME & SCHEMANAME
+usage:  `load_files -d DBNAME -s SCHEMANAME`
+
+### Loads Data into user input DBNAME & default SCHEMANAME
+usage:  `load_files -d DBNAME`
+
+### Loads Data into default DBNAME & user input SCHEMANAME
+usage:  `load_files -s SCHEMANAME`
+
+### load_files command will load the data into multiple schema if data files can be grouped into multiple folders. Script assumes folder name as Schema Name and user Input/Default name as DBNAME. 
 
 ### Pre-conditions and assumptions
 
