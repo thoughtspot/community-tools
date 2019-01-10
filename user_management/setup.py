@@ -8,6 +8,6 @@ setup(name='user_management',
       author='Nikhita Chandra',
       author_email='nikhita.chandra@thoughtspot.com',
       license='MIT',
-      packages=find_packages(),
+      packages=['user_management','user_management/user_mgmt'],
       zip_safe=False
       )
