@@ -9,5 +9,6 @@ setup(name='user_management',
       author_email='nikhita.chandra@thoughtspot.com',
       license='MIT',
       packages=['user_management/user_mgmt', 'user_management/user_mgmt/mgmt'],
+      install_requires = ['setuptools','requests','argparse','ast','xlrd'],
       zip_safe=False
       )
