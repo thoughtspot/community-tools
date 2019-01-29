@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <AlteryxJavaScriptPlugin>
   <EngineSettings EngineDll="Python" EngineDllEntryPoint="tsLoad.py" SDKVersion="10.1" />
-  <GuiSettings Html="tsLoad_GUI.html" Icon="tsLoad.png" Help="http://docs.thoughtspot.com" SDKVersion="10.1">
+  <GuiSettings Html="tsLoad_GUI.html" Icon="tsLoad.png" Help="https://github.com/thoughtspot/community-tools/blob/master/tsLoad/README.md" SDKVersion="10.1">
     <InputConnections>
       <Connection Name="Input" AllowMultiple="False" Optional="True" Type="Connection" Label=""/>
     </InputConnections>
