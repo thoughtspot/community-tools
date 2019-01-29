@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<Configuration>
+	<Properties>
+		<MetaInfo>
+			<Icon>tsTQL\tsTQL.png</Icon>
+			<Name>tsTQL</Name>
+			<CategoryName>ThoughtSpot</CategoryName>
+			<ToolVersion>1.0.0</ToolVersion>
+			<Author>Thoughtspot</Author>
+			<Description>Thoughtspot TQL</Description>
+		</MetaInfo>
+	</Properties>
+</Configuration>
