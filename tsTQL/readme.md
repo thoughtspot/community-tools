@@ -42,7 +42,7 @@ The parameters for the ThoughtSpot bulk loader include the following:
 
 An example of ThoughtSpot TQL parameters that selects all records from a table.
 
-![tsLoadParameters](Screenshots/tsTQLParameters.png)
+![tsLoadParameters](ScreenShots/tsTQLParameters.png)
 
 # Built With
 
