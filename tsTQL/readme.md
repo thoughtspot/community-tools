@@ -22,7 +22,7 @@ Once downloaded, double click on the file (tsTQL.yxi) and the tool will self ins
 
 Click the **Install button** to complete the installation process.
 
-Once done, you will find the ThoughtSpot TQL tool in the ThoughtSpot tab within Alteryx.   ![ThoughtSpotTab](Screenshots/ThoughtSpotTab.png)
+Once done, you will find the ThoughtSpot TQL tool in the ThoughtSpot tab within Alteryx.   ![ThoughtSpotTab](ScreenShots/ThoughtSpotTab.png)
 
 ## An Example
 
