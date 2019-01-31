@@ -14,7 +14,7 @@ These intstruction will get you the ThoughtSpot TQL tool installed within an Alt
 
 ## Installing
 
-To use the ThoughtSpot TQL tool within Alteryx, download the self install tool from [here.](install/tsTQL.yxi)
+To use the ThoughtSpot TQL tool within Alteryx, download the self install tool from [here.](Install/tsTQL.yxi)
 
 Once downloaded, double click on the file (tsTQL.yxi) and the tool will self install.  It is possible for the install to seeen slow and take a few minutes to install.  It may appear like nothing is happening at first.  The install process will start Alteryx if not already running.  At some piont during the installation, you will see the following dialog box appear:
 
