@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html style="padding:20px">
+<head>
+    <meta charset="utf-8">
+    <title>Python - Optional Input</title>
+    <script type="text/javascript">
+        document.write('<link rel="import" href="' + window.Alteryx.LibDir + '2/lib/includes.html">')
+    </script>
+</head>
+
+<body>
+  <form>
+     <!-- Beginning of ThoughtSpot Required Fields -->
+    <fieldset>
+      <legend class='blueTitle'>XMSG("Execute TQL on ThoughtSpot Instance")</legend>
+      <div class='leftCon'>
+        <label>XMSG("ThoughtSpot Instance")</label>
+        <ayx data-ui-props="{type: 'TextBox'}" data-item-props="{dataName: 'DestinationServer'}"></ayx>
+      </div>
+      <div class='leftCon'>
+        <label><span id="Name">XMSG("User ID")</span></label>
+          <ayx data-ui-props="{type: 'TextBox'}" data-item-props="{dataName: 'UserName'}"></ayx>
+      </div>
+      <div class='leftCon'>
+        <label><span id="Password">XMSG("Password")</span></label>
+          <ayx data-ui-props="{type: 'TextBox'}" data-item-props="{dataName: 'Password', password: true,encryptionMode: 'user'}"></ayx>
+      </div>
+    </fieldset>
+      <!-- TQL Fields -->
+    <fieldset>
+      <legend class='blueTitle'>XMSG("TQL File")</legend>
+        <ayx aria-label="data-source-metainfo-filebrowse" data-ui-props="{type:'FileBrowse', widgetId:'dataSourceFilePath', fileTypeFilters: 'ThoughtSpot TQL Files|*.tql|All Files|*.*', placeholder:'Select .tql file...'}" data-item-props="{dataName: 'dataSourceFilePath', dataType:'SimpleString'}"></ayx>
+    </fieldset>
+    <fieldset>
+      <legend class='blueTitle'>XMSG("or TQL Input")</legend>
+        <ayx data-ui-props="{type:'TextArea', rows:5, placeholder:'enter list of tql statements with ;'}" data-item-props="{dataName: 'TQLText', dataType:'SimpleString'}"></ayx>
+    </fieldset>
+
+  </form>
+
+  <style>
+    .Select, .Select div, .Select input, .Select span, .blueTitle {
+      box-sizing: content-box;
+      -webkit-box-sizing: content-box;
+      background-color: #e5e5e5;
+    }
+  </style>
+
+  <script type="text/javascript">
+    // window.Alteryx.Gui.BeforeLoad = function (manager,AlteryxDataItems,json) {
+    //     manager.getDataItem('TargetSchema').setValue('falcon_default_schema')
+    // }
+  </script>
+</body>
+</html>
