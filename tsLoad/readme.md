@@ -2,6 +2,20 @@
 
 The ThoughtSpot Bulk Loader Tool is a custom Alteryx tool that provides native [tsload](https://docs.thoughtspot.com/5.0/reference/data-importer-ref.html) capabilities in an Alteryx workflow.   The ThoughtSpot Bulk Loader tool supports both full and incremental data loads in a ThoughtSpot cluster through a data stream that does not copy data to the cluster.  The tool combines the ease of use of Alteryx and ThoughtSpot to quickly create, augment and move data to ThoughtSpot for Search and AI driven Analytics.
 
+## Support
+
+Please ask questions related to the Tool via the [ThoughtSpot Community](https://community.thoughtspot.com/) or Github community tools issues.
+
+
+
+Copyright 2017 ThoughtSpot
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
 ## Getting Started
 
 These intstruction will get you the ThoughtSpot Buld Loader tool installed within an Alteryx Designer or Alteryx Server environment
@@ -99,3 +113,5 @@ See also the list of [Contributors](https://github.com/thoughtspot/community-too
 # Aknowledgements
 
 Thank you to [Joe's Blog ](https://joelinoff.com/blog/?p=905)and many others through [stackoverflow](https://stackoverflow.com/) for sharing code examples using Paramiko.  
+
+For a great reference on developing Alteryx Python tools using the SDK, please see [NikJ's A Beginner's Guide to the Python SDK in Alteryx]( https://community.alteryx.com/t5/Data-Science-Blog/Levelling-Up-A-Beginner-s-Guide-to-the-Python-SDK-in-Alteryx/ba-p/159440)

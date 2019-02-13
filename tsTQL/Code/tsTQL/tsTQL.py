@@ -2,6 +2,7 @@ import AlteryxPythonSDK as Sdk
 import xml.etree.ElementTree as Et
 import select
 import gzip
+import sys
 from classes.sshClient import sshClient
 
 class AyxPlugin:
@@ -63,6 +64,15 @@ class AyxPlugin:
             return True
         except:
             self.xmsg("Error", "Error sending Data")
+            self.stdin.close()
+            self.channel.shutdown_write()
+            self.xmsg('Info', 'Completed Sending Commands')
+            self.writeChunks(600)
+            self.sshConnection.close()
+            self.xmsg('Info', 'Connection with Destination Closed')
+            self.output_anchor.assert_close()
+            self.information_anchor.assert_close()
+            sys.exit()
             return False
 
     def writeChunks(self,intimeout=30):

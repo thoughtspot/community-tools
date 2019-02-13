@@ -4,6 +4,7 @@ import csv
 import io
 import select
 import gzip
+import sys
 from classes.Table import Table
 from classes.TQLFile import TQLFile
 from classes.sshClient import sshClient
@@ -182,6 +183,14 @@ class IncomingInterface:
             return True
         except:
             self.parent.xmsg("Error", "Error Writing Data")
+            self.stdin.close()
+            self.channel.shutdown_write()
+            self.writeChunks(600)
+            self.sshConnection.close()
+            self.parent.xmsg('Info', 'Connection with Destination Closed')
+            self.parent.output_anchor.close() # Close outgoing connections.elf.stdin.close()
+            self.channel.shutdown_write()
+            sys.exit()
             return False
 
     def writeChunks(self,intimeout=30):
@@ -347,4 +356,4 @@ class IncomingInterface:
             self.writeChunks(600)
             self.sshConnection.close()
             self.parent.xmsg('Info', 'Connection with Destination Closed')
-            self.parent.output_anchor.close()  # Close outgoing connections.
+            self.parent.output_anchor.close() # Close outgoing connections.
