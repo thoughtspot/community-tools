@@ -14,9 +14,8 @@
 # BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT
 # OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-# TODO - Uncomment if needed.
 # Needed when running from cron since this path is set in /home/admin/.bashrc  tsload is in this path.
-# PATH=$PATH:/usr/local/scaligent/bin:/usr/local/scaligent/release/bin
+PATH=$PATH:/usr/local/scaligent/bin:/usr/local/scaligent/release/bin
 
 # Loads all of the data from files in a staging area into ThoughtSpot and then moves the files to a new location.
 # To use this file, change the settings and flags below.
@@ -254,6 +253,6 @@ cd ${OLD_DIR}/.. && tar czf ${OLD_DIR}.tar.gz ${THE_DATE_TIME} && rm -r ${OLD_DI
 
 # TODO optionally remove old archive files
 # +7 means delete older than seven days.  Modify for your specs.
-# find ${OLD_DIR} -type f -mtime +7 -name '*.gz' -execdir rm -- '{}' \;
+# find ${OLD_DIR}/.. -type f -mtime +7 -name '*.gz' -execdir rm -- '{}' \;
 
 exit ${exit_value}
