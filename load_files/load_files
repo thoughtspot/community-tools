@@ -14,9 +14,8 @@
 # BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT
 # OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-# TODO - Uncomment if needed.
 # Needed when running from cron since this path is set in /home/admin/.bashrc  tsload is in this path.
-# PATH=$PATH:/usr/local/scaligent/bin:/usr/local/scaligent/release/bin
+PATH=$PATH:/usr/local/scaligent/bin:/usr/local/scaligent/release/bin
 
 # Loads all of the data from files in a staging area into ThoughtSpot and then moves the files to a new location.
 # To use this file, change the settings and flags below.
@@ -46,6 +45,8 @@ declare -r DATA_DIR=${ROOT_DIR}/data                                   # locatio
 declare -r LOG_DIR=${ROOT_DIR}/logs                                    # directory to store load logs.
 declare -r OLD_DIR="${ROOT_DIR}/old/${THE_DATE_TIME}"                  # directory to move files to.
 declare -r BAD_RECORDS_DIR="${OLD_DIR}/bad_records"                    # directory with bad records.
+declare -r TEMP_RESULTS_FILE="/tmp/$$.results"                         # temp folder for detailed results.
+declare -r TEMP_RESULTS_SUMMARY_FILE="/tmp/$$.results.summary"         # temp folder for results summary.
 declare -r RESULTS_FILE="${LOG_DIR}/${CLUSTER_NAME}-results-${THE_DATE_TIME}.txt" # stores the results of the data load.
 declare -r LOADING_FILE="${DATA_DIR}/loading"                          # flag to indicate we are currently loading.
 declare -r V_LEVEL=0                                                   # logging verbosity level.  0-6.  0 recommended for production.
@@ -121,16 +122,21 @@ if [ -e ${LOADING_FILE} ]; then
   running_pid=`ps -ef | awk '{ print $2 }' | grep $other_pid`
   if [ "$running_pid" == "" ]; then
     echo $$ > ${LOADING_FILE}
-    echo "Taking over from stopped process $other_pid" > ${RESULTS_FILE}
+    echo "" > ${TEMP_RESULTS_FILE}
+    echo "Taking over from stopped process $other_pid" > ${TEMP_RESULTS_FILE}
   else
     exit 0
   fi
 else
   echo $$ > ${LOADING_FILE}
-  echo "" > ${RESULTS_FILE}
+  echo "" > ${TEMP_RESULTS_FILE}
 fi
 
+echo "" > ${TEMP_RESULTS_SUMMERY_FILE}
+
 had_tsload_error=false # indicates if there was a tsload error.
+number_successful_loads=0
+number_failed_loads=0
 
 # loads from a file into TS.  $1 is the root filename / tablename.
 # TODO - change flags and values as necessary before deploying.
@@ -172,7 +178,7 @@ function tsload_file {
            ${et} \
            --source_data_format csv \
            --field_separator "," \
-           --max_ignored_rows 10 \
+           --max_ignored_rows 0 \
            --has_header_row \
            --null_value "NULL" \
            --date_format "%Y-%m-%d" \
@@ -180,9 +186,14 @@ function tsload_file {
            --boolean_representation "1_0" \
            --skip_second_fraction \
            -v ${V_LEVEL} \
-           >> ${RESULTS_FILE} 2>> ${RESULTS_FILE}
+           >> ${TEMP_RESULTS_FILE} 2>> ${TEMP_RESULTS_FILE}
   if [ $? != 0 ]; then
     has_tsload_error=true
+    echo "Error:  ${filename} failed to load" >> ${TEMP_RESULTS_SUMMARY_FILE}
+    number_failed_loads=$((number_failed_loads+1))
+  else
+    echo "Success:  ${filename} loaded successfully" >> ${TEMP_RESULTS_SUMMARY_FILE}
+    number_successful_loads=$((number_successful_loads+1))
   fi
 
   # Move the loaded files to the old directory.
@@ -229,15 +240,20 @@ done
 # TODO:  Uncomment if using semaphore.
 # rm ${DATA_DIR}/${SEMAPHORE_FILE_NAME}
 rm ${LOADING_FILE}
+
+mv ${TEMP_RESULTS_SUMMARY_FILE} ${RESULTS_FILE}
+cat ${TEMP_RESULTS_FILE} >> ${RESULTS_FILE}
 cp ${RESULTS_FILE} ${OLD_DIR}
 
 # check the success of the load.
 cd ${OLD_DIR}
 
-subject="Successful data load ${THE_DATE_TIME} for cluster ${CLUSTER_NAME}"
+total_attempted_files=$((number_successful_loads+number_failed_loads))
+
+subject="Success:  ${number_successful_loads} of ${total_attempted_files} files loaded at ${THE_DATE_TIME} for cluster ${CLUSTER_NAME}"
 body="The data load ${THE_DATE_TIME} for cluster ${CLUSTER_NAME} appears successful.  See attached load results."
 if [[ ${has_tsload_error} = true ]]; then
-  subject="Errors in data load ${THE_DATE_TIME} for cluster ${CLUSTER_NAME}"
+  subject="Error:  ${number_successful_loads} of ${total_attempted_files} files loaded and ${number_failed_loads} failed at ${THE_DATE_TIME} for cluster ${CLUSTER_NAME}"
   body="The data load ${THE_DATE_TIME} for cluster ${CLUSTER_NAME} had errors loading files or rows.  See attached load results."
   exit_value=1
 fi
@@ -254,6 +270,6 @@ cd ${OLD_DIR}/.. && tar czf ${OLD_DIR}.tar.gz ${THE_DATE_TIME} && rm -r ${OLD_DI
 
 # TODO optionally remove old archive files
 # +7 means delete older than seven days.  Modify for your specs.
-# find ${OLD_DIR} -type f -mtime +7 -name '*.gz' -execdir rm -- '{}' \;
+# find ${OLD_DIR}/.. -type f -mtime +7 -name '*.gz' -execdir rm -- '{}' \;
 
 exit ${exit_value}

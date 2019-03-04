@@ -3,3 +3,4 @@ use load_files_test;
 
 create table test1 (col1 varchar(0), col2 int);
 create table test2 (col1 double, col2 varchar(0));
+create table test3 (col1 int, col2 double);
