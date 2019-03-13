@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<Configuration>
+	<Properties>
+		<MetaInfo>
+			<Icon>tsLoad\tsLoad.png</Icon>
+			<Name>tsLoad</Name>
+			<CategoryName>ThoughtSpot</CategoryName>
+			<ToolVersion>1.0.1</ToolVersion>
+			<Author>Thoughtspot</Author>
+			<Description>Thoughtspot Alteryx Bulk Loader</Description>
+		</MetaInfo>
+	</Properties>
+</Configuration>

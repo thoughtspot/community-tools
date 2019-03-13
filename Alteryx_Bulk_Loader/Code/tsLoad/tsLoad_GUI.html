@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html style="padding:20px">
+<head>
+    <meta charset="utf-8">
+    <title>Python - Optional Input</title>
+    <script type="text/javascript">
+        document.write('<link rel="import" href="' + window.Alteryx.LibDir + '2/lib/includes.html">')
+    </script>
+</head>
+
+<body>
+  <form>
+     <!-- Beginning of ThoughtSpot Required Fields -->
+    <fieldset>
+      <legend class='blueTitle'>XMSG("Move Data to ThoughtSpot Instance")</legend>
+      <div class='leftCon'>
+        <label>XMSG("ThoughtSpot Instance")</label>
+        <ayx data-ui-props="{type: 'TextBox'}" data-item-props="{dataName: 'DestinationServer'}"></ayx>
+      </div>
+      <div class='leftCon'>
+        <label><span id="createDatabaseBox">XMSG("Create Database")</span></label>
+          <ayx data-ui-props="{type: 'CheckBox', widgetId:'createDatabaseBox'}" data-item-props="{dataName: 'CreateDatabase'}"></ayx>
+      </div>
+      <div class='leftCon'>
+        <label>XMSG("ThoughtSpot Database")</label>
+        <ayx data-ui-props="{type: 'TextBox'}" data-item-props="{dataName: 'TargetDatabase'}"></ayx>
+      </div>
+      <div class='leftCon'>
+        <label>XMSG("ThoughtSpot Schema")</label>
+        <ayx data-ui-props="{type: 'TextBox'}" data-item-props="{dataName: 'TargetSchema'}"></ayx>
+      </div>
+      <div class='leftCon'>
+        <label><span id="Name">XMSG("User ID")</span></label>
+          <ayx data-ui-props="{type: 'TextBox'}" data-item-props="{dataName: 'UserName'}"></ayx>
+      </div>
+      <div class='leftCon'>
+        <label><span id="Password">XMSG("Password")</span></label>
+          <ayx data-ui-props="{type: 'TextBox'}" data-item-props="{dataName: 'Password', password: true,encryptionMode: 'user'}"></ayx>
+      </div>
+    </fieldset>
+      <!-- TSLoad Fields -->
+    <fieldset>
+      <legend class='blueTitle'>XMSG("Table Definition")</legend>
+      <div class='leftCon'>
+        <label>XMSG("Table Name")</label>
+          <ayx data-ui-props="{type: 'TextBox'}", data-item-props="{dataName: 'TableName'}">
+          </ayx>
+      </div>
+      <div class='leftCon'>
+        <label>XMSG("Boolean Representation")</label>
+          <ayx data-ui-props="{type: 'TextBox'}", data-item-props="{dataName: 'BooleanString'}">
+          </ayx>
+      </div>
+      <div class='leftCon'>
+        <label>XMSG("Maximum Ignored Rows")</label>
+          <ayx data-ui-props="{type: 'TextBox'}", data-item-props="{dataName: 'MaxIgnoredRows', dataType: 'SimpleInt'}">
+          </ayx>
+      </div>
+      <!--<div class='leftCon'>-->
+        <!--<label>XMSG("Verbosity Level")</label>-->
+          <!--<labe>(Min: 0, Max 3)</labe>-->
+          <!--<ayx data-ui-props="{type: 'NumericSpinner', widgetId:'verbosityLevel'}", data-item-props="{dataName: 'Verbosity', dataType: 'ConstrainedInt', min: 0, max: 3}">-->
+          <!--</ayx>-->
+      <!--</div>-->
+      <div class='leftCon'>
+        <label><span id="Truncate">XMSG("Truncate Data")</span></label>
+          <ayx data-ui-props="{type: 'CheckBox', widgetId:'truncateTableBox'}" data-item-props="{dataName: 'Truncate'}"></ayx>
+      </div>
+      <div class='leftCon', id="createTableBox">
+        <label><span id="CreateTable">XMSG("Create Table")</span></label>
+          <ayx data-ui-props="{type: 'CheckBox', widgetId:'createTableBox'}" data-item-props="{dataName: 'CreateTable'}"></ayx>
+      </div>
+      <div class='leftCon'>
+        <label>XMSG("Optional Primary Key")</label>
+          <ayx data-ui-props="{type: 'DropDown', clearable: true}", data-item-props="{dataName: 'PrimaryKey',dataType: 'FieldSelector',anchorIndex: '0',connectionIndex:'0'}">
+          </ayx>
+      </div>
+    </fieldset>
+  </form>
+
+  <style>
+    .Select, .Select div, .Select input, .Select span, .blueTitle {
+      box-sizing: content-box;
+      -webkit-box-sizing: content-box;
+      background-color: #e5e5e5;
+    }
+  </style>
+
+  <script type="text/javascript">
+    window.Alteryx.Gui.BeforeLoad = function (manager,AlteryxDataItems,json) {
+        manager.getDataItem('TargetSchema').setValue('falcon_default_schema')
+        manager.getDataItem('MaxIgnoredRows').setValue(0)
+        manager.getDataItem('BooleanString').setValue('T_F')
+        //manager.getDataItem('Verbosity').setValue(0)
+    }
+  </script>
+</body>
+</html>

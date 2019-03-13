@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<AlteryxJavaScriptPlugin>
+  <EngineSettings EngineDll="Python" EngineDllEntryPoint="tsLoad.py" SDKVersion="10.1" />
+  <GuiSettings Html="tsLoad_GUI.html" Icon="tsLoad.png" Help="https://github.com/thoughtspot/community-tools/blob/master/Alteryx_Bulk_Loader/readme.md" SDKVersion="10.1">
+    <InputConnections>
+      <Connection Name="Input" AllowMultiple="False" Optional="False" Type="Connection" Label=""/>
+    </InputConnections>
+    <OutputConnections>
+      <Connection Name="Output" AllowMultiple="False" Optional="False" Type="Connection" Label="O"/>
+    </OutputConnections>
+  </GuiSettings>
+  <Properties>
+    <MetaInfo>
+      <Name>ThoughtSpot Bulk Loader</Name>
+      <Description>Load a file into ThoughtSpot instance using the the ThoughtSpot Bulk Loader from Alteryx.</Description>
+      <CategoryName>ThoughtSpot</CategoryName>
+      <SearchTags>python, sdk, recordid, record, id, python sdk, optional input</SearchTags>
+      <ToolVersion>1.0.1</ToolVersion>
+      <Author>ThoughtSpot</Author>
+      <Company>ThoughtSpot, Inc.</Company>
+      <Copyright>2019</Copyright>
+    </MetaInfo>
+  </Properties>
+</AlteryxJavaScriptPlugin>

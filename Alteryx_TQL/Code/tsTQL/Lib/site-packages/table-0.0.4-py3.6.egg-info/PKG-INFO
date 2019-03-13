@@ -1,0 +1,11 @@
+Metadata-Version: 1.1
+Name: table
+Version: 0.0.4
+Summary: Two-dimensional tables backed by Numpy with named rows and columns.
+Home-page: http://github.com/eseraygun/python-table
+Author: Eser Aygün
+Author-email: eser.aygun@gmail.com
+License: BSD (2-clause)
+Description: UNKNOWN
+Platform: UNKNOWN
+Requires: numpy
