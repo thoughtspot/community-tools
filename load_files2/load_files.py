@@ -269,11 +269,17 @@ class ParallelFileLoader(object):
         table_name = table_name.split("-")[0]
 
         # handle _full and _incremental.  MUST be last thing before the extension.
-        empty_target = self.settings.get("settings.empty_target", "")
+        empty_target = self.settings.get("tsload.empty_target", "")
+        if empty_target == "true":
+            empty_target = "--empty_target"
+
+        logging.debug("empty_target from settings is --%s--" % empty_target)
         if table_name.endswith("_full"):
+            logging.debug("  _full load")
             empty_target = "--empty_target"
             table_name = table_name[:-len("_full")]
         elif table_name.endswith("_incremental"):
+            logging.debug("  _incremental load")
             empty_target = ""
             table_name = table_name[:-len("_incremental")]
 
@@ -281,6 +287,7 @@ class ParallelFileLoader(object):
             file_path=file_path, table_name=table_name
         )
 
+        logging.debug("  empty_target is now --%s--" % empty_target)
         cmd = cmd.replace(
             "--empty_target", empty_target
         )  # simply replace the default if overridden.
