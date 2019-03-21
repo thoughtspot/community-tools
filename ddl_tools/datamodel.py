@@ -129,6 +129,16 @@ class ForeignKey(object):
         else:
             self.name = name
 
+    def __eq__(self, other):
+        """
+        Compares contents to see if the two are the same or not.  Equal if all content is equal.
+        :param other:  The other ForeignKey to compare to.
+        :type other: ForeignKey
+        :return: True if they are the same.
+        """
+        return self.name == other.name and \
+            self.from_table == other.from_table and sorted(self.from_keys) == sorted(self.to_keys) and \
+            self.to_table == other.to_table and sorted(self.to_keys) == sorted(self.to_keys)
 
 # -------------------------------------------------------------------------------------------------------------------
 
@@ -162,6 +172,17 @@ class GenericRelationship(object):
 
         self.conditions = conditions
 
+    def __eq__(self, other):
+        """
+        Compares contents to see if the two are the same or not.  Equal if all content is equal.
+        :param other:  The other GenericRelationship to compare to.
+        :type other: GenericRelationship
+        :return: True if they are the same.
+        """
+        return self.name == other.name and \
+            self.from_table == other.from_table and \
+            self.to_table == other.to_table and \
+            self.conditions == other.conditions
 
 # -------------------------------------------------------------------------------------------------------------------
 
@@ -280,6 +301,17 @@ class Table(object):
         :rtype: Column
         """
         return self.columns.get(column_name, None)
+
+    def get_column_names(self):
+        """
+        Returns a list of column names in this table.
+        :return: list of str
+        """
+        column_names = []
+        for column_name in self.columns.keys():
+            column_names.append(column_name)
+
+        return column_names
 
     def number_columns(self):
         """
@@ -764,7 +796,7 @@ class DatabaseValidator:
                                 issue="foreign key %s column %s type %s doesn't match type %s for %s column %s"
                                 % (
                                     fk.name,
-                                    to_name,
+                                    from_col.column_name,
                                     from_col.column_type,
                                     to_col.column_type,
                                     to_table.table_name,

@@ -1,17 +1,17 @@
 """
 Copyright 2017 ThoughtSpot
 
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated 
-documentation files (the "Software"), to deal in the Software without restriction, including without limitation the 
-rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to 
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the Software without restriction, including without limitation the
+rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
 permit persons to whom the Software is furnished to do so, subject to the following conditions:
 
-The above copyright notice and this permission notice shall be included in all copies or substantial portions 
+The above copyright notice and this permission notice shall be included in all copies or substantial portions
 of the Software.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED 
-TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, 
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 
@@ -19,32 +19,34 @@ import re
 import sys
 import xlrd  # reading Excel
 import logging
+import contextlib
 
 # import datetime -- used by TsloadWriter, but commented out for now.
 import csv
 import os
 from openpyxl import Workbook  # writing Excel
-from datamodel import Database, Table, Column, ShardKey, DatamodelConstants, eprint
-
+from datamodel import Database, Table, Column, ShardKey, ForeignKey, GenericRelationship, DatamodelConstants, eprint
+from tqlgenerator import TQLCommandGenerator, list_to_string
 
 # -------------------------------------------------------------------------------------------------------------------
 
 
-def list_to_string(a_list, quote=False):
+@contextlib.contextmanager
+def smart_open(filename=None):
     """
-    Converts a list to a set of strings separated by a comma.
-    :param a_list: The list to convert.
-    :type a_list: list
-    :param quote: If true, then surround each item with quotes.
-    :type quote: bool
-    :return: The string version of the list.  
+    Borrowed from https://stackoverflow.com/questions/17602878/how-to-handle-both-with-open-and-sys-stdout-nicely
+    :param filename: Name of the file to write to or '-' for stdout.
     """
-    if quote:
-        string = ", ".join('"{0}"'.format(v) for v in a_list)
+    if filename and filename != '-':
+        fh = open(filename, 'w')
     else:
-        string = ", ".join("{0}".format(v) for v in a_list)
+        fh = sys.stdout
 
-    return string
+    try:
+        yield fh
+    finally:
+        if fh is not sys.stdout:
+            fh.close()
 
 
 # -------------------------------------------------------------------------------------------------------------------
@@ -75,7 +77,8 @@ class DDLParser(object):
         :type schema_name: str
         """
         self.schema_name = schema_name
-        self.database = Database(database_name=database_name)
+        self.database_name = database_name
+        self.database = None  # set when parsing.
 
     def parse_ddl(self, filename):
         """
@@ -84,6 +87,8 @@ class DDLParser(object):
         :return: A Database object.
         :rtype: Database
         """
+        # Reset for new parse job.
+        self.database = Database(self.database_name)
 
         # First read the entire input into memory.  This will allow multiple passes through the data.
         statements = self._get_statements(filename=filename)
@@ -92,7 +97,7 @@ class DDLParser(object):
             lower = stmt.lower()
             if "create database" in lower:
                 logging.debug("Ignoring create database statement.")
-            elif "create table" in lower:
+            elif "create table" in lower or "create or replace table" in lower:
                 self._parse_create_table(stmt)
             elif "alter table" in lower:
                 logging.debug("altering a table....")
@@ -196,7 +201,7 @@ class DDLParser(object):
         Parses a create table statement.
         :param statement: The statement read in.
         :type statement: str
-        :return: 
+        :return:
         """
         statement = statement.replace("[", '"').replace(
             "]", '"'
@@ -204,7 +209,7 @@ class DDLParser(object):
         table_name = self._get_table_name(statement)
         table = Table(table_name=table_name, schema_name=self.schema_name)
         self._add_columns(table, statement)
-        if "partition by hash" in statement:
+        if "partition by hash" in statement.lower():
             self._add_hashkey(table, statement)
 
         self.database.add_table(table)
@@ -219,9 +224,12 @@ class DDLParser(object):
         """
         # The table name (and maybe a schema) are before the opening (
         tn = statement[0:statement.find("(")].rstrip()
-        # split on spaces and assume last one is table name (and maybe schema)
-        tn = tn[13:]  # len("create table ") == 13
-        # tn = tn.split(" ")[-1]
+        # strip off the first part of the statement to get just the name.
+        strip_left_len = len("create table ")
+        if "or replace" in tn.lower():
+            strip_left_len = len("create or replace table ")
+        tn = tn[strip_left_len:]
+        # strip out schemas.
         tn = tn.split(".")[-1]
         tn = self._strip_quotes(tn)
         return tn
@@ -451,8 +459,9 @@ class DDLParser(object):
         :type statement: str
         """
         try:
-            pattern = re.compile("create table.*partition by hash \((.*)\) key \((.*)\)", re.IGNORECASE)
-            matches = pattern.search(statement.lower())
+            pattern = re.compile("create table.*partition by hash.*\((.*)\) key.*\((.*)\)", re.IGNORECASE)
+            # matches = pattern.search(statement.lower())
+            matches = pattern.search(statement)
             number_shards = int(matches.group(1))
             shard_keys = matches.group(2)
             shard_keys = [DDLParser._clean_name(key) for key in shard_keys.split(",")]
@@ -469,8 +478,8 @@ class DDLParser(object):
         :return:  The table name.
         """
         # check for database, schema, etc.  Assume table is last in a dot separated list.
-        table_name = DDLParser._extract_name(potential_name)
-        table_name = table_name.split(".")[-1]
+        table_name = potential_name.split(".")[-1]
+        table_name = DDLParser._extract_name(table_name)
         return DDLParser._clean_name(table_name)
 
     @staticmethod
@@ -567,10 +576,8 @@ class DDLParser(object):
                 matches = DDLParser._get_matches(patterns=patterns, statement=constraint, expect_matches=4)
                 if matches:
                     constraint_name = DDLParser._clean_name(matches[0])
-                    # from_columns = DDLParser._clean_name(matches[1])
                     from_columns = [DDLParser._clean_name(k) for k in matches[1].split(",")]
                     to_table = DDLParser._extract_table_name(matches[2])
-                    # to_columns = DDLParser._clean_name(matches[3])
                     to_columns = [DDLParser._clean_name(k) for k in matches[3].split(",")]
                 else:
                     patterns = ["foreign key *\((.*)\) references *(.*) \((.*)\)"]
@@ -616,7 +623,7 @@ class DDLParser(object):
                 patterns = ["alter table (.*) add relationship with (.*) as (.*)"]
                 matches = DDLParser._get_matches(patterns=patterns, statement=statement, expect_matches=3)
                 if not matches:
-                    eprint("Possible parsing error: unable to extract primary key from %s." % statement)
+                    eprint("Possible parsing error: unable to extract generic relationship from %s." % statement)
                     return
                 else:
                     table_name = DDLParser._extract_table_name(matches[0])
@@ -634,7 +641,8 @@ class DDLParser(object):
 
     def _add_shard_key(self, statement):
         """
-        Adds generic relationships that are created with an ALTER TABLE statement.  Should only be TQL.
+        TODO implement this for alter statements.
+        Adds shard keys (set partition).  TQL only.
         :param statement: The alter table statement.
         :type statement: str
         """
@@ -671,59 +679,8 @@ class TQLWriter:
         :param create_db: Writes create statements for the database.
         :type create_db: bool
         """
-        self.uppercase = uppercase
-        self.lowercase = lowercase
-        self.camelcase = camelcase
+        self.command_generator = TQLCommandGenerator(uppercase=uppercase, lowercase=lowercase, camelcase=camelcase)
         self.create_db = create_db
-
-    def to_case(self, string):
-        """
-        Converts the string to the proper case based on setting.
-        :param string: The string to potentially convert.
-        :type string: str
-        :return: The string in the appropriate case.
-        :rtype: str
-        """
-
-        # Exceptions.  Currently on the default schema.
-        if string == DatamodelConstants.DEFAULT_SCHEMA:
-            return string
-
-        if self.lowercase:
-            return string.lower()
-
-        elif self.uppercase:
-            return string.upper()
-
-        elif self.camelcase:
-            return TQLWriter.to_camel(string)
-
-        return string
-
-    @staticmethod
-    def to_camel(val):
-        """
-        Converts names of the form xxx_yyy to XxxYyy.  
-        This is occasionally requested for converting database and table names.
-        :param val: The string to convert.
-        :type val: str
-        :return: The new string in CamelCase.
-        :rtype: str
-        """
-        newval = val.strip("_")
-        results = newval[0].upper()
-        idx = 1
-        while idx < len(newval):
-            if newval[idx] != "_":
-                results += newval[idx]
-                idx += 1
-            else:
-                idx += 1
-                if idx < len(newval):
-                    results += newval[idx].upper()
-                idx += 1
-
-        return results
 
     def write_tql(self, database, filename=None, outfile=None):
         """
@@ -736,34 +693,30 @@ class TQLWriter:
         the filename or outfile will be provided.
         """
 
-        if not outfile:
-            if not filename:
-                outfile = open(sys.stdout, "w")
-            else:
-                outfile = open(filename, "w")
+        with smart_open(filename) as outfile:
 
-        db_name = self.to_case(database.database_name)
+            db_name = database.database_name
 
-        if self.create_db:
-            outfile.write('CREATE DATABASE "%s";\n' % db_name)
+            if self.create_db:
+                outfile.write(self.command_generator.generate_create_database_statement(database_name=db_name))
 
-        # sets to use the database.
-        outfile.write('USE "%s";\n' % db_name)
+            # sets to use the database.
+            outfile.write(self.command_generator.generate_use_database_statement(database_name=db_name))
 
-        # create the database if that was an option.
-        if self.create_db:
-            for schema_name in database.get_schema_names():
-                if schema_name != DatamodelConstants.DEFAULT_SCHEMA:
-                    outfile.write('CREATE SCHEMA "%s";\n' % schema_name)
+            # create the database if that was an option.
+            if self.create_db:
+                for schema_name in database.get_schema_names():
+                    if schema_name != DatamodelConstants.DEFAULT_SCHEMA:
+                        outfile.write(self.command_generator.generate_create_schema_statement(schema_name=schema_name))
 
-        for table in database:
-            self.write_create_table_statement(table, outfile)
+            for table in database:
+                self.write_create_table_statement(table, outfile)
 
-        for table in database:
-            self.write_foreign_keys(table, outfile)
+            for table in database:
+                self.write_foreign_keys(table, outfile)
 
-        for table in database:
-            self.write_relationships(table, outfile)
+            for table in database:
+                self.write_relationships(table, outfile)
 
     def write_create_table_statement(self, table, outfile):
         """
@@ -772,47 +725,11 @@ class TQLWriter:
         :type table:  Table
         :param outfile: File stream to write to.
         """
-        table_name = self.to_case(table.table_name)
-        schema_name = self.to_case(table.schema_name)
 
         outfile.write("\n")
-        outfile.write('DROP TABLE "%s"."%s";\n' % (schema_name, table_name))
+        outfile.write(self.command_generator.generate_drop_table_statement(table))
         outfile.write("\n")
-        outfile.write('CREATE TABLE "%s"."%s" (\n' % (schema_name, table_name))
-
-        first = True
-        for column in table:
-
-            column_name = column.column_name
-            if self.lowercase:
-                column_name = column_name.lower()
-            elif self.uppercase:
-                column_name = column_name.upper()
-
-            if first:
-                outfile.write(
-                    '    "%s" %s\n' % (column_name, column.column_type)
-                )
-                first = False
-            else:
-                outfile.write(
-                    '   ,"%s" %s\n' % (column_name, column.column_type)
-                )
-
-        if len(table.primary_key) != 0:
-            key = list_to_string(table.primary_key, quote=True)
-            outfile.write("   ,CONSTRAINT PRIMARY KEY (%s)\n" % key)
-
-        if table.shard_key is not None:
-            key = list_to_string(table.shard_key.shard_keys, quote=True)
-            outfile.write(
-                ") PARTITION BY HASH(%d) KEY(%s);"
-                % (table.shard_key.number_shards, key)
-            )
-        else:
-            outfile.write(");\n")
-
-        outfile.write("\n")
+        outfile.write(self.command_generator.generate_create_table_statement(table))
 
     def write_foreign_keys(self, table, outfile):
         """
@@ -822,24 +739,7 @@ class TQLWriter:
         :param outfile: The file to write to.
         """
         for fk in table.foreign_keys.values():
-            schema_name = self.to_case(table.schema_name)
-            from_table = self.to_case(fk.from_table)
-            from_key_str = list_to_string(fk.from_keys, quote=True)
-            to_table = self.to_case(fk.to_table)
-            to_key_str = list_to_string(fk.to_keys, quote=True)
-
-            outfile.write(
-                'ALTER TABLE "%s"."%s" ADD CONSTRAINT "%s" FOREIGN KEY (%s) REFERENCES "%s"."%s" (%s);\n'
-                % (
-                    schema_name,
-                    from_table,
-                    fk.name,
-                    from_key_str,
-                    schema_name,
-                    to_table,
-                    to_key_str,
-                )
-            )
+            outfile.write(self.command_generator.generate_foreign_key_statement(table=table, foreign_key=fk))
 
     def write_relationships(self, table, outfile):
         """
@@ -849,22 +749,7 @@ class TQLWriter:
         :param outfile: The file to write to.
         """
         for rel in table.relationships.values():
-            schema_name = self.to_case(table.schema_name)
-            from_table = self.to_case(rel.from_table)
-            to_table = self.to_case(rel.to_table)
-
-            outfile.write(
-                'ALTER TABLE "%s"."%s" ADD RELATIONSHIP "%s" WITH "%s"."%s" AS %s;\n'
-                % (
-                    schema_name,
-                    from_table,
-                    rel.name,
-                    schema_name,
-                    to_table,
-                    rel.conditions,
-                )
-            )
-
+            outfile.write(self.command_generator.generate_generic_relationships(table=table, generic_relationship=rel))
 
 # -------------------------------------------------------------------------------------------------------------------
 
@@ -953,6 +838,8 @@ class XLSWriter:
                 "Shard Key",
                 "# Shards",
                 "RLS Column",
+                "# FKs From",
+                "# FKs To"
             ],
         )
         # Write the data.
@@ -973,6 +860,14 @@ class XLSWriter:
                 shard_key = list_to_string(table.shard_key.shard_keys)
                 number_shards = table.shard_key.number_shards
 
+            # Formulas for seeing how many FKs are to and from the given table.
+            nbr_fks_from = \
+                "=IF(COUNTIF('Foreign Keys'!$D:$D,\"=\"&$C%d)>0,COUNTIF('Foreign Keys'!$D:$D,\"=\"&$C%d),\"\")" \
+                % (row_cnt, row_cnt)
+            nbr_fks_to = \
+                "=IF(COUNTIF('Foreign Keys'!$F:$F,\"=\"&$C%d)>0,COUNTIF('Foreign Keys'!$F:$F,\"=\"&$C%d),\"\")" \
+                % (row_cnt, row_cnt)
+
             # TODO add support for update frequency so that it's remembered during development.
             self._write_row(
                 ws,
@@ -989,6 +884,8 @@ class XLSWriter:
                     shard_key,
                     number_shards,
                     "",
+                    nbr_fks_from,
+                    nbr_fks_to
                 ],
             )
 
@@ -1241,6 +1138,10 @@ class XLSReader:
             row = table_sheet.row_values(rowx=row_count, start_colx=0)
 
             database_name = row[indices["Database"]]
+            if database_name == "": # ignore rows with no DBs.
+                # eprint("Warning:  no database provided. Ignoring :" % row)
+                continue
+
             database = self.databases.get(database_name, None)
             if database is None:
                 database = Database(database_name=database_name)
@@ -1404,6 +1305,7 @@ class XLSReader:
 class TsloadWriter:
     """
     Write the tsload commands with all the flags.
+    NOTE:  This class is not complete.
     """
 
     def __init__(self, default_flags=None):
