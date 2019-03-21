@@ -2,7 +2,7 @@
 """
 Converts from non-TS DDL to TS DDL.  $ convert_ddl.py --help for more details.
 
-Copyright 2017 ThoughtSpot
+Copyright 2017-2018 ThoughtSpot
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated 
 documentation files (the "Software"), to deal in the Software without restriction, including without limitation the 
@@ -25,14 +25,11 @@ The following assumptions are made about the DDL being read:
   Comment characters, such as #, --, or /* */ will not be part of a column name.
   CREATE TABLE will have (....) with no embedded, unbalanced parentheses.
 """
-# TODO(Bill): capture primary keys and add to create.
-
 import argparse
 from datamodel import Database, eprint
 from datamodelio import DDLParser, TQLWriter, XLSWriter, XLSReader, TsloadWriter
-# import logging
+import logging
 
-# logging.basicConfig(level=logging.DEBUG)
 
 def main():
     """Main function for the script."""
@@ -42,11 +39,14 @@ def main():
     if valid_args(args):
         print(args)
 
+        if args.debug:
+            logging.basicConfig(level=logging.DEBUG)
+
         if args.from_ddl:
             print("Reading DDL ...")
             database = read_ddl(args)
         elif args.from_excel:
-            print("Reading Excel")
+            print("Reading Excel ...")
             database = read_excel(args)
         else:
             database = Database(database_name=args.database)
@@ -75,6 +75,10 @@ def main():
 def parse_args():
     """Parses the arguments from the command line."""
     parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--empty", help="creates an empty modeling file.",
+        action="store_true"
+    )
     parser.add_argument(
         "--from_ddl", help="will attempt to convert DDL from the infile"
     )
@@ -125,6 +129,12 @@ def parse_args():
     parser.add_argument(
         "-v", "--validate", action="store_true", help="validate the database"
     )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Prints details of parsing."
+    )
+
     args = parser.parse_args()
     return args
 
@@ -137,8 +147,8 @@ def valid_args(args):
     """
 
     # make sure there is a to_ flag since data has to come from somewhere unless this is just creating blank Excel.
-    if not args.from_ddl and not args.from_excel and not args.to_excel:
-        eprint("--from_ddl or --from_excel must be provided as arguments.")
+    if not args.empty and not args.from_ddl and not args.from_excel and not args.to_excel:
+        eprint("--empty, --from_ddl or --from_excel must be provided as arguments.")
         return False
 
     if args.from_ddl and not args.database:
