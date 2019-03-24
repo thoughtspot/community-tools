@@ -12,13 +12,13 @@ class TestDDLParser(unittest.TestCase):
     def test_create_ddlparser_with_defaults(self):
         """Test creating a parser with defaults."""
         dp = DDLParser("testdb")
-        self.assertEquals(dp.database.database_name, "testdb")
+        self.assertEquals(dp.database_name, "testdb")
         self.assertEquals(dp.schema_name, DatamodelConstants.DEFAULT_SCHEMA)
 
     def test_create_ddlparser_with_all_params(self):
         """Test creating a parser with all values provided."""
         dp = DDLParser("testdb", "testschema")
-        self.assertEquals(dp.database.database_name, "testdb")
+        self.assertEquals(dp.database_name, "testdb")
         self.assertEquals(dp.schema_name, "testschema")
 
     def test_column_types(self):
@@ -85,54 +85,57 @@ class TestTQLWriter(unittest.TestCase):
         database = TestTQLWriter.get_simple_db()
 
         writer = TQLWriter()
-        string_io = StringIO()
-        writer.write_tql(database=database, outfile=string_io)
-        tql = string_io.getvalue()
-        string_io.close()
+        filename = "/tmp/datamodelio.test"
+        writer.write_tql(database=database, filename=filename)
+        with open(filename, "r") as input_file:
+            tql = input_file.readlines()
+            tql = "".join(tql)
 
-        self.assertIn('USE "database1"', tql)
-        self.assertIn('DROP TABLE "falcon_default_schema"."table1"', tql)
-        self.assertIn('CREATE TABLE "falcon_default_schema"."table1"', tql)
-        self.assertIn('"col1" INT', tql)
-        self.assertIn('"Col2" DOUBLE', tql)
-        self.assertIn('"COL3" FLOAT', tql)
-        self.assertNotIn("PRIMARY KEY", tql)
+            self.assertIn('USE "database1"', tql)
+            self.assertIn('DROP TABLE "falcon_default_schema"."table1"', tql)
+            self.assertIn('CREATE TABLE "falcon_default_schema"."table1"', tql)
+            self.assertIn('"col1" INT', tql)
+            self.assertIn('"Col2" DOUBLE', tql)
+            self.assertIn('"COL3" FLOAT', tql)
+            self.assertNotIn("PRIMARY KEY", tql)
 
     def test_write_upper(self):
         """Test writing with upper flag set."""
         database = TestTQLWriter.get_simple_db()
 
         writer = TQLWriter(uppercase=True)
-        string_io = StringIO()
-        writer.write_tql(database=database, outfile=string_io)
-        tql = string_io.getvalue()
-        string_io.close()
+        filename = "/tmp/datamodelio.test"
+        writer.write_tql(database=database, filename=filename)
+        with open(filename, "r") as input_file:
+            tql = input_file.readlines()
+            tql = "".join(tql)
 
-        self.assertIn('USE "DATABASE1"', tql)
-        self.assertIn('DROP TABLE "falcon_default_schema"."TABLE1"', tql)
-        self.assertIn('CREATE TABLE "falcon_default_schema"."TABLE1"', tql)
-        self.assertIn('"COL1" INT', tql)
-        self.assertIn('"COL2" DOUBLE', tql)
-        self.assertIn('"COL3" FLOAT', tql)
-        self.assertNotIn("PRIMARY KEY", tql)
+            self.assertIn('USE "DATABASE1"', tql)
+            self.assertIn('DROP TABLE "falcon_default_schema"."TABLE1"', tql)
+            self.assertIn('CREATE TABLE "falcon_default_schema"."TABLE1"', tql)
+            self.assertIn('"COL1" INT', tql)
+            self.assertIn('"COL2" DOUBLE', tql)
+            self.assertIn('"COL3" FLOAT', tql)
+            self.assertNotIn("PRIMARY KEY", tql)
 
     def test_write_lower(self):
         """Test writing with upper flag set."""
         database = TestTQLWriter.get_simple_db()
 
         writer = TQLWriter(lowercase=True)
-        string_io = StringIO()
-        writer.write_tql(database=database, outfile=string_io)
-        tql = string_io.getvalue()
-        string_io.close()
+        filename = "/tmp/datamodelio.test"
+        writer.write_tql(database=database, filename=filename)
+        with open(filename, "r") as input_file:
+            tql = input_file.readlines()
+            tql = "".join(tql)
 
-        self.assertIn('USE "database1"', tql)
-        self.assertIn('DROP TABLE "falcon_default_schema"."table1"', tql)
-        self.assertIn('CREATE TABLE "falcon_default_schema"."table1"', tql)
-        self.assertIn('"col1" INT', tql)
-        self.assertIn('"col2" DOUBLE', tql)
-        self.assertIn('"col3" FLOAT', tql)
-        self.assertNotIn("PRIMARY KEY", tql)
+            self.assertIn('USE "database1"', tql)
+            self.assertIn('DROP TABLE "falcon_default_schema"."table1"', tql)
+            self.assertIn('CREATE TABLE "falcon_default_schema"."table1"', tql)
+            self.assertIn('"col1" INT', tql)
+            self.assertIn('"col2" DOUBLE', tql)
+            self.assertIn('"col3" FLOAT', tql)
+            self.assertNotIn("PRIMARY KEY", tql)
 
     @staticmethod
     def get_complex_db():
@@ -176,29 +179,30 @@ class TestTQLWriter(unittest.TestCase):
         database = TestTQLWriter.get_complex_db()
 
         writer = TQLWriter(create_db=True)
-        string_io = StringIO()
-        writer.write_tql(database=database, outfile=string_io)
-        tql = string_io.getvalue()
-        string_io.close()
+        filename = "/tmp/datamodelio.test"
+        writer.write_tql(database=database, filename=filename)
+        with open(filename, "r") as input_file:
+            tql = input_file.readlines()
+            tql = "".join(tql)
 
-        print(tql)
+            print(tql)
 
-        self.assertIn('CONSTRAINT PRIMARY KEY ("col1")', tql)
-        self.assertIn('CONSTRAINT PRIMARY KEY ("col4", "Col5")', tql)
-        self.assertIn('PARTITION BY HASH(128) KEY("col1")', tql)
-        self.assertIn('PARTITION BY HASH(96) KEY("col4", "Col5")', tql)
+            self.assertIn('CONSTRAINT PRIMARY KEY ("col1")', tql)
+            self.assertIn('CONSTRAINT PRIMARY KEY ("col4", "Col5")', tql)
+            self.assertIn('PARTITION BY HASH(128) KEY("col1")', tql)
+            self.assertIn('PARTITION BY HASH(96) KEY("col4", "Col5")', tql)
 
-        self.assertIn(
-            'ALTER TABLE "falcon_default_schema"."table2" ADD CONSTRAINT "FK_table2_to_table1" '
-            + 'FOREIGN KEY ("Col5") '
-            + 'REFERENCES "falcon_default_schema"."table1" ("COL3");',
-            tql,
-        )
-        self.assertIn(
-            'ALTER TABLE "falcon_default_schema"."table1" ADD RELATIONSHIP "REL_table1_to_table2" '
-            'WITH "falcon_default_schema"."table2" AS ("table1"."col1" == "table2."COL6");',
-            tql,
-        )
+            self.assertIn(
+                'ALTER TABLE "falcon_default_schema"."table2" ADD CONSTRAINT "FK_table2_to_table1" '
+                + 'FOREIGN KEY ("Col5") '
+                + 'REFERENCES "falcon_default_schema"."table1" ("COL3");',
+                tql,
+            )
+            self.assertIn(
+                'ALTER TABLE "falcon_default_schema"."table1" ADD RELATIONSHIP "REL_table1_to_table2" '
+                'WITH "falcon_default_schema"."table2" AS ("table1"."col1" == "table2."COL6");',
+                tql,
+            )
 
 
 # -------------------------------------------------------------------------------------------------------------------

@@ -25,7 +25,7 @@ import contextlib
 import csv
 import os
 from openpyxl import Workbook  # writing Excel
-from datamodel import Database, Table, Column, ShardKey, ForeignKey, GenericRelationship, DatamodelConstants, eprint
+from datamodel import Database, Table, Column, ShardKey, DatamodelConstants, eprint
 from tqlgenerator import TQLCommandGenerator, list_to_string
 
 # -------------------------------------------------------------------------------------------------------------------
@@ -159,7 +159,7 @@ class DDLParser(object):
                         after_comment = line.partition("/*")[2]
                         stmt_buffer += before_comment
 
-                        if "*/" in after_comment: # could be a one line comment.
+                        if "*/" in after_comment:  # could be a one line comment.
                             in_comment = False
                             stmt_buffer += after_comment.partition("*/")[2]
                     else:
@@ -682,15 +682,13 @@ class TQLWriter:
         self.command_generator = TQLCommandGenerator(uppercase=uppercase, lowercase=lowercase, camelcase=camelcase)
         self.create_db = create_db
 
-    def write_tql(self, database, filename=None, outfile=None):
+    def write_tql(self, database, filename=None):
         """
         Main function to write the Database to TQL.
         :param database: The database object to convert.
         :type database: Database
         :param filename: File to write to or STDOUT is not set.  The caller is expected to close the output stream.
         :type filename: str
-        :param outfile: Output file handler / stream.  If provided the filename is ignored.  It's expected that either
-        the filename or outfile will be provided.
         """
 
         with smart_open(filename) as outfile:
@@ -749,7 +747,7 @@ class TQLWriter:
         :param outfile: The file to write to.
         """
         for rel in table.relationships.values():
-            outfile.write(self.command_generator.generate_generic_relationships(table=table, generic_relationship=rel))
+            outfile.write(self.command_generator.generate_relationships(table=table, relationship=rel))
 
 # -------------------------------------------------------------------------------------------------------------------
 
