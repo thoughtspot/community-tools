@@ -649,7 +649,7 @@ class SetGroupPrivilegesAPI(BaseApiInterface):
 
 class TransferOwnershipApi(BaseApiInterface):
 
-    TRANSFER_OWNERSHIP_URL = "{tsurl}/tspublic/v1/user/transfer/ownership"
+    TRANSFER_OWNERSHIP_URL = "/tspublic/v1/user/transfer/ownership"
 
     def __init__(self, tsurl, username, password, disable_ssl=False):
         """
