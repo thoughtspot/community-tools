@@ -1068,7 +1068,7 @@ class SetGroupPrivilegesAPI(BaseApiInterface):
 
 class TransferOwnershipApi(BaseApiInterface):
 
-    TRANSFER_OWNERSHIP_URL = "{tsurl}/tspublic/v1/user/transfer/ownership"
+    TRANSFER_OWNERSHIP_URL = "/tspublic/v1/user/transfer/ownership"
 
     def __init__(self, tsurl, username, password, disable_ssl=False):
         """
@@ -1095,8 +1095,10 @@ class TransferOwnershipApi(BaseApiInterface):
         :type to_username: str
         """
 
+        # https://bdbemea/callosum/v1/tspublic/v1/user/transfer/ownership?fromUserName=bk_manager&toUserName=bk_user
         url = self.format_url(TransferOwnershipApi.TRANSFER_OWNERSHIP_URL)
         url = url + "?fromUserName=" + from_username + "&toUserName=" + to_username
+        print("transferring ownership:  %s" % url)
         response = self.session.post(url, cookies=self.cookies)
 
         if response.status_code == 204:
