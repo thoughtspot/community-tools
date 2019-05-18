@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2018 ThoughtSpot
+# Copyright 2019 ThoughtSpot
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation
 # files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy,
@@ -14,262 +14,265 @@
 # BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT
 # OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-# Needed when running from cron since this path is set in /home/admin/.bashrc  tsload is in this path.
+# WARNING:  THIS FILE SHOULD NOT NEED TO BE MODIFIED.
+
+# This file will load data files into ThoughtSpot using tsload.  It expects a configuration file to be provided.  
+
+# Needed when running from cron since this path is set in /home/admin/.bashrc - tsload is in this path.
 PATH=$PATH:/usr/local/scaligent/bin:/usr/local/scaligent/release/bin
 
-# Loads all of the data from files in a staging area into ThoughtSpot and then moves the files to a new location.
-# To use this file, change the settings and flags below.
-
-# Assumptions:
-#   File names are of the format tablename[_full|_incremental|]-*.extension
-#     _full | _incremental cause a full or incremental load.  If not specified, the default for full or incremental is used.
-#     =* is optional and can be anything.  Everything from the - on is ignored.  This is useful timestamps, etc.
-#   All formats are the same for all files including separators, enclosing characters, data/time formats, etc.
-
-# TODO The following should be modified for your environment.
-declare -r DATA_FILE_EXTENSION=".csv"                                  # extension for files to be loaded.
-# declare -r ROOT_DIR="/home/admin/test_load_files"                      # Root of where data, etc. will reside.
-declare -r ROOT_DIR="./foo"                                            # Root of where data, etc. will reside.
-declare -r RESULTS_EMAIL=("you@thoughtspot.com")                       # email addresses to send the results to.
-declare -r SEMAPHORE_FILE_NAME="stage_done"                            # name of a file that indicates all staging files are loaded.
-declare -r DEFAULT_EMPTY_TARGET="--empty_target"                       # use if always empty target unless specified.
-declare -r DBNAME_DEFAULT="YOUR_DB_NAME"                               # default db name.
-declare -r SCHEMANAME_DEFAULT="falcon_default_schema"                  # default schema name.
-#declare -r DEFAULT_EMPTY_TARGET=""                                    # use if always incremental load (upserts) unless specified.
-declare -r IGNORE_DIR=(foo,test,old, dont_load, ignore)                # list of directories to ignore processing.
-
-# Data and loaded file directories.  These don't normally need to change.
-declare -r CLUSTER_NAME="`tscli cluster status | grep 'Cluster name' | sed 's/^.*: //' | sed 's/ /_/'`"
-declare -r THE_DATE_TIME="`date +"%Y-%m-%d_%H%M%S_%Z"`"                # date and time to use for load name.
-declare -r DATA_DIR=${ROOT_DIR}/data                                   # location for the data to load.  Write new files here.
-declare -r LOG_DIR=${ROOT_DIR}/logs                                    # directory to store load logs.
-declare -r OLD_DIR="${ROOT_DIR}/old/${THE_DATE_TIME}"                  # directory to move files to.
-declare -r BAD_RECORDS_DIR="${OLD_DIR}/bad_records"                    # directory with bad records.
-declare -r TEMP_RESULTS_FILE="/tmp/$$.results"                         # temp folder for detailed results.
-declare -r TEMP_RESULTS_SUMMARY_FILE="/tmp/$$.results.summary"         # temp folder for results summary.
-declare -r RESULTS_FILE="${LOG_DIR}/${CLUSTER_NAME}-results-${THE_DATE_TIME}.txt" # stores the results of the data load.
-declare -r LOADING_FILE="${DATA_DIR}/loading"                          # flag to indicate we are currently loading.
-declare -r V_LEVEL=0                                                   # logging verbosity level.  0-6.  0 recommended for production.
-
-
-# TODO Uncomment the following if using a semaphore for reason to load.
-# See if the semaphore has been set.  If not, exit since not ready to load.
-# NOTE:  This approach should be avoided in favor of remote execution of the script.  Uncomment if using semaphore approach.
-# if [ ! -e ${DATA_DIR}/${SEMAPHORE_FILE_NAME} ]; then
-#   exit 0
-# fi
-
+# Show the usage of the file.
 function usage() {
+  exit_code=$1
+
   echo ""
-  echo "to use default db name and schema name"
-  echo "usage: ${0}"
+  echo "usage: ${0} -f CONFIG_FILE"
+  echo "  where CONFIG_FILE is a configuration file for the loading."
   echo ""
-  echo "use db name parameters and default schema name"
-  echo "usage: ${0} [-d DBNAME]"
-  echo ""
-  echo "use default db name and default schema name parameter"
-  echo "usage: ${0} [-s SCHEMANAME]"
-  echo ""
-  echo "both db name and schema name passed as parameters"
-  echo "usage: ${0} [-d DBNAME] [-s SCHEMANAME]"
-  echo ""
-  exit 0
+  exit ${exit_code}
 }
 
-#Parsing the input parameters for DBName and SchemaName
-while getopts 'd:s:h' opt
-do
- case ${opt} in
-   d) dbname=${OPTARG} ;;
-   s) schemaname=${OPTARG} ;;
-   h|?)usage ;;
- esac
-done
-
-# If parameters are not provided then setting the dbnames and schemanames to default
-if [[ -z ${dbname} ]]; then
-  dbname=${DBNAME_DEFAULT}
-fi
-
-if [[ -z ${schemaname} ]]; then
-  schemaname=${SCHEMANAME_DEFAULT}
-fi
-
-# Create the needed directories.
-if [ ! -e ${DATA_DIR} ]; then
-  mkdir -p ${DATA_DIR}
-fi
-
-if [ ! -e ${LOG_DIR} ]; then
-  mkdir -p ${LOG_DIR}
-fi
-
-if [ ! -e ${OLD_DIR} ]; then
-  mkdir -p ${OLD_DIR}
-fi
-
-if [ ! -e ${OLD_DIR}/bad_records ]; then
-  mkdir -p ${OLD_DIR}/bad_records
-fi
-
-if [ ! -e ${OLD_DIR}/data ]; then
-  mkdir -p ${OLD_DIR}/data
-fi
-
-# loading is a flag that indicates this process is running.  Needed to avoid two copies running at once.
-if [ -e ${LOADING_FILE} ]; then
-  other_pid=`head -n 1 ${LOADING_FILE}`
-  running_pid=`ps -ef | awk '{ print $2 }' | grep $other_pid`
-  if [ "$running_pid" == "" ]; then
-    echo $$ > ${LOADING_FILE}
-    echo "" > ${TEMP_RESULTS_FILE}
-    echo "Taking over from stopped process $other_pid" > ${TEMP_RESULTS_FILE}
-  else
-    exit 0
+# Makes sure correct directories exist and creates where appropriate or exits with an error.
+function check_directories() {
+  if [ ! -e ${DATA_DIR} ]; then
+    echo "Required data directory ${DATA_DIR} not found.  Exiting."
+    exit -1
   fi
-else
-  echo $$ > ${LOADING_FILE}
-  echo "" > ${TEMP_RESULTS_FILE}
-fi
 
-echo "" > ${TEMP_RESULTS_SUMMERY_FILE}
+  # Just create the others if they don't exist.
+  if [ ! -e ${LOG_DIR} ]; then mkdir -p ${LOG_DIR}; fi
+  if [ ! -e ${OLD_DIR} ]; then mkdir -p ${OLD_DIR}; fi
+  if [ ! -e ${OLD_DIR}/data ]; then mkdir -p ${OLD_DIR}/data; fi
+}
 
-had_tsload_error=false # indicates if there was a tsload error.
-number_successful_loads=0
-number_failed_loads=0
+# See if there is a semaphore file.  If so, see if it exists.
+check_for_semaphore() {
+  if [[ ${SEMAPHORE_FILE_NAME} != "" ]]; then
+    if [ ! -e ${DATA_DIR}/${SEMAPHORE_FILE_NAME} ]; then
+      echo "no semaphore file exists."
+      exit 0
+    fi
+  fi
+}
 
-# loads from a file into TS.  $1 is the root filename / tablename.
-# TODO - change flags and values as necessary before deploying.
-#      - you may also need to add a sed for any data manipulation after the file name.
-function tsload_file {
-  filename=$1 # $1 is filename
-  tablename=$2 # $2 is tablename
-
-  if [[ -n $3 ]]
-    then
-      schemaname=$3
-      if [ ! -e ${OLD_DIR}/data/${schemaname} ]; then
-        mkdir -p ${OLD_DIR}/data/${schemaname}
-      fi
-      MOVE_FILE_DIR=${OLD_DIR}/data/${schemaname}
-      bad_rec_file_name=${schemaname}-${1}
+# Make sure there is only one load process at a time.  Also recover if a process failed.  
+# NOTE that this checks the local process space, so it's possible another load is running on another machine.
+# TODO:  Create a process for handling multi-node environments to prevent loads on another machine.
+function check_already_loading() {
+  if [ -e ${LOADING_FILE} ]; then
+    other_pid=`head -n 1 ${LOADING_FILE}`
+    running_pid=`ps -ef | awk '{ print $2 }' | grep $other_pid`
+    if [ "$running_pid" == "" ]; then
+      echo $$ > ${LOADING_FILE}
+      echo "" > ${TEMP_RESULTS_FILE}  # create file for logging results.
+      echo "Taking over from stopped process $other_pid" > ${TEMP_RESULTS_FILE}
     else
-      #schemaname="falcon_default_schema"
-      bad_rec_file_name=${1}
-      MOVE_FILE_DIR=${OLD_DIR}/data
+      exit 0
+    fi
+  else
+    echo "" > ${TEMP_RESULTS_FILE}  # create file for logging results.
+    echo $$ > ${LOADING_FILE}
+  fi
+}
+
+# Variables to log errors and loading.
+has_tsload_errors=false
+number_successful_loads=0
+total_attempted_files=0
+
+# Loads one file into a table using tsload.
+function load_a_file() {
+  file_name=$1
+  database_name=$2
+  schema_name=$3
+  table_name=$4
+  empty_target=$5
+
+  echo "Loading $1 into ${database_name}.${schema_name}.${table_name}"
+  total_attempted_files=$((total_attempted_files + 1))
+
+  # get the header flag.
+  hhr=""
+  if [[ ${HAS_HEADER_ROW} == "true" ]]; then
+    hhr="--has_header_row"
   fi
 
-  echo "loading ${schemaname}.${tn} from ${fn}..."
+  # Directory for loaded data and bad records.
+  move_dir="${OLD_DIR}/data/${schema_name}/"
+  if [ ! -e ${move_dir} ]; then mkdir -p ${move_dir}; fi
 
-  # determine empty_target flag.
-  et=${DEFAULT_EMPTY_TARGET}
-  if [[ ${filename} == *"_full"* ]]; then
-    et="--empty_target"
-  elif [[ ${filename} == *"_incremental"* ]]; then
-    et=""
-  fi
-
-  # if the files are gzip change cat to zcat.
-  cat ${filename} | \
-    tsload --target_database ${dbname} \
-           --target_schema ${schemaname} \
-           --target_table ${tablename} \
-           --bad_records_file ${OLD_DIR}/bad_records/${bad_rec_file_name}_bad_records.csv \
-           ${et} \
-           --source_data_format csv \
-           --field_separator "," \
-           --max_ignored_rows 0 \
-           --has_header_row \
-           --null_value "NULL" \
-           --date_format "%Y-%m-%d" \
-           --date_time_format "%Y-%m-%d %H:%M:%S" \
-           --boolean_representation "1_0" \
+  # The specific flags are set in the configuration file.
+  cat ${file_name} | \
+    tsload --target_database ${database_name} \
+           --target_schema ${schema_name} \
+           --target_table ${table_name} \
+           --bad_records_file ${move_dir}/${table_name}_bad_records.csv \
+           ${empty_target} \
+           ${hhr} \
+           --source_data_format ${SOURCE_DATA_FORMAT} \
+           --field_separator "${FIELD_SEPARATOR}" \
+           --max_ignored_rows ${MAX_IGNORED_ROWS} \
+           --null_value "${NULL_VALUE}" \
+           --date_format "${DATE_FORMAT}" \
+           --date_time_format "${DATE_TIME_FORMAT}" \
+           --boolean_representation ${BOOLEAN_REPRESENTATION} \
            --skip_second_fraction \
            -v ${V_LEVEL} \
            >> ${TEMP_RESULTS_FILE} 2>> ${TEMP_RESULTS_FILE}
   if [ $? != 0 ]; then
     has_tsload_error=true
-    echo "Error:  ${filename} failed to load" >> ${TEMP_RESULTS_SUMMARY_FILE}
+    echo "Error:  ${file_name} failed to load into ${database_name}.${schema_name}.${table_name}" >> ${TEMP_RESULTS_SUMMARY_FILE}
     number_failed_loads=$((number_failed_loads+1))
   else
-    echo "Success:  ${filename} loaded successfully" >> ${TEMP_RESULTS_SUMMARY_FILE}
+    echo "Success:  ${file_name} loaded successfully into ${database_name}.${schema_name}.${table_name}" >> ${TEMP_RESULTS_SUMMARY_FILE}
     number_successful_loads=$((number_successful_loads+1))
   fi
 
   # Move the loaded files to the old directory.
-  mv ${fn} ${MOVE_FILE_DIR}/
+  ${MOVE_LOADED_FILES} ${fn} ${move_dir}
 }
 
-exit_value=0
+function should_ignore() {
+  dir_to_check="$1"
+  for ignore in ${IGNORE_DIRS[*]}; do [[ "${ignore}" == "${dir_to_check}" ]] && return 0; done
+  return 1
+}
 
-# load the files using tsload.
-pushd ${DATA_DIR}
-files=$(ls *${DATA_FILE_EXTENSION} 2> /dev/null | wc -l)
-if [[ ${files} -ge 1 ]]; then
-  for fn in `ls *${DATA_FILE_EXTENSION}`; do
-    # TODO:  If your table names have dashes, modify the sed below to keep them.
-    tn="`echo ${fn} | sed s/${DATA_FILE_EXTENSION}// | sed s/-.*// | sed s/_incremental.*// | sed s/_full.*//`"
-    tsload_file ${fn} ${tn}
-  done
-else
-  echo "No ${DATA_FILE_EXTENSION} files found in ${DATA_DIR}"
-fi
-popd
+# Controls the actual loading of data.
+function load_data_files() {
+  local data_dir=$1
+  local schema_name=$2
 
-# to handle multiple schema in ${DATA_DIR}
-# TODO:  If your table names have underscores or dashes, modify the sed below to keep them.
-for dir in `ls -d ${DATA_DIR}/*/`; do
-  #sn="`echo ${dir}|awk -F'/' '{print $(NF-1)}'`"
-  sn=$(basename ${dir})
-  [[ ${sn} =~ ^(`echo ${IGNORE_DIR} |sed 's/,/|/'`)$ ]] && continue
-  pushd ${dir}
+  cd ${data_dir}
+  # pwd
+  # ls -l
+  echo "Loading files from $data_dir for schema $schema_name."
+
   files=$(ls *${DATA_FILE_EXTENSION} 2> /dev/null | wc -l)
   if [[ ${files} -ge 1 ]]; then
+    # load all data files, one at a time.
     for fn in `ls *${DATA_FILE_EXTENSION}`; do
-      # TODO:  If your table names have dashes, modify the sed below to keep them.
-      tn="`echo ${fn} | sed s/${DATA_FILE_EXTENSION}// | sed s/-.*// | sed s/_incremental.*// | sed s/_full.*//`"
-      tsload_file ${fn} ${tn} ${sn}
+
+      # see if the filename overrides the default empty target.
+      # use all of the patterns to get the table name from the file name.
+      if [[ ${fn} == *"_full"* ]]; then
+        empty_target="--empty_target"
+      elif [[ ${fn} == *"_incremental"* ]]; then
+        empty_target=""
+      else
+        empty_target=${DEFAULT_EMPTY_TARGET}
+      fi
+
+      # the extension and anything after a - will be automatically removed.  Neither can be used in the table name.
+      tn="`echo ${fn} | sed s/${DATA_FILE_EXTENSION}// | sed s/-.*// | sed s/_full// | sed s/_incremental//`"  
+      for pattern in ${SED_PATTERNS[*]}; do
+        tn="`echo ${tn} | sed s/${pattern}//`"
+      done
+      load_a_file ${fn} ${DATABASE_NAME} ${schema_name} ${tn} ${empty_target}
     done
   else
-    echo "No ${DATA_FILE_EXTENSION} files found in ${DATA_DIR}"
+    echo "No ${DATA_FILE_EXTENSION} files found in $data_dir"
   fi
-  popd
+
+  # Check any sub-directories to see if there are multiple schemas to support.
+  for dir in `ls -d */ 2> /dev/null`; do
+    sn=$(basename ${dir})
+    # see if the directory is in the list of ones to ignore.  
+    should_ignore ${sn}
+    if [[ $? != 0 ]]; then
+      # load the data; the directory and schema are the same name.
+      load_data_files ${sn} ${sn}
+    fi
+  done
+
+  cd ..
+}
+
+# Clean up files, archiving data, etc.
+function cleanup_from_load() {
+
+  # if there were files loaded, save the results
+  if [[ ${total_attempted_files} != 0 ]]; then
+    mv ${TEMP_RESULTS_SUMMARY_FILE} ${RESULTS_FILE}
+    cat ${TEMP_RESULTS_FILE} >> ${RESULTS_FILE}
+    cp ${RESULTS_FILE} ${OLD_DIR}
+
+    pushd .
+    cd ${OLD_DIR}/.. && tar czf ${OLD_DIR}.tar.gz ${THE_DATE_TIME} && rm -r ${OLD_DIR}
+    popd
+
+    # clear out the old archives to save space if the value is defined.
+    if [[ ${NBR_DAYS_TO_KEEP_OLD_FILE} ]]; then
+      find ${OLD_DIR}/.. -type f -mtime +${NBR_DAYS_TO_KEEP_OLD_FILES} -name '*.gz' -execdir rm -- '{}' \;
+    fi
+  else
+    rm ${TEMP_RESULTS_SUMMARY_FILE}
+    rm -r ${OLD_DIR}
+  fi
+
+  rm ${LOADING_FILE} # remove the loading semaphore file
+
+  if [ -e ${DATA_DIR}/${SEMAPHORE_FILE_NAME} ]; then
+    rm ${DATA_DIR}/${SEMAPHORE_FILE_NAME}
+  fi
+}
+
+# Sends email to indicate the results of the load.
+function send_results_notification() {
+
+  # only send if there were files that attempted to load.
+  if [[ ${total_attempted_files} != 0 ]]; then
+    subject="Success:  ${number_successful_loads} of ${total_attempted_files} files loaded at ${THE_DATE_TIME} for cluster ${CLUSTER_NAME}"
+    body="The data load ${THE_DATE_TIME} for cluster ${CLUSTER_NAME} appears successful.  See attached load results."
+    if [[ ${has_tsload_error} = true ]]; then
+      subject="Error:  ${number_successful_loads} of ${total_attempted_files} files loaded and ${number_failed_loads} failed at ${THE_DATE_TIME} for cluster ${CLUSTER_NAME}"
+      body="The data load ${THE_DATE_TIME} for cluster ${CLUSTER_NAME} had errors loading files or rows.  See attached load results."
+      exit_value=1
+    fi
+
+    echo ${body}
+    for address in ${RESULTS_EMAIL[*]}; do
+      # TODO remove after working.
+      echo ""
+      echo "${body}" | mail -s "${subject}" -a ${RESULTS_FILE} ${address}
+    done
+  fi
+}
+  
+
+#--------------------------------------- Main execution of script -------------------------------------------
+
+# Get the input parameters and verify there is a file to use for configs.
+while getopts 'f:h' opt
+do
+  case ${opt} in
+    f) config_file=${OPTARG} 
+    ;;
+    h|?) usage 0 
+    ;;
+  esac
 done
 
-# remove the semaphore since we are done with loading.
-# TODO:  Uncomment if using semaphore.
-# rm ${DATA_DIR}/${SEMAPHORE_FILE_NAME}
-rm ${LOADING_FILE}
-
-mv ${TEMP_RESULTS_SUMMARY_FILE} ${RESULTS_FILE}
-cat ${TEMP_RESULTS_FILE} >> ${RESULTS_FILE}
-cp ${RESULTS_FILE} ${OLD_DIR}
-
-# check the success of the load.
-cd ${OLD_DIR}
-
-total_attempted_files=$((number_successful_loads+number_failed_loads))
-
-subject="Success:  ${number_successful_loads} of ${total_attempted_files} files loaded at ${THE_DATE_TIME} for cluster ${CLUSTER_NAME}"
-body="The data load ${THE_DATE_TIME} for cluster ${CLUSTER_NAME} appears successful.  See attached load results."
-if [[ ${has_tsload_error} = true ]]; then
-  subject="Error:  ${number_successful_loads} of ${total_attempted_files} files loaded and ${number_failed_loads} failed at ${THE_DATE_TIME} for cluster ${CLUSTER_NAME}"
-  body="The data load ${THE_DATE_TIME} for cluster ${CLUSTER_NAME} had errors loading files or rows.  See attached load results."
-  exit_value=1
+if [ ! -f "${config_file}" ]; then 
+  usage -1
 fi
 
-echo ${body}
-for address in ${RESULTS_EMAIL[*]}; do
-  echo "${body}" | mail -s "${subject}" -a ${RESULTS_FILE} ${address}
-done
+source ${config_file}
+echo "" > ${TEMP_RESULTS_SUMMARY_FILE}
 
-cat ${RESULTS_FILE}
+check_directories                                  # check that directories exist and/or create - may exit with error
 
-# compress the backup folder
-cd ${OLD_DIR}/.. && tar czf ${OLD_DIR}.tar.gz ${THE_DATE_TIME} && rm -r ${OLD_DIR}
+check_for_semaphore                                # checks to see if a semaphore is being used and, if so, if should run - may exit
+check_already_loading                              # check if a process is already running - may exit if other running
+load_data_files ${DATA_DIR} ${DEFAULT_SCHEMA_NAME} # load all data files starting in the DATA directory.
+cleanup_from_load                                  # cleanup from the load
+send_results_notification                          # sends notification that the load has occurred
 
-# TODO optionally remove old archive files
-# +7 means delete older than seven days.  Modify for your specs.
-# find ${OLD_DIR}/.. -type f -mtime +7 -name '*.gz' -execdir rm -- '{}' \;
+# Show what happened.
 
-exit ${exit_value}
+if [[ ${total_attempted_files} != 0 ]]; then
+  cat ${RESULTS_FILE}
+else
+  echo "No files loaded."
+fi
+
