@@ -1,5 +1,0 @@
-create database "test_parallel";
-use "test_parallel";
-create table para_1 (col1 int, col2 bool);
-create table para_2 (col1 int, col2 double);
-create table para_3 (col1 int, col2 date);

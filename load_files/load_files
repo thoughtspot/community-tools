@@ -48,7 +48,7 @@ function check_directories() {
 # See if there is a semaphore file.  If so, see if it exists.
 check_for_semaphore() {
   if [[ ${SEMAPHORE_FILE_NAME} != "" ]]; then
-    if [ ! -e ${DATA_DIR}/${SEMAPHORE_FILE_NAME} ]; then
+    if [ ! -f ${DATA_DIR}/${SEMAPHORE_FILE_NAME} ]; then
       echo "no semaphore file exists."
       exit 0
     fi
@@ -59,7 +59,7 @@ check_for_semaphore() {
 # NOTE that this checks the local process space, so it's possible another load is running on another machine.
 # TODO:  Create a process for handling multi-node environments to prevent loads on another machine.
 function check_already_loading() {
-  if [ -e ${LOADING_FILE} ]; then
+  if [ -f ${LOADING_FILE} ]; then
     other_pid=`head -n 1 ${LOADING_FILE}`
     running_pid=`ps -ef | awk '{ print $2 }' | grep $other_pid`
     if [ "$running_pid" == "" ]; then
@@ -98,7 +98,7 @@ function load_a_file() {
   fi
 
   # Directory for loaded data and bad records.
-  move_dir="${OLD_DIR}/data/${schema_name}/"
+  move_dir="${OLD_DIR}/data/${schema_name}"
   if [ ! -e ${move_dir} ]; then mkdir -p ${move_dir}; fi
 
   # The specific flags are set in the configuration file.
@@ -121,7 +121,7 @@ function load_a_file() {
            >> ${TEMP_RESULTS_FILE} 2>> ${TEMP_RESULTS_FILE}
   if [ $? != 0 ]; then
     has_tsload_error=true
-    echo "Error:  ${file_name} failed to load into ${database_name}.${schema_name}.${table_name}" >> ${TEMP_RESULTS_SUMMARY_FILE}
+    echo "Error:  tsload failed to load ${file_name} into ${database_name}.${schema_name}.${table_name}" >> ${TEMP_RESULTS_SUMMARY_FILE}
     number_failed_loads=$((number_failed_loads+1))
   else
     echo "Success:  ${file_name} loaded successfully into ${database_name}.${schema_name}.${table_name}" >> ${TEMP_RESULTS_SUMMARY_FILE}
@@ -197,9 +197,9 @@ function cleanup_from_load() {
     cat ${TEMP_RESULTS_FILE} >> ${RESULTS_FILE}
     cp ${RESULTS_FILE} ${OLD_DIR}
 
-    pushd .
+    pushd . 2&>/dev/null
     cd ${OLD_DIR}/.. && tar czf ${OLD_DIR}.tar.gz ${THE_DATE_TIME} && rm -r ${OLD_DIR}
-    popd
+    popd 2&>/dev/null
 
     # clear out the old archives to save space if the value is defined.
     if [[ ${NBR_DAYS_TO_KEEP_OLD_FILE} ]]; then
@@ -212,7 +212,7 @@ function cleanup_from_load() {
 
   rm ${LOADING_FILE} # remove the loading semaphore file
 
-  if [ -e ${DATA_DIR}/${SEMAPHORE_FILE_NAME} ]; then
+  if [ -f ${DATA_DIR}/${SEMAPHORE_FILE_NAME} ]; then
     rm ${DATA_DIR}/${SEMAPHORE_FILE_NAME}
   fi
 }
