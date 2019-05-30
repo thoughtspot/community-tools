@@ -49,7 +49,7 @@ function check_directories() {
 check_for_semaphore() {
   if [[ ${SEMAPHORE_FILE_NAME} != "" ]]; then
     if [ ! -f ${DATA_DIR}/${SEMAPHORE_FILE_NAME} ]; then
-      echo "no semaphore file exists."
+      echo "no semaphore file ${DATA_DIR}/${SEMAPHORE_FILE_NAME} exists."
       exit 0
     fi
   fi
@@ -75,10 +75,26 @@ function check_already_loading() {
   fi
 }
 
+# Function to see if an element exists in an array.  
+function contains_element() {
+  local element="$1"
+  local array="$2"
+  for e in $2; do 
+    if [[ "$e" == "$element" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
 # Variables to log errors and loading.
 has_tsload_errors=false
 number_successful_loads=0
 total_attempted_files=0
+
+# This variable contains tables that have been truncated before loading parts.
+# This only supports one database.
+truncated_tables=()
 
 # Loads one file into a table using tsload.
 function load_a_file() {
@@ -90,6 +106,15 @@ function load_a_file() {
 
   echo "Loading $1 into ${database_name}.${schema_name}.${table_name}"
   total_attempted_files=$((total_attempted_files + 1))
+
+  # See if we should truncate the table before loading.
+  if [ ${TRUNCATE_BEFORE_LOAD} == "true" ]; then
+    contains_element "${schema_name}"."$tn" ${truncated_tables[@]} 
+    if [[ $? != 0 ]]; then  # this is table that should be truncated.
+      truncated_tables+=("${schema_name}"."$tn")
+      echo "truncate table ${database_name}.${schema_name}.${tn};" | tql
+    fi
+  fi
 
   # get the header flag.
   hhr=""

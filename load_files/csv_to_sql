@@ -1,0 +1,66 @@
+#!/bin/bash
+#
+# This script will read all of the delimited files in a folder and create an output SQL file.
+# The extension and output file name can be passed as parameters, otherwise, .csv and the directory name will be used.
+
+# script that will convert to SQL.
+converter="csvsql"
+
+# confirm that the file to convert to SQL exists since it's used for the conversion.
+hash ${converter} 
+if [[ "$?" != 0 ]]; then
+  echo "'${converter}' is not installed or not in the PATH.  It is required for this script."
+  exit -1
+fi
+
+# Show the usage if someone wants to see it or there is an error.
+function show_usage() {
+  echo ""
+  echo "usage: ${0}"
+  echo "	-d <delimiter>, where delimiter is the column delimeter to use"
+  echo "	-e <extension>, where extension is the file extension to use for reading files"
+  echo "	-f <filename>, where filename is the name of the output file"
+  exit 0
+}
+
+delimiter=","
+extension=".csv"
+filename="${PWD##*/}.sql"
+# get the options for the extension and file name.
+while getopts 'd:e:f:h' opt
+do
+ case ${opt} in
+   d) delimiter=${OPTARG} ;;
+   e) extension=${OPTARG} ;;
+   f) filename=${OPTARG} ;;
+   h) show_usage ;;
+ esac
+done
+
+# write the parameter
+echo "delimiter => ${delimiter}"
+echo "extension => ${extension}"
+echo "filename => ${filename}"
+
+count=`ls -1 *${extension} 2>/dev/null | wc -l`
+if [ ${count} = 0 ]; then
+  echo "no files with extension ${extension} exist to convert"
+  exit -1
+fi
+
+if [ -e $filename ]; then
+  echo "${filename} already exists.  Deleting old file."
+  rm ${filename}
+fi
+
+touch ${filename}  # create new file for SQL.
+
+# WARNING filenames with spaces will cause errors.  So don't use those.
+for f in `ls *${extension}`; do
+  echo "parsing $f"
+  fn=`echo $f | sed s/${extension}// | sed s/\\.$//`
+  head -1000 $f | csvsql --tables "${fn}" -i "postgresql" --blanks >> ${filename}
+done
+
+# open for editing / inspection
+vim ${filename}
