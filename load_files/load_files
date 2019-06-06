@@ -229,6 +229,7 @@ function cleanup_from_load() {
     # clear out the old archives to save space if the value is defined.
     if [[ ${NBR_DAYS_TO_KEEP_OLD_FILE} ]]; then
       find ${OLD_DIR}/.. -type f -mtime +${NBR_DAYS_TO_KEEP_OLD_FILES} -name '*.gz' -execdir rm -- '{}' \;
+      find ${LOG_DIR}/.. -type f -mtime +${NBR_DAYS_TO_KEEP_OLD_FILES} -name '*.txt' -execdir rm -- '{}' \;
     fi
   else
     rm ${TEMP_RESULTS_SUMMARY_FILE}
@@ -285,10 +286,11 @@ fi
 source ${config_file}
 echo "" > ${TEMP_RESULTS_SUMMARY_FILE}
 
-check_directories                                  # check that directories exist and/or create - may exit with error
-
 check_for_semaphore                                # checks to see if a semaphore is being used and, if so, if should run - may exit
 check_already_loading                              # check if a process is already running - may exit if other running
+
+check_directories                                  # check that directories exist and/or create - may exit with error
+
 load_data_files ${DATA_DIR} ${DEFAULT_SCHEMA_NAME} # load all data files starting in the DATA directory.
 cleanup_from_load                                  # cleanup from the load
 send_results_notification                          # sends notification that the load has occurred
