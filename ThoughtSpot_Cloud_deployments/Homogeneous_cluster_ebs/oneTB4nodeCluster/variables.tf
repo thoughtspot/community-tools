@@ -68,7 +68,7 @@ variable "security_groups" {
 #   default = 1000
 # }
 variable "key_name" {
-  # Doesn't work now on current TS AMI
+  # Doesn't work now on current TS AMI but a valid keypair name needed currently
   description = "The AWS key pair to be attached with ec2."
   default = ""
 }
