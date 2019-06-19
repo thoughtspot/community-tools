@@ -1,9 +1,6 @@
 variable "vpc_subnet_id" {
   description = "VPC subnet id to which we attach these resources to"
 }
-variable "key_name" {
-  description = "The AWS key pair to use for resources."
-}
 variable "customer_name" {
   description = "The instance name to be created"
 }

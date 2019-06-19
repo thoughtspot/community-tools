@@ -16,7 +16,6 @@ module "ts-instance" {
       - inst_size defines the type of the instance used
       - vpc_subnet_id defines the vpc subnet id where TS will be deployed
       - security_groups defined for access with the TS ec2 instances
-      - # $vol_size is used for AMI without disk on the module ts_ec2
   */
   source              = "../baseline/ts_modules/ts_ec2_ami_ebs"
   customer_name       = "${var.customer_name}"
@@ -25,8 +24,6 @@ module "ts-instance" {
   base_ami            = "${var.ami_id}"
   security_groups     = "${var.security_groups}"
   vpc_subnet_id       = "${var.vpc_subnet_id}"
-  key_name            = "${var.key_name}"
-  #vol_size            = "${var.vol_size}"
 }
 
 resource "local_file" "install_input" {

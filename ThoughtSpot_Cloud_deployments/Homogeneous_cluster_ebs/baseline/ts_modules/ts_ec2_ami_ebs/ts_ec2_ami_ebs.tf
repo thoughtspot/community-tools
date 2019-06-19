@@ -6,7 +6,6 @@ resource "aws_instance" "ts-saas-instance" {
   monitoring                  = false
   subnet_id                   = "${var.vpc_subnet_id}"
   vpc_security_group_ids      = "${var.security_groups}"
-  key_name                    = "${var.key_name}"
 
   tags = {
         Name                  = "${var.customer_name}-${count.index + 1}"
