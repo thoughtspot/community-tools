@@ -26,12 +26,13 @@ Network:
 - Security Group ID
 - AMI ID (ThoughtSpot AMI described above)
 
-** Please do not proceed without the above details in hand **
+:warning: Please do not proceed without the above details in hand
 
 ### Setup the deployment server
+Spin up a small centos/rhel instance. You can also do this in your existing deployment server.
 On a deployment server (centos/rhel) need to have these packages installed.
 ```
-$ sudo yum install git ansible
+$ sudo yum install git ansible unzip
 ```
 
 Get a copy of this repository and run the playbook to configure this host
@@ -42,7 +43,14 @@ $ ansible-playbook terraform.yaml
 $ ansible-playbook ansible.yaml
 ```
 
-This would install terraform and configured ansible as expected.
+This would install terraform and configured ansible as expected for this playbook.
+:warning: This will modify the ansible.cfg file. So if using on your existing ansible system, please use caution.
+Below configurations are changed in ansible.cfg configurations
+```
+enable_plugins = host_list, script, yaml, ini, auto
+host_key_checking = False
+ssh_args = -C -o ControlMaster=auto -o ControlPersist=60s -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
+```
 
 ### Provisioning infra and installing ThoughtSpot
 #### Setting up aws specific environment
