@@ -1,5 +1,5 @@
 
-resource "aws_instance" "ts-saas-instance" {
+resource "aws_instance" "ts-aws-instance" {
   count                       = "${var.number_of_instances}"
   ami                         = "${var.base_ami}"
   instance_type               = "${var.ts_instance_type}"
@@ -13,9 +13,9 @@ resource "aws_instance" "ts-saas-instance" {
 }
 
 output "ts_host_ip" {
-    value = "${aws_instance.ts-saas-instance.*.private_ip}"
+    value = "${aws_instance.ts-aws-instance.*.private_ip}"
 }
 
 output "ts_inst_id" {
-    value = "${aws_instance.ts-saas-instance.*.id}"
+    value = "${aws_instance.ts-aws-instance.*.id}"
 }
