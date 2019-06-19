@@ -19,15 +19,15 @@ Below details can be obtained from ThoughtSpot Support:
 
 Your aws environment specific details
 * For access:
-- AWS_SECRET_ACCESS_KEY
-- AWS_ACCESS_KEY_ID
+  - AWS_SECRET_ACCESS_KEY
+  - AWS_ACCESS_KEY_ID
 
 * Network:
-- VPC ID
-- Security Group ID
-- AMI ID (ThoughtSpot AMI described above)
+  - VPC ID
+  - Security Group ID
+  - AMI ID (ThoughtSpot AMI described above)
 
-:warning: Please do not proceed without the above details in hand
+:warning: **Please do not proceed without the above details in hand**
 
 ### Setup the deployment server
 Spin up a small centos/rhel instance. You can also do this in your existing deployment server.
@@ -111,13 +111,13 @@ This step creates the infrastructure as defined in the tf files
 ```
 terraform apply
 ```
-:point_right: **This step would ask for a couple of interactive inputs**
-1. Your confirmation for terraform to proceed with this change
-2. password for admin user
+:point_right: **This step would ask for a few of interactive inputs**
+1. **Your confirmation for terraform to proceed with this change**
+2. **password for admin user (TWICE)**
 
 
 ### State file management
 Terraform creates a file called terraform.tfstate which describes the provisioned infrastructure.
-This file needs to be managed properly.
-There are a number of ways to do it, which is not done in this repository.
+This file will also contain secrets, so needs to be managed properly.
+There are a number of ways to do it, which is not implemented in this repository.
 https://blog.gruntwork.io/how-to-manage-terraform-state-28f5697e68fa
