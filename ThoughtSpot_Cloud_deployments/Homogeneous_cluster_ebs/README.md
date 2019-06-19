@@ -18,10 +18,11 @@ Below details can be obtained from ThoughtSpot Support:
 - The username/password used both by ansible and to login to the provisioned instances.
 
 Your aws environment specific details
-For access:
+* For access:
 - AWS_SECRET_ACCESS_KEY
 - AWS_ACCESS_KEY_ID
-Network:
+
+* Network:
 - VPC ID
 - Security Group ID
 - AMI ID (ThoughtSpot AMI described above)
@@ -44,7 +45,9 @@ $ ansible-playbook ansible.yaml
 ```
 
 This would install terraform and configured ansible as expected for this playbook.
+
 :warning: This will modify the ansible.cfg file. So if using on your existing ansible system, please use caution.
+
 Below configurations are changed in ansible.cfg configurations
 ```
 enable_plugins = host_list, script, yaml, ini, auto
@@ -74,9 +77,9 @@ $ cd community-tools/ThoughtSpot_Cloud_deployments/Homogeneous_cluster_ebs/oneTB
 
 Update the variable file variables.tf with details as described. Some of them already has some default values which can be used as such.
 ```
-vim vars.tf
+vim variables.tf
 ```
-Cluster specific variables:
+* Cluster specific variables:
   - variable "customer_name" - The name of the cluster, no spaces allowed (eg CompanyFinanceProd)
   - variable "cluster_id" - A unique sting identifier for cluster provided by ThoughtSpot Support team
   - variable "number_of_instances" - The number of nodes in the cluster
@@ -84,7 +87,8 @@ Cluster specific variables:
   - variable "alert_email" - A email address to receive cluster stats and alerts (default value 'later')
   - variable "release" - The release string matching the tar file name provided by ThoughtSpot.
   - variable "release_location" - The directory where you have downloaded the release tar
-AWS environment specific variables:
+
+* AWS environment specific variables:
   - variable "region" - AWS region where this would be provisioned
   - variable "vpc_subnet_id" - A valid subnet in your environment
   - variable "security_groups" - Security group to allow access to Thoughspot cluster
@@ -107,7 +111,7 @@ This step creates the infrastructure as defined in the tf files
 ```
 terraform apply
 ```
-:point_right: **This step would as for a couple of interactive inputs**
+:point_right: **This step would ask for a couple of interactive inputs**
 1. Your confirmation for terraform to proceed with this change
 2. password for admin user
 
