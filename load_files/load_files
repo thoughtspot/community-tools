@@ -1,4 +1,4 @@
-!/bin/bash
+#!/bin/bash
 
 # Copyright 2019 ThoughtSpot
 #
@@ -18,22 +18,6 @@
 
 # This file will load data files into ThoughtSpot using tsload.  It expects a configuration file to be provided.  
 
-# Recent changes
-# Bugfixes:
-# - Fixed issue with checking whether element exists in array, causing the truncate feature not to work properly
-# - Fixed issue with cleanup of directory, which was not working
-# - Code cleanup
-#
-# New features:
-# - Added feature to allow a custom SQL to be ran against a ThoughtSpot table before it is loaded (useful
-#   for example if you want to run a customised delete against a table before loading)
-# - Added feature for customised cleanup (to save space). Data files will now be archived according to the following setting: 
-#      - always   : data files are always archived
-#      - onerror  : data files are archived when a loading error occurred for any of the files
-#      - onbad    : data files are archived when bad data records have been encountered for any of the files
-#      - never    : data files are never archived
-# - Improved logging and logging output
-
 # Needed when running from cron since this path is set in /home/admin/.bashrc - tsload is in this path.
 PATH=$PATH:/usr/local/scaligent/bin:/usr/local/scaligent/release/bin
 
@@ -42,29 +26,29 @@ PATH=$PATH:/usr/local/scaligent/bin:/usr/local/scaligent/release/bin
 #  Shows the usage instructions of this script
 #-------------------------------------------------------------------------------------------------------------
 function usage() {
-   exit_code=$1
+  exit_code=$1
 
-   echo ""
-   echo "usage: ${0} -f CONFIG_FILE"
-   echo "  where CONFIG_FILE is a configuration file for the loading."
-   echo ""
-   exit ${exit_code}
+  echo ""
+  echo "usage: ${0} -f CONFIG_FILE"
+  echo "  where CONFIG_FILE is a configuration file for the loading."
+  echo ""
+  exit ${exit_code}
 }
 
-#--[function logThis()]---------------------------------------------------------------------------------------
+#--[function log_this()]---------------------------------------------------------------------------------------
 #
 # Writes a message to the logfile:
 # param 1 - The message to log
 # param 2 - The priority of the message (currently free text, TODO: implement logging levels similar as verbose levels
 # param 3 - (OPTIONAL) name of the log file, if not specified the summary log file will be used
 #-------------------------------------------------------------------------------------------------------------
-function logThis() {
-   log_datetime=$(date --rfc-3339=seconds)
-   log_message="${1}"
-   log_priority="${2}"
-   log_file=${3:-${TEMP_RESULTS_SUMMARY_FILE}}
+function log_this() {
+  log_datetime=$(date --rfc-3339=seconds)
+  log_message="${1}"
+  log_priority="${2}"
+  log_file=${3:-${TEMP_RESULTS_SUMMARY_FILE}}
 
-   printf "%s | PID %s | [%-10s] | %s\n" "${log_datetime}" "$$" "${log_priority}" "${log_message}" >> "${log_file}"
+  printf "%s | PID %s | [%-10s] | %s\n" "${log_datetime}" "$$" "${log_priority}" "${log_message}" >> "${log_file}"
 }
 
 #--[function check_directories()]-----------------------------------------------------------------------------
@@ -72,15 +56,15 @@ function logThis() {
 # Makes sure correct directories exist and creates where appropriate or exits with an error.
 #-------------------------------------------------------------------------------------------------------------
 function check_directories() {
-   if [ ! -e ${DATA_DIR} ]; then
-      logThis "Required data directory ${DATA_DIR} not found.  Exiting." "ERROR"
-      exit -1
-   fi
+  if [ ! -e ${DATA_DIR} ]; then
+    log_this "Required data directory ${DATA_DIR} not found.  Exiting." "ERROR"
+    exit -1
+  fi
 
-   # Just create the others if they don't exist.
-   if [ ! -e ${LOG_DIR} ]; then mkdir -p ${LOG_DIR}; fi
-   if [ ! -e ${OLD_DIR} ]; then mkdir -p ${OLD_DIR}; fi
-   if [ ! -e ${OLD_DIR}/data ]; then mkdir -p ${OLD_DIR}/data; fi
+  # Just create the others if they don't exist.
+  if [ ! -e ${LOG_DIR} ]; then mkdir -p ${LOG_DIR}; fi
+  if [ ! -e ${OLD_DIR} ]; then mkdir -p ${OLD_DIR}; fi
+  if [ ! -e ${OLD_DIR}/data ]; then mkdir -p ${OLD_DIR}/data; fi
 }
 
 #--[function check_for_semaphore()]---------------------------------------------------------------------------
@@ -88,12 +72,12 @@ function check_directories() {
 # See if there is a semaphore file.  If so, see if it exists.
 #-------------------------------------------------------------------------------------------------------------
 check_for_semaphore() {
-   if [[ ${SEMAPHORE_FILE_NAME} != "" ]]; then
-      if [ ! -f ${DATA_DIR}/${SEMAPHORE_FILE_NAME} ]; then
-	 echo "no semaphore file ${DATA_DIR}/${SEMAPHORE_FILE_NAME} exists."
-         exit 0
-      fi
-   fi
+  if [[ ${SEMAPHORE_FILE_NAME} != "" ]]; then
+    if [ ! -f ${DATA_DIR}/${SEMAPHORE_FILE_NAME} ]; then
+   echo "no semaphore file ${DATA_DIR}/${SEMAPHORE_FILE_NAME} exists."
+      exit 0
+    fi
+  fi
 }
 
 #--[function check_already_loading()--------------------------------------------------------------------------
@@ -103,18 +87,18 @@ check_for_semaphore() {
 # TODO:  Create a process for handling multi-node environments to prevent loads on another machine.
 #-------------------------------------------------------------------------------------------------------------
 function check_already_loading() {
-   if [ -f ${LOADING_FILE} ]; then
-      other_pid=`head -n 1 ${LOADING_FILE}`
-      running_pid=`ps -ef | awk '{ print $2 }' | grep $other_pid`
-      if [ "$running_pid" == "" ]; then
-	 echo $$ > ${LOADING_FILE}
-	 logThis "Taking over from stopped process $other_pid" "INFO" 
-      else
-         exit 0
-      fi
-   else
-      echo $$ > ${LOADING_FILE}
-   fi
+  if [ -f ${LOADING_FILE} ]; then
+    other_pid=`head -n 1 ${LOADING_FILE}`
+    running_pid=`ps -ef | awk '{ print $2 }' | grep $other_pid`
+    if [ "$running_pid" == "" ]; then
+   echo $$ > ${LOADING_FILE}
+   log_this "Taking over from stopped process $other_pid" "INFO" 
+    else
+      exit 0
+    fi
+  else
+    echo $$ > ${LOADING_FILE}
+  fi
 }
 
 #--[function contains()]--------------------------------------------------------------------------------------
@@ -122,14 +106,14 @@ function check_already_loading() {
 # Function to see if an element exists in an array
 #-------------------------------------------------------------------------------------------------------------
 function contains() {
-   local n=$#
-   local value=${!n}
-   for ((i=1;i < $#;i++)) {
-      if [ "${!i}" == "${value}" ]; then
-	 return 0
-      fi
-   }
-   return 1
+  local n=$#
+  local value=${!n}
+  for ((i=1;i < $#;i++)) {
+    if [ "${!i}" == "${value}" ]; then
+   return 0
+    fi
+  }
+  return 1
 }
 
 # Variables to log errors and loading.
@@ -148,89 +132,89 @@ run_sql_tables=()
 # Loads one file into a table using tsload.
 #-------------------------------------------------------------------------------------------------------------
 function load_a_file() {
-   file_name=$1
-   database_name=$2
-   schema_name=$3
-   table_name=$4
-   empty_target=$5
+  file_name=$1
+  database_name=$2
+  schema_name=$3
+  table_name=$4
+  empty_target=$5
 
-   logThis "Loading $1 into ${database_name}.${schema_name}.${table_name}" "INFO"
+  log_this "Loading $1 into ${database_name}.${schema_name}.${table_name}" "INFO"
 
-   total_attempted_files=$((total_attempted_files + 1))
+  total_attempted_files=$((total_attempted_files + 1))
 
-   # See if we should truncate the table before loading.
-   if [ ${TRUNCATE_BEFORE_LOAD} == "true" ]; then
-      contains ${truncated_tables[@]} "${schema_name}"."$tn" 
-      if [[ $? != 0 ]]; then  # this is table that should be truncated.
-	 truncated_tables+=( "${schema_name}"."$tn" )
-         echo "truncate table ${database_name}.${schema_name}.${tn};" | tql 2>/dev/null
-         logThis "Truncated table ${database_name}.${schema_name}.${table_name} before loading file ${file_name}" "INFO"
-      fi
-   fi
+  # See if we should truncate the table before loading.
+  if [ ${TRUNCATE_BEFORE_LOAD} == "true" ]; then
+    contains ${truncated_tables[@]} "${schema_name}"."$tn" 
+    if [[ $? != 0 ]]; then  # this is table that should be truncated.
+   truncated_tables+=( "${schema_name}"."$tn" )
+      echo "truncate table ${database_name}.${schema_name}.${tn};" | tql 2>/dev/null
+      log_this "Truncated table ${database_name}.${schema_name}.${table_name} before loading file ${file_name}" "INFO"
+    fi
+  fi
 
-   # See if any sql needs to be ran before loading of this table.
-   contains ${run_sql_tables[@]} "${schema_name}"."$tn" 
-   if [[ $? != 0 ]]; then # this is the table against which the sql should be ran.
-      run_sql_tables+=("${schema_name}"."$tn")
+  # See if any sql needs to be ran before loading of this table.
+  contains ${run_sql_tables[@]} "${schema_name}"."$tn" 
+  if [[ $? != 0 ]]; then # this is the table against which the sql should be ran.
+    run_sql_tables+=("${schema_name}"."$tn")
 
-      # Need to handle spaces in names and archive_queries.  This assumes no colons in the query.
-      OLD_IFS=$IFS
-      IFS=$(echo -en ":\n")
+    # Need to handle spaces in names and archive_queries.  This assumes no colons in the query.
+    OLD_IFS=$IFS
+    IFS=$(echo -en ":\n")
 
-      if [ ${table_queries[$table_name]+abc} ]; then
-         result=`echo ${table_queries[$table_name]} | tql 2>/dev/null`
-         logThis "Running query before the loading of ${database_name}.${schema_name}.${table_name} from file ${file_name}. The query is: ${table_queries[$table_name]}" "INFO"
-      fi
+    if [ ${table_queries[$table_name]+abc} ]; then
+      result=`echo ${table_queries[$table_name]} | tql 2>/dev/null`
+      log_this "Running query before the loading of ${database_name}.${schema_name}.${table_name} from file ${file_name}. The query is: ${table_queries[$table_name]}" "INFO"
+    fi
 
-      # Reset the separator to the original values.
-      IFS=$OLD_IFS
+    # Reset the separator to the original values.
+    IFS=$OLD_IFS
 
-   fi
+  fi
 
-   # get the header flag.
-   hhr=""
-   if [[ ${HAS_HEADER_ROW} == "true" ]]; then
-      hhr="--has_header_row"
-   fi
+  # get the header flag.
+  hhr=""
+  if [[ ${HAS_HEADER_ROW} == "true" ]]; then
+    hhr="--has_header_row"
+  fi
 
-   # Directory for loaded data and bad records.
-   move_dir="${OLD_DIR}/data/${schema_name}"
-   if [ ! -e ${move_dir} ]; then mkdir -p ${move_dir}; fi
+  # Directory for loaded data and bad records.
+  move_dir="${OLD_DIR}/data/${schema_name}"
+  if [ ! -e ${move_dir} ]; then mkdir -p ${move_dir}; fi
 
-   # Write the file name to the TEMP RESULTS FILE, as the detail section does not have any reference to it, so it will make debugging easier
-   # i.e. for while file the details are shown
-   logThis "Detailed loading results for input file: ${file_name}" "INFO" ${TEMP_RESULTS_FILE}
+  # Write the file name to the TEMP RESULTS FILE, as the detail section does not have any reference to it, so it will make debugging easier
+  # i.e. for while file the details are shown
+  log_this "Detailed loading results for input file: ${file_name}" "INFO" ${TEMP_RESULTS_FILE}
 
-   # The specific flags are set in the configuration file.
-   cat ${file_name} | \
-    tsload --target_database ${database_name} \
-    --target_schema ${schema_name} \
-    --target_table ${table_name} \
-    --bad_records_file ${move_dir}/${table_name}_bad_records.csv \
-    ${empty_target} \
-    ${hhr} \
-    --source_data_format ${SOURCE_DATA_FORMAT} \
-    --field_separator "${FIELD_SEPARATOR}" \
-    --max_ignored_rows ${MAX_IGNORED_ROWS} \
-    --null_value "${NULL_VALUE}" \
-    --date_format "${DATE_FORMAT}" \
-    --date_time_format "${DATE_TIME_FORMAT}" \
-    --boolean_representation ${BOOLEAN_REPRESENTATION} \
-    --skip_second_fraction \
-    -v ${V_LEVEL} \
-    >> ${TEMP_RESULTS_FILE} 2>> ${TEMP_RESULTS_FILE}
+  # The specific flags are set in the configuration file.
+  cat ${file_name} | \
+   tsload --target_database ${database_name} \
+   --target_schema ${schema_name} \
+   --target_table ${table_name} \
+   --bad_records_file ${move_dir}/${table_name}_bad_records.csv \
+   ${empty_target} \
+   ${hhr} \
+   --source_data_format ${SOURCE_DATA_FORMAT} \
+   --field_separator "${FIELD_SEPARATOR}" \
+   --max_ignored_rows ${MAX_IGNORED_ROWS} \
+   --null_value "${NULL_VALUE}" \
+   --date_format "${DATE_FORMAT}" \
+   --date_time_format "${DATE_TIME_FORMAT}" \
+   --boolean_representation ${BOOLEAN_REPRESENTATION} \
+   --skip_second_fraction \
+   -v ${V_LEVEL} \
+   >> ${TEMP_RESULTS_FILE} 2>> ${TEMP_RESULTS_FILE}
 
-   if [ $? != 0 ]; then
-      has_tsload_error=true
-      logThis "tsload failed to load ${file_name} into ${database_name}.${schema_name}.${table_name}" "ERROR" 
-      number_failed_loads=$((number_failed_loads+1))
-   else
-      logThis "${file_name} loaded successfully into ${database_name}.${schema_name}.${table_name}" "SUCCESS" 
-      number_successful_loads=$((number_successful_loads+1))
-   fi
+  if [ $? != 0 ]; then
+    has_tsload_error=true
+    log_this "tsload failed to load ${file_name} into ${database_name}.${schema_name}.${table_name}" "ERROR" 
+    number_failed_loads=$((number_failed_loads+1))
+  else
+    log_this "${file_name} loaded successfully into ${database_name}.${schema_name}.${table_name}" "SUCCESS" 
+    number_successful_loads=$((number_successful_loads+1))
+  fi
 
-   # Move the loaded files to the old directory.
-   ${MOVE_LOADED_FILES} ${fn} ${move_dir}
+  # Move the loaded files to the old directory.
+  ${MOVE_LOADED_FILES} ${fn} ${move_dir}
 }
 
 #--[function should_ignore()]---------------------------------------------------------------------------------
@@ -238,9 +222,9 @@ function load_a_file() {
 #  Checks whether this directory should be ignored
 #-------------------------------------------------------------------------------------------------------------
 function should_ignore() {
-   dir_to_check="$1"
-   for ignore in ${IGNORE_DIRS[*]}; do [[ "${ignore}" == "${dir_to_check}" ]] && return 0; done
-   return 1
+  dir_to_check="$1"
+  for ignore in ${IGNORE_DIRS[*]}; do [[ "${ignore}" == "${dir_to_check}" ]] && return 0; done
+  return 1
 }
 
 #--[function load_data_files()]-------------------------------------------------------------------------------
@@ -249,50 +233,50 @@ function should_ignore() {
 #-------------------------------------------------------------------------------------------------------------
 # Controls the actual loading of data.
 function load_data_files() {
-   local data_dir=$1
-   local schema_name=$2
+  local data_dir=$1
+  local schema_name=$2
 
-   cd ${data_dir}
-   logThis "Loading files from $data_dir for schema $schema_name." "INFO"
+  cd ${data_dir}
+  log_this "Loading files from $data_dir for schema $schema_name." "INFO"
 
-   files=$(ls *${DATA_FILE_EXTENSION} 2> /dev/null | wc -l)
-   if [[ ${files} -ge 1 ]]; then
-      # load all data files, one at a time.
-      for fn in `ls *${DATA_FILE_EXTENSION}`; do
+  files=$(ls *${DATA_FILE_EXTENSION} 2> /dev/null | wc -l)
+  if [[ ${files} -ge 1 ]]; then
+    # load all data files, one at a time.
+    for fn in `ls *${DATA_FILE_EXTENSION}`; do
 
-         # see if the filename overrides the default empty target.
-         # use all of the patterns to get the table name from the file name.
-         if [[ ${fn} == *"_full"* ]]; then
-            empty_target="--empty_target"
-         elif [[ ${fn} == *"_incremental"* ]]; then
-            empty_target=""
-         else
-            empty_target=${DEFAULT_EMPTY_TARGET}
-         fi
-
-         # the extension and anything after a - will be automatically removed.  Neither can be used in the table name.
-         tn="`echo ${fn} | sed s/${DATA_FILE_EXTENSION}// | sed s/-.*// | sed s/_full// | sed s/_incremental//`"  
-         for pattern in ${SED_PATTERNS[*]}; do
-            tn="`echo ${tn} | sed s/${pattern}//`"
-	 done
-	 load_a_file ${fn} ${DATABASE_NAME} ${schema_name} ${tn} ${empty_target}
-      done
-   else
-      logThis "No ${DATA_FILE_EXTENSION} files found in $data_dir" "WARNING"
-   fi
-
-   # Check any sub-directories to see if there are multiple schemas to support.
-   for dir in `ls -d */ 2> /dev/null`; do
-      sn=$(basename ${dir})
-      # see if the directory is in the list of ones to ignore.  
-      should_ignore ${sn}
-      if [[ $? != 0 ]]; then
-      # load the data; the directory and schema are the same name.
-         load_data_files ${sn} ${sn}
+      # see if the filename overrides the default empty target.
+      # use all of the patterns to get the table name from the file name.
+      if [[ ${fn} == *"_full"* ]]; then
+        empty_target="--empty_target"
+      elif [[ ${fn} == *"_incremental"* ]]; then
+        empty_target=""
+      else
+        empty_target=${DEFAULT_EMPTY_TARGET}
       fi
-   done
 
-   cd ..
+      # the extension and anything after a - will be automatically removed.  Neither can be used in the table name.
+      tn="`echo ${fn} | sed s/${DATA_FILE_EXTENSION}// | sed s/-.*// | sed s/_full// | sed s/_incremental//`"  
+      for pattern in ${SED_PATTERNS[*]}; do
+        tn="`echo ${tn} | sed s/${pattern}//`"
+      done
+      load_a_file ${fn} ${DATABASE_NAME} ${schema_name} ${tn} ${empty_target}
+    done
+  else
+    log_this "No ${DATA_FILE_EXTENSION} files found in $data_dir" "WARNING"
+  fi
+
+  # Check any sub-directories to see if there are multiple schemas to support.
+  for dir in `ls -d */ 2> /dev/null`; do
+    sn=$(basename ${dir})
+    # see if the directory is in the list of ones to ignore.  
+    should_ignore ${sn}
+    if [[ $? != 0 ]]; then
+    # load the data; the directory and schema are the same name.
+      load_data_files ${sn} ${sn}
+    fi
+  done
+
+  cd ..
 }
 
 #--[function cleanup_from_load()]-----------------------------------------------------------------------------
@@ -301,49 +285,49 @@ function load_data_files() {
 #-------------------------------------------------------------------------------------------------------------
 function cleanup_from_load() {
 
-   logThis "Cleaning up from load" "INFO"
-   logThis "Archiving option: ${ARCHIVE_DATA}" "INFO" 
-   logThis "Move loaded files option: ${MOVE_LOADED_FILES}" "INFO"
-   logThis "Purging files older than ${NBR_DAYS_TO_KEEP_OLD_FILES} days from ${OLD_DIR_ROOT} and ${LOG_DIR}" "INFO" 
+  log_this "Cleaning up from load" "INFO"
+  log_this "Archiving option: ${ARCHIVE_DATA}" "INFO" 
+  log_this "Move loaded files option: ${MOVE_LOADED_FILES}" "INFO"
+  log_this "Purging files older than ${NBR_DAYS_TO_KEEP_OLD_FILES} days from ${OLD_DIR_ROOT} and ${LOG_DIR}" "INFO" 
 
-   # Check if bad records where generated
-   has_bad_records=false
-   for f in ${OLD_DIR}/data/${DEFAULT_SCHEMA_NAME}/*_bad_records.csv; do
-      [ -e "$f" ] && has_bad_records=true || has_bad_records=false
-      break
-   done
+  # Check if bad records where generated
+  has_bad_records=false
+  for f in ${OLD_DIR}/data/${DEFAULT_SCHEMA_NAME}/*_bad_records.csv; do
+    [ -e "$f" ] && has_bad_records=true || has_bad_records=false
+    break
+  done
 
-   # Move the loaded files to the old directory.
-   # if there were files loaded, save the results
-   if [[ ${total_attempted_files} != 0 ]]; then
-      mv ${TEMP_RESULTS_SUMMARY_FILE} ${RESULTS_FILE}
-      cat ${TEMP_RESULTS_FILE} >> ${RESULTS_FILE}
+  # Move the loaded files to the old directory.
+  # if there were files loaded, save the results
+  if [[ ${total_attempted_files} != 0 ]]; then
+    mv ${TEMP_RESULTS_SUMMARY_FILE} ${RESULTS_FILE}
+    cat ${TEMP_RESULTS_FILE} >> ${RESULTS_FILE}
 
-      if [[ "${ARCHIVE_DATA}" == "always" || ( "${ARCHIVE_DATA}" == "onerror" && ${has_tsload_error} = true ) || ( "${ARCHIVE_DATA}" == "onbad" && ${has_bad_records} = true ) ]] ; then
-         cp ${RESULTS_FILE} ${OLD_DIR}
-         pushd . 2&>/dev/null
-         cd ${OLD_DIR}/.. && tar czf ${OLD_DIR}.tar.gz ${THE_DATE_TIME} && rm -r ${OLD_DIR}
-         popd 2&>/dev/null
-      else
-         rm -r ${OLD_DIR}
-      fi
+    if [[ "${ARCHIVE_DATA}" == "always" || ( "${ARCHIVE_DATA}" == "onerror" && ${has_tsload_error} = true ) || ( "${ARCHIVE_DATA}" == "onbad" && ${has_bad_records} = true ) ]] ; then
+      cp ${RESULTS_FILE} ${OLD_DIR}
+      pushd . 2&>/dev/null
+      cd ${OLD_DIR}/.. && tar czf ${OLD_DIR}.tar.gz ${THE_DATE_TIME} && rm -r ${OLD_DIR}
+      popd 2&>/dev/null
+    else
+      rm -r ${OLD_DIR}
+    fi
 
-      # clear out the old archives to save space if the value is defined.
-      if [[ ${NBR_DAYS_TO_KEEP_OLD_FILES} ]]; then
+    # clear out the old archives to save space if the value is defined.
+    if [[ ${NBR_DAYS_TO_KEEP_OLD_FILES} ]]; then
 
-         find ${OLD_DIR_ROOT} -type f -mtime +${NBR_DAYS_TO_KEEP_OLD_FILES} -name '*.gz' -execdir rm -- '{}' \;
-         find ${LOG_DIR} -type f -mtime +${NBR_DAYS_TO_KEEP_OLD_FILES} -name '*.txt' -execdir rm -- '{}' \;
-      fi
-   else
-     rm ${TEMP_RESULTS_SUMMARY_FILE}
-     rm -r ${OLD_DIR}
-   fi
+      find ${OLD_DIR_ROOT} -type f -mtime +${NBR_DAYS_TO_KEEP_OLD_FILES} -name '*.gz' -execdir rm -- '{}' \;
+      find ${LOG_DIR} -type f -mtime +${NBR_DAYS_TO_KEEP_OLD_FILES} -name '*.txt' -execdir rm -- '{}' \;
+    fi
+  else
+    rm ${TEMP_RESULTS_SUMMARY_FILE}
+    rm -r ${OLD_DIR}
+  fi
 
-   rm ${LOADING_FILE} # remove the loading semaphore file
+  rm ${LOADING_FILE} # remove the loading semaphore file
 
-   if [ -f ${DATA_DIR}/${SEMAPHORE_FILE_NAME} ]; then
-      rm ${DATA_DIR}/${SEMAPHORE_FILE_NAME}
-   fi
+  if [ -f ${DATA_DIR}/${SEMAPHORE_FILE_NAME} ]; then
+    rm ${DATA_DIR}/${SEMAPHORE_FILE_NAME}
+  fi
 }
 
 #--[function send_results_notification()]---------------------------------------------------------------------
@@ -352,23 +336,23 @@ function cleanup_from_load() {
 #-------------------------------------------------------------------------------------------------------------
 function send_results_notification() {
 
-   # only send if there were files that attempted to load.
-   if [[ ${total_attempted_files} != 0 ]]; then
-      subject="Success:  ${number_successful_loads} of ${total_attempted_files} files loaded at ${THE_DATE_TIME} for cluster ${CLUSTER_NAME}"
-      body="The data load ${THE_DATE_TIME} for cluster ${CLUSTER_NAME} appears successful.  See attached load results."
-      if [[ ${has_tsload_error} = true ]]; then
-         subject="Error:  ${number_successful_loads} of ${total_attempted_files} files loaded and ${number_failed_loads} failed at ${THE_DATE_TIME} for cluster ${CLUSTER_NAME}"
-         body="The data load ${THE_DATE_TIME} for cluster ${CLUSTER_NAME} had errors loading files or rows.  See attached load results."
-         exit_value=1
-      fi
+  # only send if there were files that attempted to load.
+  if [[ ${total_attempted_files} != 0 ]]; then
+    subject="Success:  ${number_successful_loads} of ${total_attempted_files} files loaded at ${THE_DATE_TIME} for cluster ${CLUSTER_NAME}"
+    body="The data load ${THE_DATE_TIME} for cluster ${CLUSTER_NAME} appears successful.  See attached load results."
+    if [[ ${has_tsload_error} = true ]]; then
+      subject="Error:  ${number_successful_loads} of ${total_attempted_files} files loaded and ${number_failed_loads} failed at ${THE_DATE_TIME} for cluster ${CLUSTER_NAME}"
+      body="The data load ${THE_DATE_TIME} for cluster ${CLUSTER_NAME} had errors loading files or rows.  See attached load results."
+      exit_value=1
+    fi
 
-      echo ${body}
-      for address in ${RESULTS_EMAIL[*]}; do
-         # TODO remove after working.
-         echo ""
-         echo "${body}" | mail -s "${subject}" -a ${RESULTS_FILE} ${address}
-      done
-   fi
+    echo ${body}
+    for address in ${RESULTS_EMAIL[*]}; do
+      # TODO remove after working.
+      echo ""
+      echo "${body}" | mail -s "${subject}" -a ${RESULTS_FILE} ${address}
+    done
+  fi
 }
 
 
@@ -379,16 +363,16 @@ function send_results_notification() {
 # Get the input parameters and verify there is a file to use for configs.
 while getopts 'f:h' opt
 do
-   case ${opt} in 
-      f) config_file=${OPTARG} 
-      ;;
-      h|?) usage 0 
-      ;;
-   esac
+  case ${opt} in 
+    f) config_file=${OPTARG} 
+    ;;
+    h|?) usage 0 
+    ;;
+  esac
 done
 
 if [ ! -f "${config_file}" ]; then 
-   usage -1
+  usage -1
 fi
 
 # Read the configuration file
@@ -398,13 +382,13 @@ source ${config_file}
 touch ${TEMP_RESULTS_SUMMARY_FILE}
 
 # Check if a sempahore file is used, and if so, if the process should run, may exit
-check_for_semaphore                                
+check_for_semaphore                      
 
 # Check for the loading semaphore, will exit if other process is running
-check_already_loading                              
+check_already_loading                    
 
 # Check if all required folders exist and create if not, may exit with error
-check_directories                                  
+check_directories                       
 
 # Load all files present in the DATA directory at the time of checking for the semaphore
 load_data_files ${DATA_DIR} ${DEFAULT_SCHEMA_NAME} 
@@ -417,8 +401,8 @@ send_results_notification
 
 # If any file has been loaded, list the contents of the log file to stdout
 if [[ ${total_attempted_files} != 0 ]]; then
-   cat ${RESULTS_FILE}
+  cat ${RESULTS_FILE}
 else
-   logThis "No files loaded." "INFO"
+  log_this "No files loaded." "INFO"
 fi
 
