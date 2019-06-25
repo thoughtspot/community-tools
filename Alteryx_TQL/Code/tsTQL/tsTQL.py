@@ -3,6 +3,7 @@ import xml.etree.ElementTree as Et
 import select
 import gzip
 import sys
+import socket
 from classes.sshClient import sshClient
 
 class AyxPlugin:
@@ -62,17 +63,17 @@ class AyxPlugin:
             if self.channel.send_ready():
                 self.channel.sendall(compressed)
             return True
-        except:
-            self.xmsg("Error", "Error sending Data")
-            self.stdin.close()
-            self.channel.shutdown_write()
-            self.xmsg('Info', 'Completed Sending Commands')
-            self.writeChunks(600)
-            self.sshConnection.close()
-            self.xmsg('Info', 'Connection with Destination Closed')
-            self.output_anchor.assert_close()
-            self.information_anchor.assert_close()
-            sys.exit()
+        except socket.error as e:
+            self.xmsg("Error", "Error sending Commands")
+            self.xmsg("error", "Error message: &s" % str(e))
+            # self.stdin.close()
+            # self.channel.shutdown_write()
+            # self.xmsg('Info', 'Completed Sending Commands')
+            # self.writeChunks(600)
+            # self.sshConnection.close()
+            # self.xmsg('Info', 'Connection with Destination Closed')
+            # self.output_anchor.assert_close()
+            # self.information_anchor.assert_close()
             return False
 
     def writeChunks(self,intimeout=30):
@@ -194,32 +195,40 @@ class AyxPlugin:
 
             self.sshConnection = sshClient(self.destinationServer, self.userName, self.password,
                                         22, True, True)
-            if self.sshConnection is None:
-                self.xmsg('Info', 'Error with SSH Connection')
+            if self.sshConnection.status == 'Bad':
+                self.xmsg('Error', 'A Connection could not be Established')
+                self.xmsg('Error', self.sshConnection.response)
                 return False
             else:
-                self.xmsg('Info', 'Connection with Destination Established')
+                self.xmsg('Info', 'Connection Established with Server')
 
             cmd = 'gzip -dc | tql --query_results_apply_top_row_count 0 --null_string ""'
             #  cmd = 'tql --query_results_apply_top_row_count 0 --pagination_size 1000000 --null_string ""'
 
             self.xmsg('Info', cmd)
-            self.stdin, self.stdout, self.stderr = self.sshConnection.ssh.exec_command(cmd)
-            self.xmsg('Info', 'Executing Command')
-            self.channel = self.stdout.channel
-            self.channel.settimeout(None)
-            if self.tqlStatements is not None:
-                lines = self.tqlStatements.splitlines()
-                for line in lines:
-                    self.xmsg('Info',line)
-                self.write_lists_to_TS(self.tqlStatements)
-            elif self.tqlFilePath is not None:
-                with open(self.tqlFilePath,'r') as myFile:
-                    lines = "".join(line for line in myFile)
-                myFile.close()
-                for line in lines.splitlines():
-                    self.xmsg('Info',line)
-                self.write_lists_to_TS(lines)
+            try:
+                self.stdin, self.stdout, self.stderr = self.sshConnection.ssh.exec_command(cmd)
+                self.xmsg('Info', 'Executing Command')
+                self.channel = self.stdout.channel
+                self.channel.settimeout(None)
+                if self.tqlStatements is not None:
+                    lines = self.tqlStatements.splitlines()
+                    for line in lines:
+                        self.xmsg('Info', line)
+                    if not self.write_lists_to_TS(self.tqlStatements):
+                        return False
+                elif self.tqlFilePath is not None:
+                    with open(self.tqlFilePath, 'r') as myFile:
+                        lines = "".join(line for line in myFile)
+                    myFile.close()
+                    for line in lines.splitlines():
+                        self.xmsg('Info', line)
+                    if not self.write_lists_to_TS(lines):
+                        return False
+            except socket.error as e:
+                self.parent.xmsg('Error', 'An Error Occured during the execution of the Statements')
+                self.parent.xmsg('Error', 'Error: %s' % str(e))
+                return False
         return True
 
     def pi_close(self, b_has_errors: bool):
@@ -228,10 +237,11 @@ class AyxPlugin:
         :param b_has_errors: Set to true to not do the final processing.
         """
         if self.alteryx_engine.get_init_var(self.n_tool_id, 'UpdateOnly') == 'False':
-            self.stdin.close()
-            self.channel.shutdown_write()
-            self.xmsg('Info', 'Completed Sending Commands')
-            self.writeChunks(600)
+            if self.sshConnection.status == "Good":
+                self.stdin.close()
+                self.channel.shutdown_write()
+                self.xmsg('Info', 'Completed Sending Commands')
+                self.writeChunks(600)
             self.sshConnection.close()
             self.xmsg('Info', 'Connection with Destination Closed')
             self.output_anchor.assert_close()
