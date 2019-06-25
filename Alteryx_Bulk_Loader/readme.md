@@ -98,7 +98,7 @@ Please read [Contributing.md](Contributing.md) for details on our code of conduc
 
 Version 1.0.0 - Initial Public Version
 
-Version 1.0.1 - 
+Version 1.0.1 -
 
 - Encapsulated column names in quotes
 
@@ -106,9 +106,16 @@ Version 1.0.1 -
 
 - Added link to Alteryx Public Gallary
 
+Version 1.1 -
+
+- Enhanced error handling specifically around connection, login and tsload errors  
+
+- Errors retrieved from Thoughtspot (i.e. tsload errors like table not defined, etc.) can be reviewed in a browser tool connected to the output of the tool if an error occurs during the flow
+
+- The tool removes all spaces from column names.  This may cause an issue if you have a column name with a leading space in the input file.   
+
 # Future Versions
 
-- Error Handling
 - Leverage ThoughtSpot Security model to login to the bulk loader
 - Assign edit priviliges to creator and not super admin user
 

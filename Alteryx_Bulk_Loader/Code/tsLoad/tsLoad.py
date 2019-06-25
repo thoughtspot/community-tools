@@ -4,7 +4,7 @@ import csv
 import io
 import select
 import gzip
-import sys
+import socket
 from classes.Table import Table
 from classes.TQLFile import TQLFile
 from classes.sshClient import sshClient
@@ -181,16 +181,10 @@ class IncomingInterface:
             for sublist in self.field_lists:
                 del sublist[:]
             return True
-        except:
-            self.parent.xmsg("Error", "Error Writing Data")
-            self.stdin.close()
-            self.channel.shutdown_write()
-            self.writeChunks(600)
-            self.sshConnection.close()
-            self.parent.xmsg('Info', 'Connection with Destination Closed')
-            self.parent.output_anchor.close() # Close outgoing connections.elf.stdin.close()
-            self.channel.shutdown_write()
-            sys.exit()
+        except socket.error as e:
+            for sublist in self.field_lists:
+                del sublist[:]
+            self.parent.xmsg("Error", "Error Writing Data to ThoughtSpot.  Check Browse Tool for ThoughtSpot TSLoad Errors")
             return False
 
     def writeChunks(self,intimeout=30):
@@ -237,14 +231,19 @@ class IncomingInterface:
                           self.parent.alteryx_engine, self.parent.n_tool_id)
         tqlFile.add_table_def(self.table)
         cmd = "tql"
-        self.stdin, self.stdout, self.stderr = self.sshConnection.ssh.exec_command(cmd)
-        self.parent.xmsg('Info', 'Executing Create Table')
-        self.channel = self.stdout.channel
-        self.channel.send(str(tqlFile.outString))
-        self.stdin.close()
-        self.channel.shutdown_write()
-        self.writeChunks()
-        return True
+        try:
+            self.stdin, self.stdout, self.stderr = self.sshConnection.ssh.exec_command(cmd)
+            self.parent.xmsg('Info', 'Executing Create Table')
+            self.channel = self.stdout.channel
+            self.channel.send(str(tqlFile.outString))
+            self.stdin.close()
+            self.channel.shutdown_write()
+            self.writeChunks()
+            return True
+        except socket.error as e:
+            self.parent.xmsg('Error', 'An Error Occured during Table Creation')
+            self.parent.xmsg('Error', 'Error: %s' % str(e))
+            return False
 
     def createDatabase(self):
         """
@@ -252,14 +251,19 @@ class IncomingInterface:
         """
         tqlString = "create database " + self.parent.targetDatabase + ";"
         cmd = "tql"
-        self.stdin, self.stdout, self.stderr = self.sshConnection.ssh.exec_command(cmd)
-        self.parent.xmsg('Info', 'Executing Create Database')
-        self.channel = self.stdout.channel
-        self.channel.send(str(tqlString))
-        self.stdin.close()
-        self.channel.shutdown_write()
-        self.writeChunks()
-        return True
+        try:
+            self.stdin, self.stdout, self.stderr = self.sshConnection.ssh.exec_command(cmd)
+            self.parent.xmsg('Info', 'Executing Create Database')
+            self.channel = self.stdout.channel
+            self.channel.send(str(tqlString))
+            self.stdin.close()
+            self.channel.shutdown_write()
+            self.writeChunks()
+            return True
+        except socket.error as e:
+            self.parent.xmsg('Error', 'An Error Occured during Database Creation')
+            self.parent.xmsg('Error', 'Error: %s' % str(e))
+            return False
 
     def ii_init(self, record_info_in: object) -> bool:
         """
@@ -280,18 +284,20 @@ class IncomingInterface:
                 self.field_lists.append([record_info_in[field].name])
 
             self.sshConnection = sshClient(self.parent.destinationServer, self.parent.userName, self.parent.password, 22, True, True)
-
-            if self.sshConnection is None:
-                self.parent.xmsg('Info','Error with SSH Connection')
+            if self.sshConnection.status == 'Bad':
+                self.parent.xmsg('Error', 'A Connection could not be Established')
+                self.parent.xmsg('Error', self.sshConnection.response)
                 return False
             else:
-                self.parent.xmsg('Info','Connection with Destination Established')
+                self.parent.xmsg('Info', 'Connection Established with Server')
 
             if self.parent.createDatabase == 'True':
-                self.createDatabase()
+                if self.createDatabase() == 'False':
+                    return False
 
             if self.parent.createTable == 'True':
-                self.createTable()
+                if self.createTable() == 'False':
+                    return False
 
             if self.parent.truncate == 'True':
                 empty_target = '--empty_target'
@@ -301,10 +307,16 @@ class IncomingInterface:
             #cmd = 'tsload --target_database ' + self.parent.targetDatabase + ' --target_table ' + self.parent.tableName + ' --field_separator \',\' --has_header_row --date_format \'%Y-%m-%d\' --empty_target --max_ignored_rows 5'
             cmd = 'gzip -dc | tsload --target_database ' + self.parent.targetDatabase + ' --target_table ' + self.parent.tableName + ' --field_separator \',\' --null_value \'\' --date_time_format \'%Y-%m-%d %H:%M:%S\' --has_header_row --skip_second_fraction --date_format \'%Y-%m-%d\' ' + empty_target + ' --boolean_representation \'' + self.parent.booleanString + '\' --max_ignored_rows ' + self.parent.maxIgnoredRows + ' --v ' + str(self.parent.verbosity)
             self.parent.xmsg('Info', cmd)
-            self.stdin, self.stdout, self.stderr = self.sshConnection.ssh.exec_command(cmd)
-            self.parent.xmsg('Info', 'Executing Load Command')
-            self.channel = self.stdout.channel
-            self.channel.settimeout(None)
+            try:
+                self.stdin, self.stdout, self.stderr = self.sshConnection.ssh.exec_command(cmd)
+                self.parent.xmsg('Info', 'Executing Load Command')
+                self.channel = self.stdout.channel
+                self.channel.settimeout(None)
+                return True
+            except socket.error as e:
+                responsetxt = ('Could not Execute Load Command:  connection error %s' % str(e))
+                self.parent.xmsg('Error', responsetxt)
+                return False
         return True
 
     def ii_push_record(self, in_record: object) -> bool:
@@ -325,9 +337,10 @@ class IncomingInterface:
             #self.parent.xmsg('Info', str(self.field_lists))
 
         if self.counter == self.parent.batchSize:
-            self.write_lists_to_TS()
-            self.counter = 0
-
+            if self.write_lists_to_TS():
+                    self.counter = 0
+            else:
+                return False
         return True
 
     def ii_update_progress(self, d_percent: float):
@@ -349,7 +362,6 @@ class IncomingInterface:
                 # First element for each list will always be the field names.
                 if len(self.field_lists[0]) > 1:
                     self.write_lists_to_TS()
-        
             self.stdin.close()
             self.channel.shutdown_write()
             self.parent.xmsg('Info', 'Completed Streaming Rows')
