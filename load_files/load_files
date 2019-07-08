@@ -16,7 +16,7 @@
 
 # WARNING:  THIS FILE SHOULD NOT NEED TO BE MODIFIED.
 
-# This file will load data files into ThoughtSpot using tsload.  It expects a configuration file to be provided.  
+# This file will load data files into ThoughtSpot using tsload.  It expects a configuration file to be provided.
 
 # Needed when running from cron since this path is set in /home/admin/.bashrc - tsload is in this path.
 PATH=$PATH:/usr/local/scaligent/bin:/usr/local/scaligent/release/bin
@@ -56,15 +56,17 @@ function log_this() {
 # Makes sure correct directories exist and creates where appropriate or exits with an error.
 #-------------------------------------------------------------------------------------------------------------
 function check_directories() {
-  if [ ! -e ${DATA_DIR} ]; then
-    log_this "Required data directory ${DATA_DIR} not found.  Exiting." "ERROR"
-    exit -1
+
+  if [[ ${SOURCE_TYPE} == "aws_s3" ]]; then
+    echo ""
+    # don't do anything currently.  Folders will be created automatically as needed.
+  else # default to file system.
+    if [ ! -e ${OLD_DIR} ]; then mkdir -p ${OLD_DIR}; fi
+    if [ ! -e ${OLD_DIR}/data ]; then mkdir -p ${OLD_DIR}/data; fi
   fi
 
-  # Just create the others if they don't exist.
+  # Common directories for all sources.
   if [ ! -e ${LOG_DIR} ]; then mkdir -p ${LOG_DIR}; fi
-  if [ ! -e ${OLD_DIR} ]; then mkdir -p ${OLD_DIR}; fi
-  if [ ! -e ${OLD_DIR}/data ]; then mkdir -p ${OLD_DIR}/data; fi
 }
 
 #--[function check_for_semaphore()]---------------------------------------------------------------------------
@@ -72,17 +74,33 @@ function check_directories() {
 # See if there is a semaphore file.  If so, see if it exists.
 #-------------------------------------------------------------------------------------------------------------
 check_for_semaphore() {
-  if [[ ${SEMAPHORE_FILE_NAME} != "" ]]; then
-    if [ ! -f ${DATA_DIR}/${SEMAPHORE_FILE_NAME} ]; then
-   echo "no semaphore file ${DATA_DIR}/${SEMAPHORE_FILE_NAME} exists."
-      exit 0
+
+  # AWS S3 requires a different check than the file system.
+  if [[ ${SOURCE_TYPE} == "aws_s3" ]]; then
+
+    if [[ ${SEMAPHORE_FILE_NAME} != "" ]]; then
+      aws s3 ls s3://${AWS_S3_BUCKET}/${SEMAPHORE_FILE_NAME} 
+      if [[ $? != 0 ]]; then  # semaphore doesn't exist.
+        echo "no semaphore file s3://${AWS_S3_BUCKET}/${SEMAPHORE_FILE_NAME} exists."
+        exit 0
+      fi
     fi
+
+  else # default to file system.
+
+    if [[ ${SEMAPHORE_FILE_NAME} != "" ]]; then
+      if [ ! -f ${DATA_DIR}/${SEMAPHORE_FILE_NAME} ]; then
+        echo "no semaphore file ${DATA_DIR}/${SEMAPHORE_FILE_NAME} exists."
+        exit 0
+      fi
+    fi
+
   fi
 }
 
 #--[function check_already_loading()--------------------------------------------------------------------------
 #
-# Make sure there is only one load process at a time.  Also recover if a process failed.  
+# Make sure there is only one load process at a time.  Also recover if a process failed.
 # NOTE that this checks the local process space, so it's possible another load is running on another machine.
 # TODO:  Create a process for handling multi-node environments to prevent loads on another machine.
 #-------------------------------------------------------------------------------------------------------------
@@ -92,7 +110,7 @@ function check_already_loading() {
     running_pid=`ps -ef | awk '{ print $2 }' | grep $other_pid`
     if [ "$running_pid" == "" ]; then
    echo $$ > ${LOADING_FILE}
-   log_this "Taking over from stopped process $other_pid" "INFO" 
+   log_this "Taking over from stopped process $other_pid" "INFO"
     else
       exit 0
     fi
@@ -127,11 +145,11 @@ truncated_tables=()
 # This variable contains tables for which an sql statement has been run before loading
 run_sql_tables=()
 
-#--[function load_a_file()]-----------------------------------------------------------------------------------
+#--[function load_a_local_file()]-----------------------------------------------------------------------------------
 #
 # Loads one file into a table using tsload.
 #-------------------------------------------------------------------------------------------------------------
-function load_a_file() {
+function load_a_local_file() {
   file_name=$1
   database_name=$2
   schema_name=$3
@@ -144,7 +162,7 @@ function load_a_file() {
 
   # See if we should truncate the table before loading.
   if [ ${TRUNCATE_BEFORE_LOAD} == "true" ]; then
-    contains ${truncated_tables[@]} "${schema_name}"."$tn" 
+    contains ${truncated_tables[@]} "${schema_name}"."$tn"
     if [[ $? != 0 ]]; then  # this is table that should be truncated.
    truncated_tables+=( "${schema_name}"."$tn" )
       echo "truncate table ${database_name}.${schema_name}.${tn};" | tql 2>/dev/null
@@ -153,7 +171,7 @@ function load_a_file() {
   fi
 
   # See if any sql needs to be ran before loading of this table.
-  contains ${run_sql_tables[@]} "${schema_name}"."$tn" 
+  contains ${run_sql_tables[@]} "${schema_name}"."$tn"
   if [[ $? != 0 ]]; then # this is the table against which the sql should be ran.
     run_sql_tables+=("${schema_name}"."$tn")
 
@@ -206,15 +224,119 @@ function load_a_file() {
 
   if [ $? != 0 ]; then
     has_tsload_error=true
-    log_this "tsload failed to load ${file_name} into ${database_name}.${schema_name}.${table_name}" "ERROR" 
+    log_this "tsload failed to load ${file_name} into ${database_name}.${schema_name}.${table_name}" "ERROR"
     number_failed_loads=$((number_failed_loads+1))
   else
-    log_this "${file_name} loaded successfully into ${database_name}.${schema_name}.${table_name}" "SUCCESS" 
+    log_this "${file_name} loaded successfully into ${database_name}.${schema_name}.${table_name}" "SUCCESS"
     number_successful_loads=$((number_successful_loads+1))
   fi
 
   # Move the loaded files to the old directory.
   ${MOVE_LOADED_FILES} ${fn} ${move_dir}
+}
+
+#--[function load_an_s3_file()]-----------------------------------------------------------------------------------
+#
+# Loads one file into a table using tsload.
+#-------------------------------------------------------------------------------------------------------------
+function load_an_s3_file() {
+  file_name=$1
+  database_name=$2
+  schema_name=$3
+  table_name=$4
+  empty_target=$5
+
+  if [[ ${schema_name} != "${DEFAULT_SCHEMA_NAME}" ]]; then
+    fn="${schema_name}/${file_name}"
+  else
+    fn="${file_name}"
+  fi
+
+  log_this "Loading $1 into ${database_name}.${schema_name}.${table_name}" "INFO"
+
+  total_attempted_files=$((total_attempted_files + 1))
+
+  # See if we should truncate the table before loading.
+  if [ ${TRUNCATE_BEFORE_LOAD} == "true" ]; then
+    contains ${truncated_tables[@]} "${schema_name}"."$tn"
+    if [[ $? != 0 ]]; then  # this is table that should be truncated.
+   truncated_tables+=( "${schema_name}"."$tn" )
+      echo "truncate table ${database_name}.${schema_name}.${tn};" | tql 2>/dev/null
+      log_this "Truncated table ${database_name}.${schema_name}.${table_name} before loading file ${file_name}" "INFO"
+    fi
+  fi
+
+  # See if any sql needs to be ran before loading of this table.
+  contains ${run_sql_tables[@]} "${schema_name}"."$tn"
+  if [[ $? != 0 ]]; then # this is the table against which the sql should be ran.
+    run_sql_tables+=("${schema_name}"."$tn")
+
+    # Need to handle spaces in names and archive_queries.  This assumes no colons in the query.
+    OLD_IFS=$IFS
+    IFS=$(echo -en ":\n")
+
+    if [ ${table_queries[$table_name]+abc} ]; then
+      result=`echo ${table_queries[$table_name]} | tql 2>/dev/null`
+      log_this "Running query before the loading of ${database_name}.${schema_name}.${table_name} from file ${file_name}. The query is: ${table_queries[$table_name]}" "INFO"
+    fi
+
+    # Reset the separator to the original values.
+    IFS=$OLD_IFS
+
+  fi
+
+  # get the header flag.
+  hhr=""
+  if [[ ${HAS_HEADER_ROW} == "true" ]]; then
+    hhr="--has_header_row"
+  fi
+
+  # Directory for loaded data and bad records.
+  move_dir="${OLD_DIR}/data/${schema_name}"
+
+  # Write the file name to the TEMP RESULTS FILE, as the detail section does not have any reference to it, so it will make debugging easier
+  # i.e. for while file the details are shown
+  log_this "Detailed loading results for input file: ${file_name}" "INFO" ${TEMP_RESULTS_FILE}
+
+  # The specific flags are set in the configuration file.
+  tsload --source_file "/aws/default/${fn}" \
+    --target_database ${database_name} \
+    --target_schema ${schema_name} \
+    --target_table ${table_name} \
+    ${empty_target} \
+    ${hhr} \
+    --source_data_format ${SOURCE_DATA_FORMAT} \
+    --field_separator "${FIELD_SEPARATOR}" \
+    --max_ignored_rows ${MAX_IGNORED_ROWS} \
+    --null_value "${NULL_VALUE}" \
+    --date_format "${DATE_FORMAT}" \
+    --date_time_format "${DATE_TIME_FORMAT}" \
+    --boolean_representation ${BOOLEAN_REPRESENTATION} \
+    --skip_second_fraction \
+    -v ${V_LEVEL} \
+    --aws_s3_bucket_name "${AWS_S3_BUCKET}" \
+    --aws_s3_credentials "${AWS_S3_ACCESS_KEY_ID};${AWS_S3_SECRET_ACCESS_KEY}" \
+    --aws_s3_region "${AWS_S3_REGION}" \
+    --aws_s3_root "${AWS_S3_DATA_DIR}" \
+    >> ${TEMP_RESULTS_FILE} 2>> ${TEMP_RESULTS_FILE}
+
+  if [[ $? != 0 ]]; then
+    has_tsload_error=true
+    log_this "tsload failed to load ${file_name} into ${database_name}.${schema_name}.${table_name}" "ERROR"
+    number_failed_loads=$((number_failed_loads+1))
+  else
+    log_this "${file_name} loaded successfully into ${database_name}.${schema_name}.${table_name}" "SUCCESS"
+    number_successful_loads=$((number_successful_loads+1))
+  fi
+
+  # Move the loaded files to the old directory.
+  # Currently only mv and cp is supported for S3.  Others will probably fail.
+  echo "copying from bucket ${AWS_S3_BUCKET}"
+  if [[ ${schema_name} != ${DEFAULT_SCHEMA_NAME} ]]; then
+    aws s3 ${MOVE_LOADED_FILES} s3://${AWS_S3_BUCKET}/${schema_name}/${file_name} ${OLD_DIR}/${schema_name}/${file_name} 
+  else
+    aws s3 ${MOVE_LOADED_FILES} s3://${AWS_S3_BUCKET}/${file_name} ${OLD_DIR}/${schema_name}/${file_name} 
+  fi
 }
 
 #--[function should_ignore()]---------------------------------------------------------------------------------
@@ -227,24 +349,24 @@ function should_ignore() {
   return 1
 }
 
-#--[function load_data_files()]-------------------------------------------------------------------------------
+#--[function load_local_data_files()]-------------------------------------------------------------------------------
 #
 # Loads and process the data files from the data folder
 #-------------------------------------------------------------------------------------------------------------
 # Controls the actual loading of data.
-function load_data_files() {
+function load_local_data_files() {
   local data_dir=$1
   local schema_name=$2
 
   cd ${data_dir}
-  log_this "Loading files from $data_dir for schema $schema_name." "INFO"
+  log_this "Loading files from ${data_dir} for schema ${schema_name}." "INFO"
 
   files=$(ls *${DATA_FILE_EXTENSION} 2> /dev/null | wc -l)
   if [[ ${files} -ge 1 ]]; then
     # load all data files, one at a time.
     for fn in `ls *${DATA_FILE_EXTENSION}`; do
 
-      # see if the filename overrides the default empty target.
+      # see if the file name overrides the default empty target.
       # use all of the patterns to get the table name from the file name.
       if [[ ${fn} == *"_full"* ]]; then
         empty_target="--empty_target"
@@ -255,11 +377,11 @@ function load_data_files() {
       fi
 
       # the extension and anything after a - will be automatically removed.  Neither can be used in the table name.
-      tn="`echo ${fn} | sed s/${DATA_FILE_EXTENSION}// | sed s/-.*// | sed s/_full// | sed s/_incremental//`"  
+      tn="`echo ${fn} | sed s/${DATA_FILE_EXTENSION}// | sed s/-.*// | sed s/_full// | sed s/_incremental//`"
       for pattern in ${SED_PATTERNS[*]}; do
         tn="`echo ${tn} | sed s/${pattern}//`"
       done
-      load_a_file ${fn} ${DATABASE_NAME} ${schema_name} ${tn} ${empty_target}
+      load_a_local_file ${fn} ${DATABASE_NAME} ${schema_name} ${tn} ${empty_target}
     done
   else
     log_this "No ${DATA_FILE_EXTENSION} files found in $data_dir" "WARNING"
@@ -268,32 +390,78 @@ function load_data_files() {
   # Check any sub-directories to see if there are multiple schemas to support.
   for dir in `ls -d */ 2> /dev/null`; do
     sn=$(basename ${dir})
-    # see if the directory is in the list of ones to ignore.  
+    # see if the directory is in the list of ones to ignore.
     should_ignore ${sn}
     if [[ $? != 0 ]]; then
     # load the data; the directory and schema are the same name.
-      load_data_files ${sn} ${sn}
+      load_local_data_files ${sn} ${sn}
     fi
   done
 
   cd ..
 }
 
-#--[function cleanup_from_load()]-----------------------------------------------------------------------------
+#--[function load_s3_data_files()]-------------------------------------------------------------------------------
+#
+# Loads and process the data files from the data folder
+#-------------------------------------------------------------------------------------------------------------
+# Controls the actual loading of data.
+function load_s3_data_files() {
+
+  log_this "Loading files from ${AWS_S3_BUCKET}." "INFO"
+
+  files_to_load=`aws s3 ls --recursive s3://${AWS_S3_BUCKET} | awk '{$1=$2=$3=""; print $0}' | sed 's/^[ \t]*//' | grep "${DATA_FILE_EXTENSION}$"`
+
+  if [[ $files_to_load != "" ]]; then
+    # load all data files, one at a time.
+    for fn in ${files_to_load}; do
+
+      # For S3, the directory name if part of the file name.  Note that only one level deep is support.
+      local schema_name=${DEFAULT_SCHEMA_NAME}
+      if [[ $fn == *"/"* ]]; then
+        schema_name=$(echo $fn | cut -d"/" -f 1)
+        file_name=$(echo $fn | cut -d"/" -f 2)
+      else
+        file_name=$fn
+      fi
+
+      # see if the file_name overrides the default empty target.
+      # use all of the patterns to get the table name from the file name.
+      if [[ ${file_name} == *"_full"* ]]; then
+        empty_target="--empty_target"
+      elif [[ ${file_name} == *"_incremental"* ]]; then
+        empty_target=""
+      else
+        empty_target=${DEFAULT_EMPTY_TARGET}
+      fi
+
+      # the extension and anything after a - will be automatically removed.  Neither can be used in the table name.
+      tn="`echo ${file_name} | sed s/${DATA_FILE_EXTENSION}// | sed s/-.*// | sed s/_full// | sed s/_incremental//`"
+      for pattern in ${SED_PATTERNS[*]}; do
+        tn="`echo ${tn} | sed s/${pattern}//`"
+      done
+      load_an_s3_file ${file_name} ${DATABASE_NAME} ${schema_name} ${tn} ${empty_target}
+    done
+  else
+    log_this "No ${DATA_FILE_EXTENSION} files found in ${AWS_S3_BUCKET}" "WARNING"
+  fi
+}
+
+#--[function cleanup_from_local_load()]-----------------------------------------------------------------------------
 #
 # Clean up files, archiving data, etc.
 #-------------------------------------------------------------------------------------------------------------
-function cleanup_from_load() {
+function cleanup_from_local_load() {
 
   log_this "Cleaning up from load" "INFO"
-  log_this "Archiving option: ${ARCHIVE_DATA}" "INFO" 
+  log_this "Archiving option: ${ARCHIVE_DATA}" "INFO"
   log_this "Move loaded files option: ${MOVE_LOADED_FILES}" "INFO"
-  log_this "Purging files older than ${NBR_DAYS_TO_KEEP_OLD_FILES} days from ${OLD_DIR_ROOT} and ${LOG_DIR}" "INFO" 
+  log_this "Purging files older than ${NBR_DAYS_TO_KEEP_OLD_FILES} days from ${OLD_DIR_ROOT} and ${LOG_DIR}" "INFO"
 
-  # Check if bad records where generated
+  # Check if bad records where generated -- only for local file system loads.
   has_bad_records=false
   for f in ${OLD_DIR}/data/${DEFAULT_SCHEMA_NAME}/*_bad_records.csv; do
-    [ -e "$f" ] && has_bad_records=true || has_bad_records=false
+    [ -e "${f}" ] && has_bad_records=true || has_bad_records=false
     break
   done
 
@@ -330,6 +498,31 @@ function cleanup_from_load() {
   fi
 }
 
+#--[function cleanup_from_s3_load()]-----------------------------------------------------------------------------
+#
+# Clean up files, archiving data, etc.
+#-------------------------------------------------------------------------------------------------------------
+function cleanup_from_s3_load() {
+
+  log_this "Cleaning up from load" "INFO"
+  log_this "Archiving option: ${ARCHIVE_DATA}" "INFO"
+  log_this "Move loaded files option: ${MOVE_LOADED_FILES}" "INFO"
+
+  # Move the loaded files to the old directory.
+  # if there were files loaded, save the results
+  if [[ ${total_attempted_files} != 0 ]]; then
+    mv ${TEMP_RESULTS_SUMMARY_FILE} ${RESULTS_FILE}
+    cat ${TEMP_RESULTS_FILE} >> ${RESULTS_FILE}
+
+    results_file_name=`echo "${RESULTS_FILE}" | sed 's/.*\///'`
+    aws s3 cp ${RESULTS_FILE} ${OLD_DIR}/${results_file_name}
+  fi
+
+  rm ${LOADING_FILE} # remove the loading semaphore file
+
+  aws s3 rm s3://${AWS_S3_BUCKET}/${SEMAPHORE_FILE_NAME} 
+}
+
 #--[function send_results_notification()]---------------------------------------------------------------------
 #
 # Sends email to indicate the results of the load.
@@ -363,38 +556,47 @@ function send_results_notification() {
 # Get the input parameters and verify there is a file to use for configs.
 while getopts 'f:h' opt
 do
-  case ${opt} in 
-    f) config_file=${OPTARG} 
+  case ${opt} in
+    f) config_file=${OPTARG}
     ;;
-    h|?) usage 0 
+    h|?) usage 0
     ;;
   esac
 done
 
-if [ ! -f "${config_file}" ]; then 
+if [ ! -f "${config_file}" ]; then
   usage -1
 fi
 
 # Read the configuration file
 source ${config_file}
 
+if [[ ${SOURCE_TYPE} == "aws_s3" ]]; then
+  export AWS_ACCESS_KEY_ID=${AWS_S3_ACCESS_KEY_ID}
+  export AWS_SECRET_ACCESS_KEY=${AWS_S3_SECRET_ACCESS_KEY}
+fi
+
+# Check if a sempahore file is used, and if so, if the process should run, may exit
+check_for_semaphore
+
+# Check for the loading semaphore, will exit if other process is running
+check_already_loading
+
+# Check if all required folders exist and create if not, may exit with error
+check_directories
+
 # Initialise the log summary file
 touch ${TEMP_RESULTS_SUMMARY_FILE}
 
-# Check if a sempahore file is used, and if so, if the process should run, may exit
-check_for_semaphore                      
-
-# Check for the loading semaphore, will exit if other process is running
-check_already_loading                    
-
-# Check if all required folders exist and create if not, may exit with error
-check_directories                       
-
-# Load all files present in the DATA directory at the time of checking for the semaphore
-load_data_files ${DATA_DIR} ${DEFAULT_SCHEMA_NAME} 
-
-# Cleanup files after load
-cleanup_from_load
+if [[ ${SOURCE_TYPE} == "aws_s3" ]]; then
+  # Load all data files from S3
+  load_s3_data_files
+  cleanup_from_s3_load
+else # default to file system load.
+  # Load all files present in the data directory
+  load_local_data_files ${DATA_DIR} ${DEFAULT_SCHEMA_NAME}
+  cleanup_from_local_load
+fi
 
 # Sends a notification of the results
 send_results_notification
