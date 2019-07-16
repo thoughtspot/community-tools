@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-import argparse
 from tsut.apps import TSUserGroupSyncApp, TSUGXLSXReader, TSUGSyncWriter
 
 """
@@ -20,7 +19,13 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 
-reader = TSUGXLSXReader()
-writer = TSUGSyncWriter()
-sync_app = TSUserGroupSyncApp(reader=reader, writer=writer)
-sync_app.run()
+
+def run_app():
+    reader = TSUGXLSXReader()
+    writer = TSUGSyncWriter()
+    sync_app = TSUserGroupSyncApp(reader=reader, writer=writer)
+    sync_app.run()
+
+
+if __name__ == "__main__":
+    run_app()
