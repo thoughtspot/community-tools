@@ -52,10 +52,10 @@ def get_args():
     parser = argparse.ArgumentParser()
 
     add_cnx_parser_arguments(parser=parser)
-    parser.add_argument("users", help="List of user ids to delete.")
-    parser.add_argument("groups", help="List of group ids to delete.")
-    parser.add_argument("user_file", help="File with list of user ids to delete.")
-    parser.add_argument("group_file", help="File with list of group ids to delete.")
+    parser.add_argument("--users", help="List of user ids to delete.")
+    parser.add_argument("--groups", help="List of group ids to delete.")
+    parser.add_argument("--user_file", help="File with list of user ids to delete.")
+    parser.add_argument("--group_file", help="File with list of group ids to delete.")
 
     return parser.parse_args()
 
