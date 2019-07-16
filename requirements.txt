@@ -1,5 +1,0 @@
-requests
-argparse
-setuptools
-ast
-xlrd
