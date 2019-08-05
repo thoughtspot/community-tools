@@ -1,6 +1,7 @@
 import argparse
 from abc import abstractmethod
 import copy
+import json
 
 from tsut.api import SyncUserAndGroups
 from tsut.model import UsersAndGroups
@@ -309,6 +310,8 @@ class TSUGStdOutWriter(TSUGWriter):
         :type ugs: UsersAndGroups
         :return:  None
         """
+        # TODO Add pretty print.  Doesn't always work if there are certain, embedded characters.
+        # print(json.dumps(json.loads(ugs.to_json()), indent=4, ensure_ascii=False))
         print(ugs.to_json())
 
 
@@ -409,25 +412,34 @@ class TSUserGroupSyncApp(object):
 
     A standard extension will create a sub-class, add arguments to the defaults, call initialize, and then execute.
     """
-    def __init__(self, reader, writer):
+    def __init__(self, reader, writers):
         """
         :param reader: An object of type TSUGReader that can read users and groups.
         :type reader: TSUGReader
-        :param writer: An object of type TSUGWriter that can write users and groups.
-        :type writer: TSUGWriter
+        :param writers: An object of type TSUGWriter that can write users and groups, or list of those objects.
+        :type writers: TSUGWriter | list of TSUGWriter
         """
 
         # Make sure we have all the right types.
         assert (isinstance(reader, TSUGReader))
-        assert (isinstance(writer, TSUGWriter))
+        self._ug_reader = reader
+
+        self._ug_writers = []
+        if isinstance(writers, TSUGWriter):
+            self._ug_writers.append(writers)
+        else:
+            for w in writers:
+                assert (isinstance(w, TSUGWriter))
+                self._ug_writers.append(w)
 
         parser = argparse.ArgumentParser(conflict_handler="resolve")
         reader.add_parser_arguments(parser)
-        writer.add_parser_arguments(parser)
+
+        for w in self._ug_writers:
+            w.add_parser_arguments(parser)
+
         self._args = parser.parse_args()
 
-        self._ug_reader = reader
-        self._ug_writer = writer
 
     @staticmethod
     def _get_error_msg(issues):
@@ -444,6 +456,14 @@ class TSUserGroupSyncApp(object):
 
         return err_msg
 
+    def get_args(self):
+        """
+        Gets the command line arguments.
+        :return: The command line arguments entered by the user.
+        :rtype: argparse.Namespace
+        """
+        return self._args
+
     def run(self):
         """
         Gets and validates the command line arguments, runs the getter, then runs the setter.
@@ -455,15 +475,17 @@ class TSUserGroupSyncApp(object):
             fail = True
             print(TSUserGroupSyncApp._get_error_msg(has_valid_args[1]))
 
-        has_valid_args = self._ug_writer.has_valid_arguments(args=self._args)
-        if not has_valid_args[0]:
-            fail = True
-            print(TSUserGroupSyncApp._get_error_msg(has_valid_args[1]))
+        for w in self._ug_writers:
+            has_valid_args = w.has_valid_arguments(args=self._args)
+            if not has_valid_args[0]:
+                fail = True
+                print(TSUserGroupSyncApp._get_error_msg(has_valid_args[1]))
 
         if fail:
             raise AttributeError("Invalid arguments.  Provide all required arguments.")
 
         ugs = self._ug_reader.get_users_and_groups(args=self._args)
-        self._ug_writer.write_user_and_groups(ugs=ugs, args=self._args)
+        for w in self._ug_writers:
+            w.write_user_and_groups(ugs=ugs, args=self._args)
 
         print("Success")

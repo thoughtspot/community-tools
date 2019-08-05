@@ -1,6 +1,6 @@
 from __future__ import print_function
-import json
 from collections import OrderedDict, namedtuple
+import json
 
 """
 Copyright 2018 ThoughtSpot
@@ -112,10 +112,10 @@ class User(object):
         self.password = password
         self.mail = mail
         self.created = created
-        if not group_names:
-            self.groupNames = list()
-        else:
-            self.groupNames = list(group_names)
+        self.groupNames = list()
+        if group_names:
+            for gn in group_names:
+                self.groupNames.append(gn)
         self.visibility = visibility
         self.id = id
 
@@ -182,10 +182,10 @@ class Group(object):
         self.description = description
         self.visibility = visibility
         self.created = created
-        if not group_names:
-            self.groupNames = list()
-        else:
-            self.groupNames = list(group_names)
+        self.groupNames = list()
+        if group_names:
+            for gn in group_names:
+                self.groupNames.append(gn)
 
     def add_group(self, group_name):
         """
@@ -242,19 +242,22 @@ class UsersAndGroups(object):
         :param u: User object to add to the container.
         :param duplicate: Flag to indicate how to handle duplicates.
         """
-        user = self.get_user(u.name)
+        l_username = u.name.lower()  # keys are stored in lower case to avoid duplicates.
+        user = self.get_user(l_username)
         if not user:
-            self.users[u.name] = u
+            self.users[l_username] = u
         else:
+            print("WARNING:  Duplicate user %s already exists." % user.name)
+
             if duplicate == UsersAndGroups.RAISE_ERROR_ON_DUPLICATE:
                 raise Exception("Duplicate user %s" % u)
             elif duplicate == UsersAndGroups.IGNORE_ON_DUPLICATE:
                 pass  # keep the old one.
             elif duplicate == UsersAndGroups.OVERWRITE_ON_DUPLICATE:
-                self.users[u.name] = u
+                self.users[l_username] = u
             elif duplicate == UsersAndGroups.UPDATE_ON_DUPLICATE:
                 u.groupNames.extend(user.groupNames)
-                self.users[u.name] = u
+                self.users[l_username] = u
             else:
                 raise Exception("Unknown duplication rule %s" % duplicate)
 
@@ -265,7 +268,7 @@ class UsersAndGroups(object):
         :return: True if the user is in the set, else false.
         :rtype: bool
         """
-        return user_name in self.users
+        return user_name.lower() in self.users
 
     def get_user(self, user_name):
         """
@@ -274,14 +277,14 @@ class UsersAndGroups(object):
         :return: The user object or None.
         :rtype: User
         """
-        return self.users.get(user_name, None)
+        return self.users.get(user_name.lower(), None)
 
     def remove_user(self, user_name):
         """
         Removes the user with the given name if it is in the collection..
         :param user_name: Name of the user to remove.
         """
-        return self.users.pop(user_name, None)
+        return self.users.pop(user_name.lower(), None)
 
     def number_users(self):
         """
@@ -307,6 +310,10 @@ class UsersAndGroups(object):
         """
         group = self.get_group(g.name)
         if not group:
+            if g.groupNames:
+                assert(isinstance(g.groupNames, list))
+                groups_to_add = list(g.groupNames)  # making a copy in case the original is modified.
+                g.groupNames = groups_to_add
             self.groups[g.name] = g
         else:
             if duplicate == UsersAndGroups.RAISE_ERROR_ON_DUPLICATE:
@@ -407,12 +414,12 @@ class UsersAndGroups(object):
         valid = True  # true by default until an issue is found.
 
         for user in self.users.values():
-            # Enforcing the rule in 5.3+ that users have to have an email address.
-            if not user.mail:
-                issue = "user %s doesn't have a required email address." % user.name
-                print(issue)
-                issues.append(issue)
-                valid = False
+            # 5.3+ will require emails, but it's not clear if always.  Leaving this commented out for now.
+            #if not user.mail:
+            #    issue = "user %s doesn't have a required email address." % user.name
+            #    print(issue)
+            #    issues.append(issue)
+            #    valid = False
 
             for parent_group in user.groupNames:
                 if parent_group not in self.groups:

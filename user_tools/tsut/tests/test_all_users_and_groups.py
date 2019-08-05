@@ -44,6 +44,24 @@ class TestAllUsersAndGroups(unittest.TestCase):
 
         self.assertIsNone(auag.get_user("noone"))
 
+    def test_duplicate_users(self):
+        """Tests adding users with the same name, but duplicate in case."""
+        auag = UsersAndGroups()
+
+        auag.add_user(User("user1"))
+        with self.assertRaises(Exception):
+            auag.add_user(User("user1"))
+        with self.assertRaises(Exception):
+            auag.add_user(User("User1"))
+        self.assertEqual(auag.number_users(), 1)
+
+        self.assertTrue(auag.has_user("user1"))
+        self.assertTrue(auag.has_user("User1"))
+
+        auag.remove_user("user1")
+        self.assertFalse(auag.has_user("user1"))
+        self.assertEqual(auag.number_users(), 0)
+
     def test_adding_and_removing_groups(self):
         """Tests adding and removing groups."""
         auag = UsersAndGroups()
