@@ -83,7 +83,11 @@ class UGJsonReader(object):
                     created=value.get("created", None),
                     id=value.get("id", None)
                 )
-                auag.add_user(user)
+                # TODO remove after testing.
+                if auag.has_user(user.name):
+                    print("WARNING:  Duplicate user %s already exists." % user.name)
+                else:
+                    auag.add_user(user)
             else:
                 group = Group(
                     name=value.get("name", None),
@@ -235,6 +239,7 @@ class SyncUserAndGroups(BaseApiInterface):
         response = self.session.get(url, cookies=self.cookies)
         if response.status_code == 200:
             logging.info("Successfully got users and groups.")
+            logging.debug(response.text)
             json_list = json.loads(response.text)
             reader = UGJsonReader()
             auag = reader.parse_json(json_list=json_list)
@@ -298,7 +303,7 @@ class SyncUserAndGroups(BaseApiInterface):
         """
 
         if not apply_changes:
-            print("Testing sync.  Changes will not be applied.  Use --apply_change flag to apply.")
+            print("Testing sync.  Changes will not be applied.  Use --apply_changes flag to apply.")
 
         if remove_deleted and batch_size > 0:
             raise Exception("Cannot have remove_deleted True and batch_size > 0")
