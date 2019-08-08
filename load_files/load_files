@@ -257,14 +257,14 @@ function load_a_file() {
     run_sql_tables+=("${schema_name}"."${table_name}")
 
     # Need to handle spaces in names and archive_queries.  This assumes no colons in the query.
-   OLD_IFS=$IFS
+    OLD_IFS=$IFS
     IFS=$(echo -en ":\n")
 
-    if [[ ${#table_queries[@]} > 0 ]]; then
-      if [[ ${table_queries[$table_name]+abc} ]]; then
-        sql=${table_queries[$table_name]}
+    if [[ ${#pre_load_tql[@]} > 0 ]]; then
+      if [[ ${pre_load_tql[$table_name]+abc} ]]; then
+        sql=${pre_load_tql[$table_name]}
 
-        log_this "Running query before the loading of ${DATABASE_NAME}.${schema_name}.${table_name} from file ${file_name}. The query is: ${table_queries[$table_name]}" "INFO"
+        log_this "Running query before the loading of ${DATABASE_NAME}.${schema_name}.${table_name} from file ${file_name}. The query is: ${pre_load_tql[$table_name]}" "INFO"
         if run_sql "${sql}"; then
           log_this "Query completed successfully." "SUCCESS"
         else
@@ -368,6 +368,20 @@ function load_a_file() {
 
   parse_tsload_results ${schema_name} ${table_name} "${file_name}"
   
+  # Run any post load commands for this table.
+  if [[ ${#post_load_tql[@]} > 0 ]]; then
+    if [[ ${post_load_tql[$table_name]+abc} ]]; then
+      sql=${post_load_tql[$table_name]}
+ 
+      log_this "Running query before the loading of ${DATABASE_NAME}.${schema_name}.${table_name} from file ${file_name}. The query is: ${post_load_tql[$table_name]}" "INFO"
+      if run_sql "${sql}"; then
+        log_this "Query completed successfully." "SUCCESS"
+      else
+        log_this "Query failed." "ERROR"
+      fi
+    fi
+  fi
+
   # Move the loaded files to the old directory.
   if [[ ${SOURCE_TYPE} == "aws_s3" ]]; then
     # Currently only mv and cp is supported for S3.  Others will probably fail.
