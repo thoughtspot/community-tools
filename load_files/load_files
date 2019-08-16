@@ -401,7 +401,11 @@ function load_a_file() {
 #  Checks whether this directory should be ignored
 #-------------------------------------------------------------------------------------------------------------
 function should_ignore() {
-  dir_to_check="$1"
+  local fn=$1
+  OLD_IFS=${IFS}
+  IFS="/" read -r dir_to_check string <<< "${fn}"
+  IFS=${OLD_IFS}
+
   for ignore in ${IGNORE_DIRS[*]}; do [[ "${ignore}" == "${dir_to_check}" ]] && return 0; done
   return 1
 }
@@ -412,7 +416,7 @@ function load_data_files() {
     files_to_load=`aws s3 ls --recursive s3://${AWS_S3_BUCKET} | awk '{$1=$2=$3=""; print $0}' | sed 's/^[ \t]*//' | grep "${DATA_FILE_EXTENSION}$"`
   else
     source_location=${DATA_DIR}
-    files_to_load=`find ${DATA_DIR} -maxdepth 2 -iname *.csv -print`
+    files_to_load=`find ${DATA_DIR} -maxdepth 2 -iname *${DATA_FILE_EXTENSION} -print`
   fi
   
   log_this "Loading files from ${source_location}." "INFO"
@@ -429,7 +433,11 @@ function load_data_files() {
         fn=${fn#"/"}
       fi
        
-      load_a_file "${fn}"
+      should_ignore ${fn}  # makes sure not an ignore directory.
+      if [[ $? != 0 ]]; then
+        load_a_file "${fn}"
+      fi
+
     done
   else
     log_this "No ${DATA_FILE_EXTENSION} files found in ${source_location}" "WARNING"
