@@ -70,9 +70,14 @@ Please read [Contributing.md](Contributing.md) for details on our code of conduc
 
 We use [SemVer](http://semver.org/) for versioning. For the versions available, see the [tags on this repository](https://github.com/thoughtspot/community-tools/tsLoad/tags).
 
+Version 1.0.0 - Initial Release
+
+Version 1.1.0 - Better Error Handling
+
 # Future Versions
 
-- Error Handling
+- Select statements create a flow for other Alteryx tools
+- Input statements as a part of the inflow
 
 # Authors
 
