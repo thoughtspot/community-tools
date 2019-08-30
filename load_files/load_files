@@ -20,6 +20,8 @@
 
 # Needed when running from cron since this path is set in /home/admin/.bashrc - tsload is in this path.
 PATH=$PATH:/usr/local/scaligent/bin:/usr/local/scaligent/release/bin
+declare -r EXIT_OK=0
+declare -r EXIT_ERROR=1
 
 #--[function usage()]-----------------------------------------------------------------------------------------
 #
@@ -63,14 +65,14 @@ function check_directories() {
   else # default to file system.
     if [[ ! -e ${DATA_DIR} ]]; then
       log_this "Required data directory ${DATA_DIR} not found.  Exiting." "ERROR"
-      exit -1
+      exit ${EXIT_ERROR}
     fi
-    if [[ ! -e ${OLD_DIR} ]]; then mkdir -p ${OLD_DIR}; fi
-    if [[ ! -e ${OLD_DIR}/data ]]; then mkdir -p ${OLD_DIR}/data; fi
+    if [[ ! -e ${OLD_DIR} ]]; then mkdir -p "${OLD_DIR}"; fi
+    if [[ ! -e ${OLD_DIR}/data ]]; then mkdir -p "${OLD_DIR}/data"; fi
   fi
 
   # Common directories for all sources.
-  if [[ ! -e ${LOG_DIR} ]]; then mkdir -p ${LOG_DIR}; fi
+  if [[ ! -e ${LOG_DIR} ]]; then mkdir -p "${LOG_DIR}"; fi
 }
 
 #--[function check_for_semaphore()]---------------------------------------------------------------------------
@@ -86,7 +88,7 @@ check_for_semaphore() {
       aws s3 ls s3://${AWS_S3_BUCKET}/${SEMAPHORE_FILE_NAME} 
       if [[ $? != 0 ]]; then  # semaphore doesn't exist.
         echo "no semaphore file s3://${AWS_S3_BUCKET}/${SEMAPHORE_FILE_NAME} exists."
-        exit 0
+        exit ${EXIT_OK}
       fi
     fi
 
@@ -95,7 +97,7 @@ check_for_semaphore() {
     if [[ ${SEMAPHORE_FILE_NAME} != "" ]]; then
       if [[ ! -f ${DATA_DIR}/${SEMAPHORE_FILE_NAME} ]]; then
         echo "no semaphore file ${DATA_DIR}/${SEMAPHORE_FILE_NAME} exists."
-        exit 0
+        exit ${EXIT_OK}
       fi
     fi
 
@@ -113,13 +115,13 @@ function check_already_loading() {
     other_pid=`head -n 1 ${LOADING_FILE}`
     running_pid=`ps -ef | awk '{ print $2 }' | grep $other_pid`
     if [[ "$running_pid" == "" ]]; then
-      echo $$ > ${LOADING_FILE}
+      echo $$ > "${LOADING_FILE}"
       log_this "Taking over from stopped process $other_pid" "INFO"
     else
-      exit 0
+      exit ${EXIT_OK}
     fi
   else
-    echo $$ > ${LOADING_FILE}
+    echo $$ > "${LOADING_FILE}"
   fi
 }
 
@@ -295,11 +297,16 @@ function load_a_file() {
     log_this "Running tsload for AWS S3 load" "INFO"
     source_file="/aws/default/${orig_file_name}"
 
+    # If configured, run a dos2unix on the source file before loading
+    if [[ ${RUN_DOS2UNIX} == 1 ]]; then
+      dos2unix "${source_file}"
+    fi
+    
     # The specific flags are set in the configuration file, q.v..
     tsload --source_file ${source_file} \
       --target_database ${DATABASE_NAME} \
       --target_schema ${schema_name} \
-      --target_table ${table_name} \
+      --target_table "${table_name}" \
       ${empty_target} \
       ${hhr} \
       --source_data_format ${SOURCE_DATA_FORMAT} \
@@ -323,6 +330,11 @@ function load_a_file() {
     source_file="${DATA_DIR}/${orig_file_name}"
     log_this "Source file=${source_file}" "INFO"
 
+    # If configured, run a dos2unix on the source file before loading
+    if [[ ${RUN_DOS2UNIX} == 1 ]]; then
+      dos2unix "${source_file}"
+    fi
+
     # The specific flags are set in the configuration file, q.v..
     header=""
     if [[ ${#extra_table_headers[@]} > 0 ]]; then
@@ -341,7 +353,7 @@ function load_a_file() {
       tsload \
       --target_database ${DATABASE_NAME} \
       --target_schema ${schema_name} \
-      --target_table ${table_name} \
+      --target_table "${table_name}" \
       --bad_records_file ${move_dir}/${table_name}_bad_records.csv \
       ${empty_target} \
       ${hhr} \
@@ -416,13 +428,13 @@ function load_data_files() {
     files_to_load=`aws s3 ls --recursive s3://${AWS_S3_BUCKET} | awk '{$1=$2=$3=""; print $0}' | sed 's/^[ \t]*//' | grep "${DATA_FILE_EXTENSION}$"`
   else
     source_location=${DATA_DIR}
-    files_to_load=`find ${DATA_DIR} -maxdepth 2 -iname *${DATA_FILE_EXTENSION} -print`
+    files_to_load=`find ${DATA_DIR} -maxdepth 2 -iname "*${DATA_FILE_EXTENSION}" -print`
   fi
   
-  log_this "Loading files from ${source_location}." "INFO"
-
   if [[ $files_to_load != "" ]]; then
     # load all data files, one at a time.
+    OLD_IFS=$IFS
+    IFS=$'\n'
     for fn in ${files_to_load}; do
       local schema_name=${DEFAULT_SCHEMA_NAME}
       
@@ -439,6 +451,7 @@ function load_data_files() {
       fi
 
     done
+    IFS=$OLD_IFS
   else
     log_this "No ${DATA_FILE_EXTENSION} files found in ${source_location}" "WARNING"
   fi
