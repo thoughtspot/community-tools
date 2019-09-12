@@ -72,3 +72,34 @@ are documented and expected to exist, so removing any can cause `load_files` to 
 
 You should not need to alter the base `load_files` script.  If you find bugs or have issues, please post on 
 https://community.thoughtspot.com
+
+# diff_csv_schema.sh
+
+This script allows you to compare the structure of a csv input file to a target table in ThoughtSpot. It will highlight differences in column names as well as data types which might not match. The script will display a table which gives an easy overview.
+
+The script takes three parameters:
+--input   The input file which should be checked
+--table   The table name, including database name and schema name, to check
+--lines   Optional parameter to limit the number of lines of the input file it will parse. Large files will take a long time to parse. If not specified the full file will be parsed.
+
+Usage: bash diff_csv_schema.sh --input <input file> --table <database name>.<schema name>.<table name> --lines <number>
+
+Sample output:
+Comparing input file <input file> to tablename <table name>
+Parsing just 100 of the input file
+
+Comparison results
+
+|../data/bauer_interactions_full.csv|          |bauer.falcon_default_schema.bauer_interactions|          |status    |
+|-----------------------------------|----------|----------------------------------------------|----------|----------|
+|date_time                          |Text      |date_time                                     |date_time |OK        |
+|message_type                       |Text      |message_type                                  |varchar   |OK        |
+|mobile_number                      |Number    |mobile_number                                 |varchar   |REVIEW    |
+|network                            |Text      |network                                       |varchar   |OK        |
+|message_header                     |Number    |message_header                                |varchar   |REVIEW    |
+|price_pence                        |Number    |price_pence                                   |double    |OK        |
+|missing                            |          |campaign                                      |varchar   |ISSUE     |
+|missing                            |          |status                                        |varchar   |ISSUE     |
+|missing                            |          |message_body                                  |varchar   |ISSUE     |
+
+In this example you quickly see that there are 3 columns missing in the source file and that two columns might need to be reviewed to see if the data types are as intended.
