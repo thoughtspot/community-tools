@@ -90,18 +90,16 @@ Parsing just 100 of the input file
 
 Comparison results
 
-===================================|==========|==============================================|==========|==========
-<input file>                       |          |table name                                    |          |status
-===================================|==========|==============================================|==========|==========
-date_time                          |Text      |date_time                                     |date_time |OK
-message_type                       |Text      |message_type                                  |varchar   |OK
-mobile_number                      |Number    |mobile_number                                 |varchar   |REVIEW
-network                            |Text      |network                                       |varchar   |OK
-message_header                     |Number    |message_header                                |varchar   |REVIEW
-price_pence                        |Number    |price_pence                                   |double    |OK
-<missing>                          |          |campaign                                      |varchar   |ISSUE
-<missing>                          |          |status                                        |varchar   |ISSUE
-<missing>                          |          |message_body                                  |varchar   |ISSUE
-===================================|==========|==============================================|==========|==========
+|<input file>                       |          |table name                                    |          |status    |
+|-----------------------------------|----------|----------------------------------------------|----------|----------|
+|date_time                          |Text      |date_time                                     |date_time |OK        |
+|message_type                       |Text      |message_type                                  |varchar   |OK        |
+|mobile_number                      |Number    |mobile_number                                 |varchar   |REVIEW    |
+|network                            |Text      |network                                       |varchar   |OK        |
+|message_header                     |Number    |message_header                                |varchar   |REVIEW    |
+|price_pence                        |Number    |price_pence                                   |double    |OK        |
+|<missing>                          |          |campaign                                      |varchar   |ISSUE     |
+|<missing>                          |          |status                                        |varchar   |ISSUE     |
+|<missing>                          |          |message_body                                  |varchar   |ISSUE     |
 
 In this example you quickly see that there are 3 columns missing in the source file and that two columns might need to be reviewed to see if the data types are as intended.
