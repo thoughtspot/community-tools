@@ -2,14 +2,14 @@
 
 In this folder you will find the script for automating data loads:
 
-- [Load Files](#load_files)
+- [Load Files](#user-content-load-files)
 
 Besides the `load_files` script, there are also two other scripts available in the `load_files` folder of the community tools. Both these scripts can be useful in the process of data preparation and validation.
 
 - [csv_to_sql](#csv_to_sql)
 - [diff_csv_to_schema](#diff_csv_to_schema)
 
-## Load Files {#load_files}
+## Load Files
 
 The `load_files` script is a bash script which automates the process of loading files using ThoughtSpot's bulk loader `tsload`. The benefit of using `load_files` is that it's configurable and manages error handling, archiving loaded files as well as logging and reporting status. It supports the loading of local files as well as directly loading from an AWS S3 bucket (as-of TS v5.2).
 
