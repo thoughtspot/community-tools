@@ -1,54 +1,27 @@
-# load_files scripts and utilities
+# Loading scripts and utilities - Index
+
+In this folder you will find the script for automating data loads:
+
+- [Load Files](#load_files)
+
+Besides the `load_files` script, there are also two other scripts available in the `load_files` folder of the community tools. Both these scripts can be useful in the process of data preparation and validation.
+
+- [csv_to_sql](#csv_to_sql)
+- [diff_csv_to_schema](#diff_csv_to_schema)
+
+## Load Files {#load_files}
+
 The `load_files` script is a bash script which automates the process of loading files using ThoughtSpot's bulk loader `tsload`. The benefit of using `load_files` is that it's configurable and manages error handling, archiving loaded files as well as logging and reporting status. It supports the loading of local files as well as directly loading from an AWS S3 bucket (as-of TS v5.2).
 
-## Preparing data
-Besides the `load_files` script, there are also two other scripts available in the `load_files` folder of the community tools:
+### Loading data into ThoughtSpot
 
-- csv_to_sql
-- diff_csv_to_schema
-
-### csv_to_sql
-
-### diff_csv_to_schema
-This script allows you to compare the structure of a csv input file to a target table in ThoughtSpot. It will highlight differences in column names as well as data types which might not match. The script will display a table which gives an easy overview.
-
-The script takes three parameters:
-
-`input`             The input file which should be checked
-
-`table`             The table name, including database name and schema name, to check
-
-`number of lines`   Optional parameter to limit the number of lines of the input file it will parse. Large files will take a long time to parse. If not specified the full file will be parsed.
-
-    Usage: diff_csv_schema.sh --input `input file` --table `database name`.`schema name`.`table name` --lines `number of lines`
-
-Sample output:
-    Comparing input file `input file` to tablename `table name`
-    Parsing just 100 of the input file
-    
-    Comparison results
-    
-    |../data/bauer_interactions_full.csv|          |bauer.falcon_default_schema.bauer_interactions|          |status    |
-    |-----------------------------------|----------|----------------------------------------------|----------|----------|
-    |date_time                          |Text      |date_time                                     |date_time |OK        |
-    |message_type                       |Text      |message_type                                  |varchar   |OK        |
-    |mobile_number                      |Number    |mobile_number                                 |varchar   |REVIEW    |
-    |network                            |Text      |network                                       |varchar   |OK        |
-    |message_header                     |Number    |message_header                                |varchar   |REVIEW    |
-    |price_pence                        |Number    |price_pence                                   |double    |OK        |
-    |missing                            |          |campaign                                      |varchar   |ISSUE     |
-    |missing                            |          |status                                        |varchar   |ISSUE     |
-    |missing                            |          |message_body                                  |varchar   |ISSUE     |
-
-In this example you quickly see that there are 3 columns missing in the source file and that two columns might need to be reviewed to see if the data types are as intended.
-
-## Loading data into ThoughtSpot
 The whole purpose of the `load_files` script is to make the process of loading data as easy as possible. There are two scripts required, or actually one script and a configuration file.
 
 - The `load_files` script. There should be no need to make any change to this script as all configuration should be done in the configuration files. If you do find bugs or issues in the `load_files` script itself, please post this issue on [ThoughtSpot Community](https://community.thoughtspot.com).
 - A configuration file, e.g. `load.cfg` containing all the parameters and configuration required for the loading process. Note that because you can run the load script with different configurations, it's possible to support multiple databases and formats by creating multiple configuration files and running the script with the correct files.
 
-### Usage
+#### Usage
+
 The process can be launched from the command line, by executing the following command:
 
     load_files -f <configuration_file>
@@ -59,14 +32,15 @@ For example:
 
 Obviously, you can schedule this using any type of scheduler.
 
-### Pre-conditions and assumptions
+#### Pre-conditions and assumptions
 
 - The database has been created in ThoughtSpot using TQL
 - The table names are the same as the names of the files with some allowed deviations (see below), e.g. SalesData.csv goes into a SalesData table.
 - The formats for dates, datetimes, boolean, and nulls are the same for all files.
 - (optional) Email has been configured on the cluster so that load results can be sent to indicate status of the load.
 
-### File names
+#### File names
+
 The `load_files` script will determine which table to update based on the name of the file. This means that the table name should be present in the base file name (excluding extension).
 File names are processed as follows:
 
@@ -80,7 +54,7 @@ File names are processed as follows:
 
 The whole concept is that after stripping all the elements above, that the remaining part will be the name of the table.
 
-### Loading into Schemas
+#### Loading into Schemas
 
 If you are loading all data in the same target schema, you can just specify this in the configuration file (***DEFAULT_SCHEMA_NAME***). If you are not using schemas, just leave this to the default setting of falcon_default_schema.
 
@@ -88,7 +62,7 @@ However, if you want to load into multiple schema, you can create sub folders in
 
 For example, say you have a database called MY_COOL_DATABASE and have two different schemas called SCHEMA_A and SCHEMA_B with tables in each. You can create a directory for the data with two sub-directories named SCHEMA_A and SCHEMA_B, then put the data to be loaded into those sub-directories.
 
-## Overview of the `load_files` process
+### Overview of the `load_files` process
 
 Because `load_files` uses `tsload`, it must be run directly on the TS cluster. It can load files that are physically on the cluster, written to a drive that is mounted on the cluster, or written to AWS S3.
 
@@ -126,7 +100,7 @@ The complete loading process is described in the diagram below.
 | **Cleanup From Load** | | This step will clean up all temporary files and will archive the source data and log files according to the setting in ***ARCHIVE_DATA***. <br/>It will also clean up old archives based on the number of days specified in ***NBR_DAYS_TO_KEEP_OLD_FILES***.|
 | **Send Results Notification** | | If activated on the cluster this step well send an status email to the email addresses specified in ***RESULTS_EMAIL***, with the log attached. <br/>If HTML email is enabled (***USE_HTML_EMAIL***), a nicely formatted table will be created in the body of the email, allowing an easy and quick insight into the results of the load.|
 
-## Deploy and configure
+### Deploy and configure
 
 The `load_files` script assumes a particular file structure, i.e. there should be a root directory from where the scripts run. This directory is specified in the configuration file (***ROOT_DIR***).
 
@@ -146,7 +120,7 @@ Once `load_files` has been deployed, edit the configuration file to use the vari
 
 WARNING: The configuration flags are documented and expected to exist, so removing any can cause `load_files` to fail.
 
-## The configuration file
+### The configuration file
 
 The configuration file should be passed to the script via the -f parameter. The following table will describe the key parameters.
 
@@ -203,3 +177,42 @@ Parameter	Description
 | ***post_load_tql*** | This array contains SQL statements which will be executed after the loading of a table. The key of the array should be the table name. |
 | ***extra_table_headers*** | This defines the column names of the columns which will be added to the data file before loading. Should be used in conjunction with ***extra_table_values***. |
 | ***extra_table_values*** | This defines the values for the columns which will be added to the data file before loading. Should be used in conjunction with ***extra_table_headers***. |
+
+## csv_to_sql {#csv_to_sql}
+
+(Documentation Coming soon)
+
+## diff_csv_to_schema {#diff_csv_to_schema}
+
+This script allows you to compare the structure of a csv input file to a target table in ThoughtSpot. It will highlight differences in column names as well as data types which might not match. The script will display a table which gives an easy overview.
+
+The script takes three parameters:
+
+`input`             The input file which should be checked
+
+`table`             The table name, including database name and schema name, to check
+
+`number of lines`   Optional parameter to limit the number of lines of the input file it will parse. Large files will take a long time to parse. If not specified the full file will be parsed.
+
+    Usage: diff_csv_schema.sh --input `input file` --table `database name`.`schema name`.`table name` --lines `number of lines`
+
+Sample output:
+    Comparing input file `input file` to tablename `table name`
+    Parsing just 100 of the input file
+    
+    Comparison results
+    
+    |../data/bauer_interactions_full.csv|          |bauer.falcon_default_schema.bauer_interactions|          |status    |
+    |-----------------------------------|----------|----------------------------------------------|----------|----------|
+    |date_time                          |Text      |date_time                                     |date_time |OK        |
+    |message_type                       |Text      |message_type                                  |varchar   |OK        |
+    |mobile_number                      |Number    |mobile_number                                 |varchar   |REVIEW    |
+    |network                            |Text      |network                                       |varchar   |OK        |
+    |message_header                     |Number    |message_header                                |varchar   |REVIEW    |
+    |price_pence                        |Number    |price_pence                                   |double    |OK        |
+    |missing                            |          |campaign                                      |varchar   |ISSUE     |
+    |missing                            |          |status                                        |varchar   |ISSUE     |
+    |missing                            |          |message_body                                  |varchar   |ISSUE     |
+
+In this example you quickly see that there are 3 columns missing in the source file and that two columns might need to be reviewed to see if the data types are as intended.
+
