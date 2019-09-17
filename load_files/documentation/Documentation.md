@@ -75,7 +75,7 @@ WARNING: Whatever process you implement, you must ensure that files are complete
 
 The complete loading process is described in the diagram below.
 
-![Process flow load_files!](load_files_flow.jpg)
+![Process flow load_files!](images/load_files_flow.jpg)
 
 
 | Step Name	| Sub Steps	| Description       |
@@ -178,11 +178,11 @@ Parameter	Description
 | ***extra_table_headers*** | This defines the column names of the columns which will be added to the data file before loading. Should be used in conjunction with ***extra_table_values***. |
 | ***extra_table_values*** | This defines the values for the columns which will be added to the data file before loading. Should be used in conjunction with ***extra_table_headers***. |
 
-## csv_to_sql {#csv_to_sql}
+## csv_to_sql
 
 (Documentation Coming soon)
 
-## diff_csv_to_schema {#diff_csv_to_schema}
+## diff_csv_to_schema
 
 This script allows you to compare the structure of a csv input file to a target table in ThoughtSpot. It will highlight differences in column names as well as data types which might not match. The script will display a table which gives an easy overview.
 
