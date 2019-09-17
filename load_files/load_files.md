@@ -1,5 +1,46 @@
-# load_files
+# load_files scripts and utilities
 The `load_files` script is a bash script which automates the process of loading files using ThoughtSpot's bulk loader `tsload`. The benefit of using `load_files` is that it's configurable and manages error handling, archiving loaded files as well as logging and reporting status. It supports the loading of local files as well as directly loading from an AWS S3 bucket (as-of TS v5.2).
+
+## Preparing data
+Besides the `load_files` script, there are also two other scripts available in the `load_files` folder of the community tools:
+
+- csv_to_sql
+- diff_csv_to_schema
+
+### csv_to_sql
+
+### diff_csv_to_schema
+This script allows you to compare the structure of a csv input file to a target table in ThoughtSpot. It will highlight differences in column names as well as data types which might not match. The script will display a table which gives an easy overview.
+
+The script takes three parameters:
+
+`input`             The input file which should be checked
+
+`table`             The table name, including database name and schema name, to check
+
+`number of lines`   Optional parameter to limit the number of lines of the input file it will parse. Large files will take a long time to parse. If not specified the full file will be parsed.
+
+    Usage: diff_csv_schema.sh --input `input file` --table `database name`.`schema name`.`table name` --lines `number of lines`
+
+Sample output:
+    Comparing input file `input file` to tablename `table name`
+    Parsing just 100 of the input file
+    
+    Comparison results
+    
+    |../data/bauer_interactions_full.csv|          |bauer.falcon_default_schema.bauer_interactions|          |status    |
+    |-----------------------------------|----------|----------------------------------------------|----------|----------|
+    |date_time                          |Text      |date_time                                     |date_time |OK        |
+    |message_type                       |Text      |message_type                                  |varchar   |OK        |
+    |mobile_number                      |Number    |mobile_number                                 |varchar   |REVIEW    |
+    |network                            |Text      |network                                       |varchar   |OK        |
+    |message_header                     |Number    |message_header                                |varchar   |REVIEW    |
+    |price_pence                        |Number    |price_pence                                   |double    |OK        |
+    |missing                            |          |campaign                                      |varchar   |ISSUE     |
+    |missing                            |          |status                                        |varchar   |ISSUE     |
+    |missing                            |          |message_body                                  |varchar   |ISSUE     |
+
+In this example you quickly see that there are 3 columns missing in the source file and that two columns might need to be reviewed to see if the data types are as intended.
 
 ## Loading data into ThoughtSpot
 The whole purpose of the `load_files` script is to make the process of loading data as easy as possible. There are two scripts required, or actually one script and a configuration file.
@@ -60,17 +101,17 @@ WARNING: Whatever process you implement, you must ensure that files are complete
 
 The complete loading process is described in the diagram below.
 
-![Process flow `load_files`!](`load_files`_flow.jpg)
+![Process flow load_files!](load_files_flow.jpg)
 
 
 | Step Name	| Sub Steps	| Description       |
 | --------- | --------- | ----------------- |
-| Read Config File | | Reads the configuration file passed to the script using the -f parameter |
-| Check for Semaphore | Semaphore Required? | A semaphore is required when a name for a semaphore has been provided in the ***SEMAPHORE_FILE_NAME*** parameter in the configuration file. If left empty, it is not required |
+| **Read Config File** | | Reads the configuration file passed to the script using the -f parameter |
+| **Check for Semaphores** | Semaphore Required? | A semaphore is required when a name for a semaphore has been provided in the ***SEMAPHORE_FILE_NAME*** parameter in the configuration file. If left empty, it is not required |
 | | Semaphore Present? | If the file name as specified in ***SEMAPHORE_FILE_NAME*** exists, the semaphore is present, otherwise stop the process |
-| Check for Loading File | Loading File Present? | Checks if the file specified in ***LOADING_FILE*** in the configuration file is present. If it is present it means another loading process is already running and no new loading processes will be started. Note that this process only checks the local process space, so it is possible another load is running on another machine. |
-| Check Directories | | This process will check if the required directories exists. If the data directory does not exist the process will halt, all other required directories will be created when needed.|
-| Load Data Files | Data Files Available? | This will check if any files matching the extension ***DATA_FILE_EXTENSION*** are present in the ***DATA_DIR***. If there are, they will be processed in sequence as found at the time of the start of the process. |
+| | Loading File Present? | Checks if the file specified in ***LOADING_FILE*** in the configuration file is present. If it is present it means another loading process is already running and no new loading processes will be started. Note that this process only checks the local process space, so it is possible another load is running on another machine. |
+| **Check Directories** | | This process will check if the required directories exists. If the data directory does not exist the process will halt, all other required directories will be created when needed.|
+| **Load Data Files** | Data Files Available? | This will check if any files matching the extension ***DATA_FILE_EXTENSION*** are present in the ***DATA_DIR***. If there are, they will be processed in sequence as found at the time of the start of the process. |
 | | Parse File Name | The following logic will be derived from the file name: <ul><li>If the file sits in a sub folder in ***DATA_DIR***, the name of the sub folder is taken as the name of the target schema name. If it is not sitting in a sub folder it will load into the schema specified in ***DEFAULT_SCHEMA_NAME***</li><li>If the base file name ends at ‘_full’ the target table will be emptied as part of the `tsload` process (--emptytarget)</li><li>If the base file name ends at ‘_incremental’, data will be appended to the target table</li><li>If neither ‘_full’ or ‘_incremental’ are specified, the setting in ***DEFAULT_EMPTY_TARGET*** will be used to decide whether to empty the target before loading</li><li>If there are any sed patterns defined in ***SED_PATTERNS***, these will be removed from the file name as well.</li></ul> After all these rules, whatever is left of the file name string (without extension) will be used as the target table name.|
 | | Create Folders | Create any required folders, if they have not been created before. |
 | |	Manual Truncate? | This is a special option for truncating which has been designed for case where input files might be delivered in parts, i.e. multiple files per table with a sequence number. In this case we cannot use the built-in truncate option as that would clear the table for every file. Setting the option ***TRUNCATE_BEFORE_LOAD*** to true will execute a manual truncate command before the `tsload` process. |
@@ -82,8 +123,8 @@ The complete loading process is described in the diagram below.
 | | Load Data File | This will execute the actual `tsload` process. All required parameters can be defined in the config file. |
 | | Run Post SQL?	| This is similar as the Pre SQL, with the difference that these are run after the `tsload`. They are defined in the post_load_sql. |
 | | Run Post SQL Once Per Table	| Run the Post SQL commands if specified for each table once. |
-| Cleanup From Load | | This step will clean up all temporary files and will archive the source data and log files according to the setting in ***ARCHIVE_DATA***. <br/>It will also clean up old archives based on the number of days specified in ***NBR_DAYS_TO_KEEP_OLD_FILES***.|
-| Send Results Notification | | If activated on the cluster this step well send an status email to the email addresses specified in ***RESULTS_EMAIL***, with the log attached. <br/>If HTML email is enabled (***USE_HTML_EMAIL***), a nicely formatted table will be created in the body of the email, allowing an easy and quick insight into the results of the load.|
+| **Cleanup From Load** | | This step will clean up all temporary files and will archive the source data and log files according to the setting in ***ARCHIVE_DATA***. <br/>It will also clean up old archives based on the number of days specified in ***NBR_DAYS_TO_KEEP_OLD_FILES***.|
+| **Send Results Notification** | | If activated on the cluster this step well send an status email to the email addresses specified in ***RESULTS_EMAIL***, with the log attached. <br/>If HTML email is enabled (***USE_HTML_EMAIL***), a nicely formatted table will be created in the body of the email, allowing an easy and quick insight into the results of the load.|
 
 ## Deploy and configure
 
