@@ -6,8 +6,8 @@ In this folder you will find the script for automating data loads:
 
 Besides the `load_files` script, there are also two other scripts available in the `load_files` folder of the community tools. Both these scripts can be useful in the process of data preparation and validation.
 
-- [csv_to_sql](#csv_to_sql)
-- [diff_csv_to_schema](#diff_csv_to_schema)
+- [csv_to_sql](#user-content-csv_to_sql)
+- [diff_csv_to_schema](#user-content-diff_csv_to_schema)
 
 ## Load Files
 
