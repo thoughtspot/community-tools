@@ -62,7 +62,7 @@ However, if you want to load into multiple schema, you can create sub folders in
 
 For example, say you have a database called MY_COOL_DATABASE and have two different schemas called SCHEMA_A and SCHEMA_B with tables in each. You can create a directory for the data with two sub-directories named SCHEMA_A and SCHEMA_B, then put the data to be loaded into those sub-directories.
 
-### Overview of the `load_files` process
+### Overview of the load_files process
 
 Because `load_files` uses `tsload`, it must be run directly on the TS cluster. It can load files that are physically on the cluster, written to a drive that is mounted on the cluster, or written to AWS S3.
 
@@ -106,11 +106,11 @@ The `load_files` script assumes a particular file structure, i.e. there should b
 
 Typically we would set up a structure as follows:
 
-    /home/username	(***ROOT_DIR***)
-    |------	bin			(script files)
-    |------	data	(***DATA_DIR***)	(the data to be loaded)
-    |------	logs	(***LOG_DIR***)	(output dir for log files)
-    |------	old	(***OLD_DIR***)	(archive for processed files)
+    /home/username	(ROOT_DIR)
+    |------	bin			        (script files)
+    |------	data	(DATA_DIR)	(the data to be loaded)
+    |------	logs	(LOG_DIR)	(output dir for log files)
+    |------	old	    (OLD_DIR)	(archive for processed files)
 
 Although this is a typical set up, all directories can be configured to be anywhere. This is useful for example if you don’t want to store the data files and the archives in the home folder, but maybe on a mounted drive.
 
@@ -202,17 +202,17 @@ Sample output:
     
     Comparison results
     
-    |../data/bauer_interactions_full.csv|          |bauer.falcon_default_schema.bauer_interactions|          |status    |
-    |-----------------------------------|----------|----------------------------------------------|----------|----------|
-    |date_time                          |Text      |date_time                                     |date_time |OK        |
-    |message_type                       |Text      |message_type                                  |varchar   |OK        |
-    |mobile_number                      |Number    |mobile_number                                 |varchar   |REVIEW    |
-    |network                            |Text      |network                                       |varchar   |OK        |
-    |message_header                     |Number    |message_header                                |varchar   |REVIEW    |
-    |price_pence                        |Number    |price_pence                                   |double    |OK        |
-    |missing                            |          |campaign                                      |varchar   |ISSUE     |
-    |missing                            |          |status                                        |varchar   |ISSUE     |
-    |missing                            |          |message_body                                  |varchar   |ISSUE     |
+    |../data/interactions_full.csv|          |bauer_interactions|          |status    |
+    |-----------------------------|----------|------------------|----------|----------|
+    |date_time                    |Text      |date_time         |date_time |OK        |
+    |message_type                 |Text      |message_type      |varchar   |OK        |
+    |mobile_number                |Number    |mobile_number     |varchar   |REVIEW    |
+    |network                      |Text      |network           |varchar   |OK        |
+    |message_header               |Number    |message_header    |varchar   |REVIEW    |
+    |price_pence                  |Number    |price_pence       |double    |OK        |
+    |missing                      |          |campaign          |varchar   |ISSUE     |
+    |missing                      |          |status            |varchar   |ISSUE     |
+    |missing                      |          |message_body      |varchar   |ISSUE     |
 
 In this example you quickly see that there are 3 columns missing in the source file and that two columns might need to be reviewed to see if the data types are as intended.
 

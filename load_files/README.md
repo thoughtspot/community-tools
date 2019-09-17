@@ -6,6 +6,10 @@ archiving loaded files as well as logging and reporting status.
 
 `load_files` supports loading local files as well as directly loading from an AWS S3 bucket (as-of TS v5.2).
 
+There are two other utility scripts available in this folder, which are useful for data preparation and validation.
+
+The full documentation can be found here: [load_files and utilities documentation](./documentation/Documentation.md)
+
 ### Loads Data into Default DBNAME & SCHEMANAME
 usage:  `load_files` -f <configuration-file>
 
