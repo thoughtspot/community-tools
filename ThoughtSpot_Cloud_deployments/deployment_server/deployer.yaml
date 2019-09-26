@@ -1,0 +1,7 @@
+---
+- name: Configure the deployment host
+  hosts: localhost
+  gather_facts: False
+  become: true
+  roles:
+    - { role: deployer }

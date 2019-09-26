@@ -1,0 +1,22 @@
+---
+- name: Install necessary packages
+  yum:
+    name:
+      - git
+      - unzip
+      - wget
+      - ansible
+    state: present
+- name: Configure ansible
+  copy:
+    src: ansible.cfg
+    dest: /etc/ansible/ansible.cfg
+    owner: root
+    group: root
+    mode: '0644'
+    backup: yes
+- name: Install Terraform
+  unarchive:
+    src: https://releases.hashicorp.com/terraform/0.12.2/terraform_0.12.2_linux_amd64.zip
+    dest: /usr/bin
+    remote_src: True

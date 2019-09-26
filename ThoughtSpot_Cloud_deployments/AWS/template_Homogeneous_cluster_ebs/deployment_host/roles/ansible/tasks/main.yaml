@@ -1,0 +1,9 @@
+---
+- name: replace ansible configuration
+  copy:
+    src: ansible.cfg
+    dest: /etc/ansible/ansible.cfg
+    owner: root
+    group: root
+    mode: '0644'
+    backup: yes
