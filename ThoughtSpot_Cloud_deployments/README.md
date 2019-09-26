@@ -79,9 +79,10 @@ To facilitate this, setup the keys in the environment variables
 (There are other methods which can be used to provide credentials, not covered in this)
 
 For AWS:
+```
 $ export AWS_SECRET_ACCESS_KEY="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 $ export AWS_ACCESS_KEY_ID="yyyyyyyyyyyyyyyyy"
-
+```
 ### Ready to start
 We are now ready to proceed with the setup.
  - GO TO -> the respective cloud section under ./community-tools/ThoughtSpot_Cloud_deployments/
