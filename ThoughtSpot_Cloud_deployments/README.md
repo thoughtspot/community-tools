@@ -83,5 +83,6 @@ $ export AWS_SECRET_ACCESS_KEY="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 $ export AWS_ACCESS_KEY_ID="yyyyyyyyyyyyyyyyy"
 
 ### Ready to start
-We are not ready to proceed with the setup.
-GO TO -> the respective cloud section under ./community-tools/ThoughtSpot_Cloud_deployments/ and follow the instructions in the README.md
+We are now ready to proceed with the setup.
+ - GO TO -> the respective cloud section under ./community-tools/ThoughtSpot_Cloud_deployments/
+ - follow the instructions in the README.md for the type of cluster (eg template_Heterogeneous_cluster)
