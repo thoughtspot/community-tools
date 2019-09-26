@@ -1,66 +1,151 @@
-SYNC USERS AND GROUPS
-This folder contains wrapper code for using the ThoughtSpot APIs related to users and groups from Python. Additionally it contains several helpful tools that make use of the API and can make your life easier when dealing with users and groups.
+# ThoughtSpot User Tool
 
-So why use this API wrapper instead of calling the APIs directly? Mainly because, if you are using Python to call the APIs, this file has been tested and known to work. It includes validation code to (try to) prevent you from making hard to debug errors when using the sync and other web calls. If you are not using Python, it provides good example code for creating your own interface to the APIs.
+ThoughtSpot user tools are a collection of tools for managing users and groups in ThoughtSpot as well as working with 
+the ThoughtSpot Web APIs that manage users and groups.  The tools and Web APIs are all written in Python and 
+require a Python environment in which to run.  The remainder of this document will describe how to deploy and use 
+the tools and how to write your own custom applications based on the API wrappers.
 
-tsUserGroupApi.py
-This file is a Python module that provides abstraction for the APIs. Classes from this module abstract away the complexity of the API and make it easier to use. This file has been used to create API interfaces in hours instead of days. Note that the tsUserGroupApi.py file will work with the latest version of ThoughtSpot and have the latest relevant API support. Older versions will be tagged with the name of the version, e.g. tsUserGroupApi_4_2.py should work with version 4.2, but not 4.4 and later.
+## Packages and scripts
 
-Always refer the code for actual details. And you can view the test classes (discussed below) to see how to use the classes for different operations.
+The tools can be split into two broad categories.  The first are the scripts that you can run to directly do things.  
+For example, the `get_users.py` script will let you get all of the users and groups from a running ThoughtSpot instance.
 
-Current list of classes in the module:
+The second category are the Web API Python wrappers.  These are all contained in the tsut package and categorized into 
+modules based on functionality, such as writting sync applications, modeling users and groups and calling the APIs from
+Python scripts.
 
-class Visibility - contains options for visibility of users and groups
-class User - represents a user in ThoughtSpot
-class Group - represents a group in ThoughtSpot
-class UsersAndGroups - represents a collection of users and groups
-class UGJsonReader - reads users and groups from valid JSON
-class SyncUserAndGroups - Supports the calls to ThoughtSpot to sync, etc.
-class UGXLSWriter - will write users and groups to Excel
-Please note that this code was built and tested with Python 2.7, which is the version that runs on ThoughtSpot.
+## Setup
 
-test_xxx.py
-These are the various test cases used to verify the code works. These files are very convenient to see how to use the classes in the API.
+This section will walk you through how to set up the environment to get started with the user tools.
 
-Stand Alone Scripts
-To assist with system management and perform some actions that are not available from the UI, several scripts have been created. These should work as-is, as long as the correct parameters are passed.
+### Environment
 
-WARNING: You usually have to use HTTPS for the URLs or you will get HTTP 405 errors.
+These tools have all been written in Python 2.7 and expect to be run in such an environment.  Note that Python 2.7 
+will be deprecated at the end of 2019 and an update to Python 3.x is anticipated, but not yet scheduled.
 
-How to deploy the code
-To run these scripts, you will need to put tsUserGroupApi.py and the scripts into the same directory of your choice and run from there.
+You can either install the tools into an existing Python environment or you can create a new virtual environment to 
+deploy into.  Note that some tools require that they be run on the ThoughtSpot cluster.  These should *always* be 
+installed into a virtual environment.  This is because the user tools require additional packages that could conflict
+through the packages used by ThoughtSpot.  ThoughtSpot typically uses `virtualenv` for virtual environments.
 
-You will also need to have Python 2.7 running in your environment. Python 3 might work, but it's not been tested.
 
-get_users.py
-This script will retrieve a list of users and groups from ThoughtSpot and write to either JSON or Excel.
+## Downloading and installing the user tools
 
-Usage: get_users [flags]
+There are two ways to deploy the user tools.  First, ts_user_tools.tar.gz file has been created that you can download 
+and install in a Python environment.  Run `pip install ts_user_tools.tar.gz`.  Note that this package has dependencies
+that it will attempt to automatically install.  This step *only* installs the user tools package and modules, not the 
+actual command line tools.  This package is needed for the command line tools.
 
-To get a full list of the available flags, run python get_users.py --help
+Alternatively you can download the tsut folder (including all .py files) and place in your Python path.  Note that references
+to the modules in the user tools is relative to tsut, so you have to have them in that folder.  
 
-sync_from_excel.py
-This script will sync users and groups from a formatted Excel file to ThoughtSpot. The format is the same as that returned by get_users.py. So a common workflow would be to run get_users.py, edit the file, then run sync_from_excel.py.
+To get specific user tools, you'll need to download those scripts individually.  The tools need to be run in a Python
+environment that has the tsut package installed.
 
-Usage: sync_from_excel [flags]
+## Running the pre-built tools
 
-To get a full list of the available flags, run python sync_from_excel.py --help
+The user tools currently consist of four scripts:
+1. `delete_ugs.py`, which deletes users and groups from a ThoughtSpot cluster.
+2. `get_users.py` that can get users and groups from a ThoughtSpot cluster in multiple formats.
+3. `sync_from_excel.py` that syncs ThoughtSpot from a properly formatted Excel document.  The format for the 
+Excel document is the same as the one created by `get_users.py`.
+4. `transfer_ownership.py` that transfers all of the objects owned by one one user to another.  Partial transfer of
+ownership is not currently supported.
 
-delete_ugs.py
-This file will delete a list of users and/or groups from ThoughtSpot by userid.
+The general format for running any tool is `python tool_name.py <flags>`.  To get a full list of available and 
+required flags, run `python <tool_name>.py --help`.  
 
-Usage: delete_ugs [flags]
+### delete_ugs
 
-To get a full list of the available flags, run python delete_ugs.py --help
+Deletes users and/or groups specified in either the flags or a file from a ThoughtSpot cluster.
 
-transfer_ownership.py
-This script will transfer ownership of all content from one user to another.
+~~~
+usage: delete_ugs.py [-h] [--ts_url TS_URL] [--username USERNAME]
+                     [--password PASSWORD] [--disable_ssl] [--users USERS]
+                     [--groups GROUPS] [--user_file USER_FILE]
+                     [--group_file GROUP_FILE]
 
-Usage: python transfer_ownership.ui [flags]
+optional arguments:
+  -h, --help            show this help message and exit
+  --ts_url TS_URL       URL to ThoughtSpot, e.g. https://myserver
+  --username USERNAME   Name of the user to log in as.
+  --password PASSWORD   Password for login of the user to log in as.
+  --disable_ssl         Will ignore SSL errors.
+  --users USERS         List of user ids to delete.
+  --groups GROUPS       List of group ids to delete.
+  --user_file USER_FILE
+                        File with list of user ids to delete.
+  --group_file GROUP_FILE
+                        File with list of group ids to delete.
+~~~
 
-To get a full list of the available flags, run python transfer_ownership.py --help
+### get_users
 
-validate_json.py
-This simple script will verify that JSON is valid. Even if you are not using the Python APIs, it's a simple way to validate your JSON to avoid errors calling the API. Invalid JSON will give an error, but it's often hard understand.
+Retrieves all of the users and groups from a ThoughtSpot cluster and writes them to the output, a JSON file or Excel.
 
-Usage: validate_json.py where is the name of a file containing JSON.
+~~~
+usage: get_users.py [-h] [--ts_url TS_URL] [--username USERNAME]
+                    [--password PASSWORD] [--disable_ssl]
+                    [--output_type OUTPUT_TYPE] [--filename FILENAME]
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --ts_url TS_URL       URL to ThoughtSpot, e.g. https://myserver
+  --username USERNAME   Name of the user to log in as.
+  --password PASSWORD   Password for login of the user to log in as.
+  --disable_ssl         Will ignore SSL errors.
+  --output_type OUTPUT_TYPE
+                        One of stdout, xls, excel, or json.
+  --filename FILENAME   Name of file to write to if not stdout. Required for
+                        Excel and JSON.
+~~~
+
+### sync_from_excel
+
+Synchronized users and groups from an Excel document in the format created by `get_users` to a ThoughtSpot cluster.
+
+~~~
+usage: sync_from_excel.py [-h] [--filename FILENAME] [--ts_url TS_URL]
+                          [--username USERNAME] [--password PASSWORD]
+                          [--disable_ssl] [--remove_deleted] [--apply_changes]
+                          [--batch_size BATCH_SIZE] [--merge_groups]
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --filename FILENAME   Name of file to write to.
+  --ts_url TS_URL       URL to ThoughtSpot, e.g. https://myserver
+  --username USERNAME   Name of the user to log in as.
+  --password PASSWORD   Password for login of the user to log in as.
+  --disable_ssl         Will ignore SSL errors.
+  --remove_deleted      Will remove users not in the load. Cannot be used with
+                        batch_size.
+  --apply_changes       Will apply changes. Default is False for testing.
+  --batch_size BATCH_SIZE
+                        Loads the users in batches. Needed to avoid timeouts
+                        for large groups of users.
+  --merge_groups        Merge new groups with groups in ThoughtSpot.
+~~~
+
+
+### transfer_ownership
+
+Transfers the ownership of all objects from one user to another in a ThoughtSpot cluster.
+
+~~~
+usage: transfer_ownership.py [-h] [--ts_url TS_URL] [--username USERNAME]
+                             [--password PASSWORD] [--disable_ssl]
+                             [--from_user FROM_USER] [--to_user TO_USER]
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --ts_url TS_URL       URL to ThoughtSpot, e.g. https://myserver
+  --username USERNAME   Name of the user to log in as.
+  --password PASSWORD   Password for login of the user to log in as.
+  --disable_ssl         Will ignore SSL errors.
+  --from_user FROM_USER
+                        User to transfer ownership from.
+  --to_user TO_USER     User to transfer ownership to.
+~~~
+
+## Creating custom syncronizations
+

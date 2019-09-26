@@ -27,7 +27,7 @@ This script will retrieve users and groups and write the results to an output fi
 
 
 def run_app():
-    get_users_app = TSUserGroupSyncApp(reader=TSUGSyncReader(), writer=TSUGOutputWriter())
+    get_users_app = TSUserGroupSyncApp(reader=TSUGSyncReader(), writers=TSUGOutputWriter())
     get_users_app.run()
 
 

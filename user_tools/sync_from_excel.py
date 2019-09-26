@@ -23,7 +23,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 def run_app():
     reader = TSUGXLSXReader()
     writer = TSUGSyncWriter()
-    sync_app = TSUserGroupSyncApp(reader=reader, writer=writer)
+    sync_app = TSUserGroupSyncApp(reader=reader, writers=writer)
     sync_app.run()
 
 

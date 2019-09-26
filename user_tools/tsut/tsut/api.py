@@ -6,6 +6,10 @@ import json
 import time
 import requests.packages.urllib3
 from model import User, Group, UsersAndGroups
+
+logger = logging.getLogger()
+logger.setLevel(logging.DEBUG)
+
 """
 Copyright 2018 ThoughtSpot
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
@@ -85,7 +89,7 @@ class UGJsonReader(object):
                 )
                 # TODO remove after testing.
                 if auag.has_user(user.name):
-                    print("WARNING:  Duplicate user %s already exists." % user.name)
+                    logging.warn("Duplicate user %s already exists." % user.name)
                 else:
                     auag.add_user(user)
             else:
@@ -199,8 +203,8 @@ class SyncUserAndGroups(BaseApiInterface):
     UPDATE_PASSWORD_URL = "/tspublic/v1/user/updatepassword"
     DELETE_USERS_URL = "/session/user/deleteusers"
     DELETE_GROUPS_URL = "/session/group/deletegroups"
-    USER_METADATA_URL = "/tspublic/v1/metadata/listobjectheaders?type=USER"
-    GROUP_METADATA_URL = "/tspublic/v1/metadata/listobjectheaders?type=USER_GROUP"
+    USER_METADATA_URL = "/tspublic/v1/metadata/listobjectheaders?type=USER&batchsize=-1"
+    GROUP_METADATA_URL = "/tspublic/v1/metadata/listobjectheaders?type=USER_GROUP&batchsize=-1"
 
     def __init__(
         self,
@@ -265,6 +269,7 @@ class SyncUserAndGroups(BaseApiInterface):
         if response.status_code == 200:
             logging.info("Successfully got user metadata.")
             json_list = json.loads(response.text)
+            logging.debug("metadata for users:  %s" % response.text)
             for value in json_list:
                 user = User(
                     name=value.get("name", None),
@@ -323,7 +328,7 @@ class SyncUserAndGroups(BaseApiInterface):
                 ug_batch = UsersAndGroups()
                 for user in user_batch:
                     ug_batch.add_user(users_and_groups.get_user(user.name))
-                    for group_name in user.groupNames: #  Add the user's groups as well.
+                    for group_name in user.groupNames:  # Add the user's groups as well.
                         ug_batch.add_group(users_and_groups.get_group(group_name=group_name),
                                            duplicate=UsersAndGroups.IGNORE_ON_DUPLICATE)
 
@@ -362,7 +367,6 @@ class SyncUserAndGroups(BaseApiInterface):
         :type apply_changes: bool
         :param remove_deleted: Flag to removed deleted users.  If true, delete.  Cannot be used with batch_size.
         :type remove_deleted: bool
-        :type batch_size: int
         :returns: The response from the sync.
         """
 
@@ -375,7 +379,7 @@ class SyncUserAndGroups(BaseApiInterface):
 
         logging.debug("calling %s" % url)
         json_str = users_and_groups.to_json()
-        logging.debug("data == %s" % json_str)
+        logging.info("%s" % json_str)
         json.loads(json_str)  # do a load to see if it breaks due to bad JSON.
 
         tmp_file = "/tmp/ug.json.%d" % time.time()
@@ -395,12 +399,12 @@ class SyncUserAndGroups(BaseApiInterface):
 
         if response.status_code == 200:
             logging.info("Successfully synced users and groups.")
-            print(response.text.encode("utf-8"))
+            logging.info(response.text.encode("utf-8"))
             return response
 
         else:
             logging.error("Failed synced users and groups.")
-            print(response.text.encode("utf-8"))
+            logging.info(response.text.encode("utf-8"))
             with open("ts_users_and_groups.json", "w") as outfile:
                 outfile.write(json_str.encode("utf-8"))
             raise requests.ConnectionError(
@@ -417,11 +421,13 @@ class SyncUserAndGroups(BaseApiInterface):
         """
 
         # for each username, get the guid and put in a list.  Log errors for users not found, but don't stop.
+        logging.info("Deleting users %s." % usernames)
         url = self.format_url(SyncUserAndGroups.USER_METADATA_URL)
         response = self.session.get(url, cookies=self.cookies)
         users = {}
         if response.status_code == 200:
             logging.info("Successfully got user metadata.")
+            logging.debug("response:  %s" % response.text)
             json_list = json.loads(response.text)
             for h in json_list:
                 name = h["name"]
@@ -432,17 +438,15 @@ class SyncUserAndGroups(BaseApiInterface):
             for u in usernames:
                 id = users.get(u, None)
                 if not id:
-                    eprint(
-                        "WARNING:  user %s not found, not attempting to delete this user."
-                        % u
-                    )
+                    logging.warning("User %s not found, not attempting to delete this user." % u)
                 else:
                     user_list.append(id)
 
             if not user_list:
-                eprint("No valid users to delete.")
+                logging.warning("No valid users to delete.")
                 return
 
+            logging.info("Deleting user IDs %s." % user_list)
             url = self.format_url(SyncUserAndGroups.DELETE_USERS_URL)
             params = {"ids": json.dumps(user_list)}
             response = self.session.post(
@@ -647,7 +651,7 @@ class SetGroupPrivilegesAPI(BaseApiInterface):
                     )
 
             except Exception:
-                print("Error getting group details.")
+                logging.error("Error getting group details.")
                 raise
 
         else:
