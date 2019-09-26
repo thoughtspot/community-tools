@@ -3,12 +3,15 @@ Terraform repository for TS heterogeneous cluster
 
 ## Getting Started
 These instructions will get you a copy of the project up and running on your local machine for development and testing purposes.
+
 This repo contains terraform config tf code that is designed to provision a TS heterogeneous cluster.
+
 See deployment for notes on how to deploy the project on a live system.
 
 ### Prerequisites
 You would need to have the deployment host setup.
-Please refer README.md under community-tools/ThoughtSpot_Cloud_deployments directory
+Please refer README.md under community-tools/ThoughtSpot_Cloud_deployments directory.
+
 :warning: Do not proceed with below steps if the deployment host is not setup properly.
 
 ### Reach the code
@@ -55,4 +58,4 @@ terraform apply
 ```
 
 ### State file management
-Currently not setup. 
+Currently not setup.
