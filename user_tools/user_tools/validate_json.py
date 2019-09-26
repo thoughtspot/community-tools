@@ -1,11 +1,9 @@
-#!/usr/bin/python
-
+import json
 import argparse
-
-from tsut.apps import TSUserGroupSyncApp, TSUGSyncReader, TSUGOutputWriter
+import sys
 
 """
-Copyright 2019 ThoughtSpot
+Copyright 2018 ThoughtSpot
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
 documentation files (the "Software"), to deal in the Software without restriction, including without limitation the
@@ -21,15 +19,22 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 
-"""
-This script will retrieve users and groups and write the results to an output file.
-"""
-
-
 def run_app():
-    get_users_app = TSUserGroupSyncApp(reader=TSUGSyncReader(), writers=TSUGOutputWriter())
-    get_users_app.run()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--filename", help="file containing data to load.")
+    args = parser.parse_args()
 
+    json_data = ""
+    if args.filename:
+        with open(args.filename, "r") as infile:
+            json_data = infile.read()
+
+    else:
+        for line in sys.stdin:
+            json_data += line
+
+    json.loads(json_data)
+    print("valid JSON")  # only prints if valid.
 
 if __name__ == "__main__":
     run_app()
