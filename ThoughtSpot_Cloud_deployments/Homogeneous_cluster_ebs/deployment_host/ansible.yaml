@@ -1,7 +1,0 @@
----
-- name: Replace ansible configuration
-  hosts: localhost
-  gather_facts: False
-  become: true
-  roles:
-    - { role: ansible }
