@@ -4,9 +4,9 @@ Community tools consists of several python packages to provide APIs and tools fo
 programatically.  
 
 These projects are:
-* [DDL Tools](https://github.com/thoughtspot/user_tools/tree/master/ddl_tools): Tools for working with ThoughtSpot DDL.
-* [User Tools](https://github.com/thoughtspot/user_tools/tree/master/user_tools): Tools for working with ThoughtSpot users.
-* [PyTQL](https://github.com/thoughtspot/user_tools/tree/master/py-tql):  Tools for working with ThoughtSpot Query Language.
+* [DDL Tools](https://github.com/thoughtspot/ddl_tools): Tools for working with ThoughtSpot DDL.
+* [User Tools](https://github.com/thoughtspot/user_tools): Tools for working with ThoughtSpot users.
+* [PyTQL](https://github.com/thoughtspot/py-tql):  Tools for working with ThoughtSpot Query Language.
 
 ### Environment
 
