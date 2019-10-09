@@ -1,3 +1,0 @@
-#! /bin/bash
-# creates a .tar.gz file that can be downloaded and deployed using pip install ./tql.tar.gz
-tar -cvzf tql.tar.gz --exclude "*pyc" --exclude "__pycache__" .
