@@ -1,0 +1,22 @@
+# The following must be in the virtual environment (see tst)
+
+# Change to point to your environment.
+TSTOOLS_DIR='/your-path/tstools'
+
+# Set up aliases for environment and navigation.
+source $TSTOOLS_DIR/venv/bin/activate
+alias cdtst='cd $TSTOOLS_DIR'
+
+# Set up aliases for tools.
+
+## DDL tools
+alias convert_ddl='python -m ddltools.convert_ddl'
+alias ddldiff='python -m ddltools.ddldiff'
+
+## user tools
+alias delete_ugs='python -m user_tools.delete_ugs'
+alias get_user='python -m user_tools.get_user'
+alias sync_from_excel='python -m user_tools.sync_from_excel'
+alias transfer_ownership='python -m user_tools.transfer_ownership'
+alias validate_json='python -m user_tools.validate_json'
+
