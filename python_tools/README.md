@@ -1,7 +1,7 @@
 # Python Tools
 
-Community tools consists of several python packages to provide APIs and tools for working with ThoughtSpot 
-programatically.  
+Community tools consists of several Python packages that provide APIs and tools for working with ThoughtSpot 
+programmatically.  
 
 These projects are:
 * [DDL Tools](https://github.com/thoughtspot/ddl_tools): Tools for working with ThoughtSpot DDL.
@@ -13,16 +13,20 @@ These projects are:
 These tools have all been written in Python 3.x and expect to be run in a 3.6 environment at a minimum.  This section 
 describes how to set up a virtual environment to use for the user tools and how to generally install those tools.  
 
-You can either install directly into an existing Python environment, but it's better to run in an virtual environment 
-to avoid conflicts with dependencies.  Note that this installation process requires external access to install packages 
+You can install directly into an existing Python environment, but it's better to run in an virtual environment 
+to avoid dependency conflicts.  Note that this installation process requires external access to install packages 
 and get the Python modules from GitHub.
 
 #### Creating Virtual Environment
+
 To create a virtual environment, you can run the following from the command prompt:
 
 `$ virtualenv -p python3 ./venv`
 
-Note that the `venv` folder can be whatever name and location you like (preferably external to a code repository).
+Note that the `venv` folder can be whatever name and location you like (preferably external to a code repository). 
+It's recommended that you put this into a sub-folder where you can put a few more helper scripts (see below).  For
+example, you can create a `tstools` folder on your system, create the virtual environment there and then install the
+scripts into that environment.
 
 Next, you need to activate the environment with the command: 
 
@@ -49,3 +53,18 @@ You should see output as the Python tool and dependencies are installed.
 If you want or need to update to a newer version of the Python tool, use the command:
 
 `$ pip install --upgrade git+https://github.com/thoughtspot/tool_name`.  
+
+## Reusable Scripts
+
+There are two reusable scripts to assist with setting up and using the environment.  Once you have created
+the virtual environment, you can install the scripts and use them instead of manually installing the packages.  
+
+* `upgrade_all` is a script that will install and/or upgrade all of the TS Python tools.  Simply update the 
+path in the `TOOLS_DIR` variable and run the script.
+* `tstools` is a script that will activate the virtual environment and then provide simpler aliases to run the 
+command-line tools. 
+
+If you are using bash, you can create an alias in your .bash_profile to quickly activate the Python environment from 
+any location:  `alias tst='source /Users/bill.back/ThoughtSpot/tstools/tstools'`  Then you can simply type `tst`
+and the environment and aliases will be available.  Type `deactivate` to exit the virtual environment.
+
