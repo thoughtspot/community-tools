@@ -36,7 +36,8 @@ Note that you will need to reactivate the environment whenever you want to use i
 
 You should see your prompt change to (venv) plus whatever it was before.  To verify the python version run:
 
-`$ python --version`  You want to be on version 3.6 or higher.
+`$ python --version`  You want to be on version 3.6 or higher.  Note that in some installs you have to use 
+`python3` instead of `python`.
 
 If you want to leave the virtual environment, simple enter `$ deactivate` or close the terminal you are using.
 
