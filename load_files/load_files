@@ -315,6 +315,7 @@ function load_a_file() {
       --null_value "${NULL_VALUE}" \
       --date_format "${DATE_FORMAT}" \
       --date_time_format "${DATE_TIME_FORMAT}" \
+      --time_format "${TIME_FORMAT}" \
       --boolean_representation ${BOOLEAN_REPRESENTATION} \
       --skip_second_fraction \
       -v ${V_LEVEL} \
@@ -363,6 +364,7 @@ function load_a_file() {
       --null_value "${NULL_VALUE}" \
       --date_format "${DATE_FORMAT}" \
       --date_time_format "${DATE_TIME_FORMAT}" \
+      --time_format "${TIME_FORMAT}" \
       --boolean_representation ${BOOLEAN_REPRESENTATION} \
       --skip_second_fraction \
       -v ${V_LEVEL} \
