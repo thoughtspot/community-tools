@@ -1,0 +1,150 @@
+
+---
+- name: "Wait for host to be up"
+  hosts: localhost
+  gather_facts: True
+  check_mode: no
+  tasks:
+  - name: Add public ip addresses to an dynamic inventory
+    add_host:
+      name: "{{ host }}"
+      groups: tshost
+
+  - local_action: wait_for port=22 host="{{ host }}" search_regex=OpenSSH delay=10
+
+# Prepare the instances
+- name: "Setup disks on all the hosts"
+  hosts: tscluster
+  gather_facts: false
+  become: true
+  become_user: admin
+  tasks:
+    - name: Wait for system to become reachable
+      wait_for_connection:
+        timeout: 5
+    - name: "Setup disks"
+      shell: "/usr/local/scaligent/bin/prepare_disks.sh"
+      become: yes
+      become_user: root
+
+#Copy the installation config from terraform to the instance
+- name: "Getting release and installation configuration input files"
+  hosts: tsinstall
+  gather_facts: false
+  become: true
+  become_user: admin
+  tasks:
+    - name: "Create the installation staging directory"
+      file:
+        path: /export/release_stage
+        state: directory
+        owner: admin
+        group: admin
+    - name: "Copy 5.3 release tarball"
+      copy:
+        src: "{{ release_loc }}/{{ release }}.tar.gz"
+        dest: /export/release_stage
+        owner: admin
+        group: admin
+        mode: preserve
+    - name: "Copy release md5"
+      copy:
+        src: "{{ release_loc }}/{{ release }}.tar.gz.MD5checksum"
+        dest: /export/release_stage
+        owner: admin
+        group: admin
+        mode: preserve
+    - name: "Copy instalation input file"
+      copy:
+        src: config/install.ini
+        dest: /export/release_stage
+        owner: admin
+        group: admin
+        mode: preserve
+    - name: "Copy service labelling config file"
+      copy:
+        src: config/service_label.config
+        dest: /export/release_stage
+        owner: admin
+        group: admin
+        mode: preserve
+    - name: "Copy service scheduling policy config file"
+      copy:
+        src: config/override_{{ scheduling_policy }}.config
+        dest: /export/release_stage
+        owner: admin
+        group: admin
+        mode: preserve
+
+#Install cluster 5.3 with S3 enabled
+- name: "Install the Rootfs and reboot the host "
+  hosts: tsinstall
+  gather_facts: false
+  become: true
+  become_user: root
+  tasks:
+    - name: "Installing the rootfs for new release"
+      shell: tscli --testdev node install-rootfs --release {{ release }}.tar.gz
+      become: yes
+      become_user: admin
+      register: tscli_result
+      failed_when: '"Shutdown scheduled" not in tscli_result.stderr'
+      args:
+        chdir: /export/release_stage/
+    - name: "Pause for a few minutes to allow reboot"
+      pause:
+        minutes: 2
+# install TS
+- name: "Install cluster with 5.3"
+  hosts: tsinstall
+  gather_facts: false
+  become: true
+  become_user: root
+  tasks:
+    - name: Wait for the reboot and check status
+      wait_for:
+        port: 22
+        host: "{{ host }}"
+        search_regex: OpenSSH
+        delay: 10
+        timeout: 600
+      connection: local
+    - name: "Installing the cluster with release {{ release }}"
+      shell: tscli cluster --adv create {{ release }}.tar.gz < install.ini
+      become: yes
+      become_user: admin
+      register: tscli_create
+      args:
+        chdir: /export/release_stage/
+    - name: "tscli cluster create - output"
+      debug:
+        msg: "{{ tscli_create.stdout.split('\n') }}"
+    - name: "Pause for a few minutes to allow cluster startup"
+      pause:
+        minutes: 1
+    - name: "Apply labels for the heterogeneous nodes in the cluster,"
+      shell: echo "y" | tscli --testdev node apply-labels --file service_label.config
+      become: yes
+      become_user: admin
+      args:
+        chdir: /export/release_stage/
+    - name: "Apply service config overrides for each service"
+      shell: cat override_{{ scheduling_policy }}.config | tscli --adv service set-service-override {{ item }}
+      with_items:
+        - falcon
+        - sage
+        - tomcat
+      become: yes
+      become_user: admin
+      args:
+        chdir: /export/release_stage/
+    - name: "Pushing the service config of each service"
+      shell: tscli --adv service push {{ item }} production/orion/{{ item }}/prod.config
+      with_items:
+        - falcon
+        - sage
+        - tomcat
+      become: yes
+      become_user: admin
+      args:
+        chdir: /usr/local/scaligent/release/

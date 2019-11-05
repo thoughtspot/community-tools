@@ -1,98 +1,167 @@
 <!DOCTYPE html>
-<html style="padding:20px">
-<head>
-    <meta charset="utf-8">
+<html class="no-js" lang="en" style="height: 100%; width: 100%">
+  <head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="main.css">
     <title>Python - Optional Input</title>
     <script type="text/javascript">
         document.write('<link rel="import" href="' + window.Alteryx.LibDir + '2/lib/includes.html">')
     </script>
-</head>
+  </head>
+  <body onload="main()">
+    <header class="ts_Header">Move Data to ThoughtSpot Instance</header>
+    <! -- Menu Items at top of page starts -->
+    <div class="tab">
+        <button id="btn_connection" class="tablinks" onclick="openTabContent('Connection');">Connection</button>
+        <button id="btn_table" class="tablinks" onclick="openTabContent('Table');">Target Table</button>
+    </div>
 
-<body>
-  <form>
-     <!-- Beginning of ThoughtSpot Required Fields -->
-    <fieldset>
-      <legend class='blueTitle'>XMSG("Move Data to ThoughtSpot Instance")</legend>
-      <div class='leftCon'>
-        <label>XMSG("ThoughtSpot Instance")</label>
-        <ayx data-ui-props="{type: 'TextBox'}" data-item-props="{dataName: 'DestinationServer'}"></ayx>
-      </div>
-      <div class='leftCon'>
-        <label><span id="createDatabaseBox">XMSG("Create Database")</span></label>
-          <ayx data-ui-props="{type: 'CheckBox', widgetId:'createDatabaseBox'}" data-item-props="{dataName: 'CreateDatabase'}"></ayx>
-      </div>
-      <div class='leftCon'>
-        <label>XMSG("ThoughtSpot Database")</label>
-        <ayx data-ui-props="{type: 'TextBox'}" data-item-props="{dataName: 'TargetDatabase'}"></ayx>
-      </div>
-      <div class='leftCon'>
-        <label>XMSG("ThoughtSpot Schema")</label>
-        <ayx data-ui-props="{type: 'TextBox'}" data-item-props="{dataName: 'TargetSchema'}"></ayx>
-      </div>
-      <div class='leftCon'>
-        <label><span id="Name">XMSG("User ID")</span></label>
-          <ayx data-ui-props="{type: 'TextBox'}" data-item-props="{dataName: 'UserName'}"></ayx>
-      </div>
-      <div class='leftCon'>
-        <label><span id="Password">XMSG("Password")</span></label>
-          <ayx data-ui-props="{type: 'TextBox'}" data-item-props="{dataName: 'Password', password: true,encryptionMode: 'user'}"></ayx>
-      </div>
-    </fieldset>
-      <!-- TSLoad Fields -->
-    <fieldset>
-      <legend class='blueTitle'>XMSG("Table Definition")</legend>
-      <div class='leftCon'>
-        <label>XMSG("Table Name")</label>
-          <ayx data-ui-props="{type: 'TextBox'}", data-item-props="{dataName: 'TableName'}">
-          </ayx>
-      </div>
-      <div class='leftCon'>
-        <label>XMSG("Boolean Representation")</label>
-          <ayx data-ui-props="{type: 'TextBox'}", data-item-props="{dataName: 'BooleanString'}">
-          </ayx>
-      </div>
-      <div class='leftCon'>
-        <label>XMSG("Maximum Ignored Rows")</label>
-          <ayx data-ui-props="{type: 'TextBox'}", data-item-props="{dataName: 'MaxIgnoredRows', dataType: 'SimpleInt'}">
-          </ayx>
-      </div>
-      <!--<div class='leftCon'>-->
-        <!--<label>XMSG("Verbosity Level")</label>-->
-          <!--<labe>(Min: 0, Max 3)</labe>-->
-          <!--<ayx data-ui-props="{type: 'NumericSpinner', widgetId:'verbosityLevel'}", data-item-props="{dataName: 'Verbosity', dataType: 'ConstrainedInt', min: 0, max: 3}">-->
-          <!--</ayx>-->
-      <!--</div>-->
-      <div class='leftCon'>
-        <label><span id="Truncate">XMSG("Truncate Data")</span></label>
-          <ayx data-ui-props="{type: 'CheckBox', widgetId:'truncateTableBox'}" data-item-props="{dataName: 'Truncate'}"></ayx>
-      </div>
-      <div class='leftCon', id="createTableBox">
-        <label><span id="CreateTable">XMSG("Create Table")</span></label>
-          <ayx data-ui-props="{type: 'CheckBox', widgetId:'createTableBox'}" data-item-props="{dataName: 'CreateTable'}"></ayx>
-      </div>
-      <div class='leftCon'>
-        <label>XMSG("Optional Primary Key")</label>
-          <ayx data-ui-props="{type: 'DropDown', clearable: true}", data-item-props="{dataName: 'PrimaryKey',dataType: 'FieldSelector',anchorIndex: '0',connectionIndex:'0'}">
-          </ayx>
-      </div>
-    </fieldset>
-  </form>
+    <!-- Tab Content Starts -->
+    <!-- ThoughtSpot Connection Variables -->
+    <div id="ts_connection_div" class="tabcontent">
+      <h3>Connection Information</h3>
+      <form>
+        <fieldset>
+          <div class='leftCon'>
+            <label>XMSG("ThoughtSpot Instance")</label>
+            <ayx data-ui-props="{type: 'TextBox'}"
+                 data-item-props="{dataName: 'DestinationServer'}"></ayx>
+          </div>
+          <div class='leftCon'>
+            <label>XMSG("ThoughtSpot SSH Port")</label>
+            <ayx data-ui-props="{type: 'TextBox'}"
+                 data-item-props="{dataName: 'DestinationPort', dataType: 'SimpleInt'}"></ayx>
+          </div>
+          <div class='leftCon'>
+            <label>XMSG("Buffer Size")</label>
+            <ayx data-ui-props="{type: 'TextBox'}"
+                 data-item-props="{dataName: 'BufferSize', dataType: 'SimpleInt'}"></ayx>
+          </div>
+          <div class='leftCon'>
+            <label><span id="createDatabaseBox">XMSG("Create Database")</span></label>
+              <ayx data-ui-props="{type: 'CheckBox', widgetId:'createDatabaseBox'}"
+                   data-item-props="{dataName: 'CreateDatabase'}"></ayx>
+          </div>
+          <div class='leftCon'>
+            <label>XMSG("ThoughtSpot Database")</label>
+            <ayx data-ui-props="{type: 'TextBox'}"
+                 data-item-props="{dataName: 'TargetDatabase'}"></ayx>
+          </div>
+          <div class='leftCon'>
+            <label>XMSG("ThoughtSpot Schema")</label>
+            <ayx data-ui-props="{type: 'TextBox'}"
+                 data-item-props="{dataName: 'TargetSchema'}"></ayx>
+          </div>
+          <div class='leftCon'>
+            <label><span id="Name">XMSG("User ID")</span></label>
+              <ayx data-ui-props="{type: 'TextBox'}"
+                   data-item-props="{dataName: 'UserName'}"></ayx>
+          </div>
+          <fieldset>
+            <!-- Can be used for unencrypted password
+            <div class='leftCon'>
+              <label><span id="Password">XMSG("Password")</span></label>
+                <ayx data-ui-props="{type: 'TextBox'}" data-item-props="{dataName: 'Password'}"></ayx>
+            </div>
+            -->
+            <div class='leftCon'>
+              <label><span id="Password">XMSG("Password")</span></label>
+                <ayx data-ui-props="{type: 'TextBox'}"
+                     data-item-props="{dataName: 'Password', password: true,encryptionMode: 'user'}"></ayx>
+            </div>
+            <div class="leftCon">
+              <label><span id="rsaFile">XMSG("or RSA Key File")</span></label>
+              <ayx aria-label="data-source-metainfo-filebrowse"
+                   data-ui-props="{type:'FileBrowse', widgetId:'rsaFilePath', fileTypeFilters: 'Key Files|*.key|All Files|*.*', placeholder:'Select .key file...'}"
+                   data-item-props="{dataName: 'rsaFilePath', dataType:'SimpleString'}">
+              </ayx>
+            </div>
+          </fieldset>
+        </fieldset>
+      </form>
+    </div>
+    <!-- ThoughtSpot Table Variables -->
+    <div id="ts_table_div" class="tabcontent">
+      <h3>Table Definition</h3>
+      <form>
+        <fieldset>
+          <div class='leftCon'>
+            <label>XMSG("Table Name")</label>
+              <ayx data-ui-props="{type: 'TextBox'}"
+                   data-item-props="{dataName: 'TableName'}">
+              </ayx>
+          </div>
+          <div class='leftCon'>
+            <label>XMSG("Boolean Representation")</label>
+              <ayx data-ui-props="{type: 'TextBox'}"
+                   data-item-props="{dataName: 'BooleanString'}">
+              </ayx>
+          </div>
+          <div class='leftCon'>
+            <label>XMSG("Maximum Ignored Rows")</label>
+              <ayx data-ui-props="{type: 'TextBox'}"
+                   data-item-props="{dataName: 'MaxIgnoredRows', dataType: 'SimpleInt'}">
+              </ayx>
+          </div>
+          <div class='leftCon'>
+            <label><span id="Truncate">XMSG("Truncate Data")</span></label>
+              <ayx data-ui-props="{type: 'CheckBox', widgetId:'truncateTableBox'}"
+                   data-item-props="{dataName: 'Truncate'}"></ayx>
+          </div>
+          <div class='leftCon' id="createTableBox">
+            <label><span id="CreateTable">XMSG("Create Table")</span></label>
+              <ayx data-ui-props="{type: 'CheckBox', widgetId:'createTableBox'}"
+                   data-item-props="{dataName: 'CreateTable'}"></ayx>
+          </div>
+          <div class='leftCon'>
+            <label>XMSG("Optional Primary Key(s)")</label>
+              <ayx data-ui-props="{type: 'ListBox', clearable: true}"
+                   data-item-props="{dataName: 'PrimaryKey',dataType: 'FieldSelectorMulti',anchorIndex: '0',connectionIndex:'0'}">
+              </ayx>
+          </div>
+        </fieldset>
+      </form>
+    </div>
+  </body>
+  <div class="clear"></div>
+  <!-- Tab Content Ends -->
 
-  <style>
-    .Select, .Select div, .Select input, .Select span, .blueTitle {
-      box-sizing: content-box;
-      -webkit-box-sizing: content-box;
-      background-color: #e5e5e5;
-    }
-  </style>
-
-  <script type="text/javascript">
-    window.Alteryx.Gui.BeforeLoad = function (manager,AlteryxDataItems,json) {
-        manager.getDataItem('TargetSchema').setValue('falcon_default_schema')
-        manager.getDataItem('MaxIgnoredRows').setValue(0)
-        manager.getDataItem('BooleanString').setValue('T_F')
-        //manager.getDataItem('Verbosity').setValue(0)
+  <!-- Application Scripts -->
+   <script type="text/javascript">
+    window.Alteryx.Gui.BeforeLoad = function (manager, AlteryxDataItems, json) {
+      manager.getDataItem('DestinationServer').setValue(localStorage.getItem('DestinationServer'));
+      if (localStorage.getItem('TargetSchema') == null) {
+        localStorage.setItem('TargetSchema', 'falcon_default_schema');
+      }
+      if (localStorage.getItem('DestinationPort') == null) {
+        localStorage.setItem('DestinationPort', '22');
+      }
+       if (localStorage.getItem('BufferSize') == null) {
+        localStorage.setItem('BufferSize', '1000');
+      }
+      manager.getDataItem('TargetSchema').setValue(localStorage.getItem('TargetSchema'));
+      manager.getDataItem('TargetDatabase').setValue(localStorage.getItem('TargetDatabase'));
+      manager.getDataItem('UserName').setValue(localStorage.getItem('UserName'));
+      manager.getDataItem('Password').setValue(localStorage.getItem('Password'));
+      manager.getDataItem('DestinationPort').setValue(localStorage.getItem('DestinationPort'));
+      manager.getDataItem('BufferSize').setValue(localStorage.getItem('BufferSize'));
+      manager.getDataItem('rsaFilePath').setValue(localStorage.getItem('rsaFilePath'));
+      manager.getDataItem('MaxIgnoredRows').setValue(0);
+      manager.getDataItem('BooleanString').setValue('T_F');
+      //manager.getDataItem('Verbosity').setValue(0)
     }
   </script>
-</body>
+  <script type="text/javascript">
+    window.Alteryx.Gui.AfterLoad = function (manager, AlteryxDataItems) {
+      localStorage.setItem('DestinationServer', manager.getDataItem('DestinationServer').getValue());
+      localStorage.setItem('TargetSchema', manager.getDataItem('TargetSchema').getValue());
+      localStorage.setItem('TargetDatabase', manager.getDataItem('TargetDatabase').getValue());
+      localStorage.setItem('UserName', manager.getDataItem('UserName').getValue());
+      localStorage.setItem('Password', manager.getDataItem('Password').getValue());
+      localStorage.setItem('rsaFilePath', manager.getDataItem('rsaFilePath').getValue())
+    }
+  </script>
+  <script src="main.js"></script>
 </html>

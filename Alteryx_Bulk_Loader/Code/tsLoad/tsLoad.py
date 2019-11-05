@@ -1,13 +1,7 @@
 import AlteryxPythonSDK as Sdk
-import xml.etree.ElementTree as Et
-import csv
-import io
-import select
-import gzip
-import socket
-from classes.Table import Table
-from classes.TQLFile import TQLFile
-from classes.sshClient import sshClient
+from ts_controller import ThoughtSpotController
+from alteryx_xmsg import XMSG
+
 
 class AyxPlugin:
     """
@@ -29,24 +23,9 @@ class AyxPlugin:
         self.output_anchor_mgr = output_anchor_mgr
 
         # Custom properties
-        self.destinationServer = None
-        self.targetDatabase = None
-        self.targetSchema = None
-        self.userName = None
-        self.password = None
-        self.tableName = None
-        self.truncate = False
-        self.primaryKey = None
-        self.createTable = False
-        self.createDatabase = False
-        self.verbosity = 0
-        self.maxIgnoredRows = 5
-        self.booleanString = None
+        self.ts_controller = None
+        self.xmsg = XMSG(self.alteryx_engine, self.n_tool_id)
         self.is_valid = True
-        self.tables = []
-        self.batchSize = 100
-
-        self.is_initialized = True
         self.single_input = None
         self.output_anchor = None
         self.output_field = None
@@ -61,27 +40,11 @@ class AyxPlugin:
         Called when the Alteryx engine is ready to provide the tool configuration from the GUI.
         :param str_xml: The raw XML from the GUI.
         """
+        #  Instantiate the log file and parameters for the ThoughtSpot connection
+        self.ts_controller = ThoughtSpotController(self.alteryx_engine, str_xml)
+        if self.ts_controller.status == 'bad':
+            self.xmsg.error(self.ts_controller.status_response)
 
-        # Getting the dataName data property from the Gui.html
-        self.destinationServer = Et.fromstring(str_xml).find('DestinationServer').text if 'DestinationServer' in str_xml else self.xmsg("Error", "Please Enter a Destination Server")
-        self.targetDatabase = Et.fromstring(str_xml).find('TargetDatabase').text if 'TargetDatabase' in str_xml else self.xmsg("Error", "Please Enter a Target Database")
-        self.targetSchema = Et.fromstring(str_xml).find('TargetSchema').text if 'TargetSchema' in str_xml else 'falcon_default_schema'
-        self.userName = Et.fromstring(str_xml).find('UserName').text if 'UserName' in str_xml else self.xmsg("Error", "Please Enter a User Name")
-        password = Et.fromstring(str_xml).find('Password').text if 'Password' in str_xml else None
-        if password is None:
-            self.xmsg('Error', "A Password Must be Entered")
-        else:
-            self.password = self.alteryx_engine.decrypt_password(Et.fromstring(str_xml).find('Password').text, 0)
-        self.tableName = Et.fromstring(str_xml).find('TableName').text if 'TableName' in str_xml else self.xmsg("Error", "Please Enter a Table Name")
-        self.verbosity = Et.fromstring(str_xml).find('Verbosity').text if 'Verbosity' in str_xml else 0
-        self.maxIgnoredRows = Et.fromstring(str_xml).find('MaxIgnoredRows').text if 'MaxIgnoredRows' in str_xml else 0
-        self.truncate = Et.fromstring(str_xml).find('Truncate').text if 'Truncate' in str_xml else False
-        self.createDatabase = Et.fromstring(str_xml).find('CreateDatabase').text if 'CreateDatabase' in str_xml else False
-        self.booleanString = Et.fromstring(str_xml).find('BooleanString').text if 'BooleanString' in str_xml else 'T_F'
-        self.createTable = Et.fromstring(str_xml).find('CreateTable').text if 'CreateTable' in str_xml else False
-        self.primaryKey = Et.fromstring(str_xml).find('PrimaryKey').text if 'PrimaryKey' in str_xml else None
-        #if self.createTable == True and self.primaryKey is None:
-        #    self.xmsg('Error', 'A Create Table must have a selected Primary Key')
         # Getting the output anchor from Config.xml by the output connection name
         self.output_anchor = self.output_anchor_mgr.get_output_anchor('Output')
 
@@ -111,7 +74,7 @@ class AyxPlugin:
         :param n_record_limit: Set it to <0 for no limit, 0 for no records, and >0 to specify the number of records.
         :return: False if there's an error with the field name, otherwise True.
         """
-        self.xmsg('Error','Missing Incoming Connection')
+        self.xmsg.error('Missing Incoming Connection')
         return False
 
     def pi_close(self, b_has_errors: bool):
@@ -121,17 +84,6 @@ class AyxPlugin:
         """
         self.output_anchor.assert_close()
 
-    def xmsg(self, msg_type: str, msg_string: str):
-        """
-        A non-interface, non-operational placeholder for the eventual localization of predefined user-facing strings.
-        :param msg_string: The user-facing string.
-        :return: msg_string
-        """
-        if msg_type == "Info":
-            self.alteryx_engine.output_message(self.n_tool_id, Sdk.EngineMessageType.info,msg_string)
-        elif msg_type == "Error":
-            self.alteryx_engine.output_message(self.n_tool_id, Sdk.EngineMessageType.error,msg_string)
-        return True
 
 class IncomingInterface:
     """
@@ -139,131 +91,55 @@ class IncomingInterface:
     utilized by the Alteryx engine to communicate with a plugin when processing an incoming connection.
     Prefixed with "ii", the Alteryx engine will expect the below four interface methods to be defined.
     """
+
     def __init__(self, parent: object):
         """
         Constructor for IncomingInterface.
         :param parent: AyxPlugin
         """
-        # Default properties
+        # Properties
         self.parent = parent
-
-        # Custom properties
+        self.ts_controller = self.parent.ts_controller
+        self.parameters = self.parent.ts_controller.parameters
+        self.logger = self.parent.ts_controller.logger
+        self.xmsg = self.parent.xmsg
         self.record_info_in = None
         self.field_lists = []
         self.counter = 0
-        self.table = None
-        self.sshConnection = None
+        self.completed_status = True
         self.DataField: Sdk.Field = None
-        self.channel = None
-        self.stdin = None
-        self.stdout = None
-        self.stderr = None
-        self.inData = io.StringIO()
-        self.writer = None
         self.record_creator = None
-        self.tsmessage = None
         self.record_info_out = None
 
-    def write_lists_to_TS(self):
+    def write_list_to_ts(self):
         """
         A non-interface, helper function that handles writing a compressed CSV in Memory and clears the list elements.
         """
-        try:
-            inData = io.StringIO()
-            writer = csv.writer(inData, delimiter=',')
-            writer.writerows(zip(*self.field_lists))
-            #self.parent.xmsg("Info", "Completed Streaming Rows")
-            compressed=gzip.compress(inData.getvalue().encode())
-            if self.channel.send_ready():
-                #self.parent.xmsg("Info", "Start Writing Rows")
-                self.channel.sendall(compressed)
-                #self.parent.xmsg("Info", "Completed Writing Rows")
+        if self.ts_controller.send_rows_to_server(self.field_lists):
             for sublist in self.field_lists:
                 del sublist[:]
-            return True
-        except socket.error as e:
-            for sublist in self.field_lists:
-                del sublist[:]
-            self.parent.xmsg("Error", "Error Writing Data to ThoughtSpot.  Check Browse Tool for ThoughtSpot TSLoad Errors")
+        else:
+            self.xmsg.error("Error Writing Data to ThoughtSpot.  Check Browse Tool or ThoughtSpot log at "
+                            "AppData/Roaming/ThoughtSpot/Logs fo ThoughtSpot Errors")
             return False
-
-    def writeChunks(self,intimeout=30):
-        """
-        A non-interface, helper function that reads the SSH buffers and stores the chunks for reporting.
-        """
-        timeout = intimeout
-        stdout_chunks = []
-        stdout_chunks.append(self.stdout.channel.recv(len(self.stdout.channel.in_buffer)).decode('utf-8'))
-        while not self.channel.closed or self.channel.recv_ready() or self.channel.recv_stderr_ready():
-            got_chunk = False
-            readq, _, _ = select.select([self.stdout.channel], [], [], timeout)
-            for c in readq:
-                if c.recv_ready():
-                    stdout_chunks.append(self.stdout.channel.recv(len(c.in_buffer)).decode('utf-8'))
-                    got_chunk = True
-                if c.recv_stderr_ready():
-                    stdout_chunks.append(self.stderr.channel.recv_stderr(len(c.in_stderr_buffer)).decode('utf-8'))
-                    got_chunk = True
-            if not got_chunk \
-                    and self.stdout.channel.exit_status_ready() \
-                    and not self.stderr.channel.recv_stderr_ready() \
-                    and not self.stdout.channel.recv_ready():
-                self.stdout.channel.shutdown_read()
-                self.stdout.channel.close()
-                break
-        self.stdout.close()
-        self.stderr.close()
-        for tsmessage in stdout_chunks:
-            for tsrow in tsmessage.splitlines():
-                self.record_info_out[0].set_from_string(self.record_creator, str(tsrow).strip())
-                out_record = self.record_creator.finalize_record()
-                self.parent.output_anchor.push_record(out_record, False)
-                self.record_creator.reset()
         return True
 
-    def createTable(self):
-        """
-        A non-interface, helper function that uses TQL to drop and create a table.
-        """
-        self.table = Table(self.record_info_in, self.parent.tableName, self.parent.alteryx_engine,
-                           self.parent.n_tool_id,self.parent.primaryKey)
-        tqlFile = TQLFile(self.parent.targetDatabase, self.parent.createTable, self.parent.targetSchema,
-                          self.parent.alteryx_engine, self.parent.n_tool_id)
-        tqlFile.add_table_def(self.table)
-        cmd = "tql"
-        try:
-            self.stdin, self.stdout, self.stderr = self.sshConnection.ssh.exec_command(cmd)
-            self.parent.xmsg('Info', 'Executing Create Table')
-            self.channel = self.stdout.channel
-            self.channel.send(str(tqlFile.outString))
-            self.stdin.close()
-            self.channel.shutdown_write()
-            self.writeChunks()
-            return True
-        except socket.error as e:
-            self.parent.xmsg('Error', 'An Error Occured during Table Creation')
-            self.parent.xmsg('Error', 'Error: %s' % str(e))
-            return False
+    def write_server_messages(self):
+        for tsmessage in self.ts_controller.server_messages:
+            if tsmessage.find('Failed') != -1:
+                self.completed_status = False
+            self.record_info_out[0].set_from_string(self.record_creator, tsmessage)
+            out_record = self.record_creator.finalize_record()
+            self.parent.output_anchor.push_record(out_record, False)
+            self.record_creator.reset()
 
-    def createDatabase(self):
-        """
-        A non-interface, helper function that uses TQL to drop and create a table.
-        """
-        tqlString = "create database " + self.parent.targetDatabase + ";"
-        cmd = "tql"
-        try:
-            self.stdin, self.stdout, self.stderr = self.sshConnection.ssh.exec_command(cmd)
-            self.parent.xmsg('Info', 'Executing Create Database')
-            self.channel = self.stdout.channel
-            self.channel.send(str(tqlString))
-            self.stdin.close()
-            self.channel.shutdown_write()
-            self.writeChunks()
-            return True
-        except socket.error as e:
-            self.parent.xmsg('Error', 'An Error Occured during Database Creation')
-            self.parent.xmsg('Error', 'Error: %s' % str(e))
-            return False
+        for tsmessage in self.ts_controller.server_errors:
+            if tsmessage.find('Failed') != -1:
+                self.completed_status = False
+            self.record_info_out[0].set_from_string(self.record_creator, tsmessage)
+            out_record = self.record_creator.finalize_record()
+            self.parent.output_anchor.push_record(out_record, False)
+            self.record_creator.reset()
 
     def ii_init(self, record_info_in: object) -> bool:
         """
@@ -272,51 +148,57 @@ class IncomingInterface:
         :param record_info_in: A RecordInfo object for the incoming connection's fields.
         :return: False if there's an error with the field name, otherwise True.
         """
-
         if self.parent.alteryx_engine.get_init_var(self.parent.n_tool_id, 'UpdateOnly') == 'False':
             self.record_info_in = record_info_in  # For later reference.
             self.record_info_out = Sdk.RecordInfo(self.parent.alteryx_engine)
-            self.record_info_out.add_field(self.parent.tsmessage,self.parent.tsmessage_type,self.parent.tsmessage_size)
+            self.record_info_out.add_field(self.parent.tsmessage,
+                                           self.parent.tsmessage_type,
+                                           self.parent.tsmessage_size)
             self.parent.output_anchor.init(self.record_info_out)
             self.record_creator = self.record_info_out.construct_record_creator()
 
             for field in range(record_info_in.num_fields):
                 self.field_lists.append([record_info_in[field].name])
 
-            self.sshConnection = sshClient(self.parent.destinationServer, self.parent.userName, self.parent.password, 22, True, True)
-            if self.sshConnection.status == 'Bad':
-                self.parent.xmsg('Error', 'A Connection could not be Established')
-                self.parent.xmsg('Error', self.sshConnection.response)
-                return False
+            #  Create the ThoughtSpot Controller object
+            self.xmsg.info('Connecting to:  %s' % self.parameters.thoughtspot_host_name)
+            if self.ts_controller.initiate_thoughtspot():
+                self.xmsg.info('Connection Established with ThoughtSpot Server')
             else:
-                self.parent.xmsg('Info', 'Connection Established with Server')
+                self.xmsg.error(self.ts_controller.status_response)
+                return False
 
-            if self.parent.createDatabase == 'True':
-                if self.createDatabase() == 'False':
+            #  Create Database if needed
+            if self.parameters.ts_create_database == 'True':
+                self.xmsg.info('Creating ThoughtSpot Database %s' % self.parameters.thoughtspot_database_name)
+                if self.ts_controller.create_database():
+                    self.xmsg.info('Created ThoughtSpot Database')
+                else:
+                    self.xmsg.error(self.ts_controller.status_response)
+                    self.write_server_messages()
+                    self.ts_controller.close()
                     return False
 
-            if self.parent.createTable == 'True':
-                if self.createTable() == 'False':
+            #  Create Table if needed
+            if self.parameters.ts_create_table == 'True':
+                self.xmsg.info('Dropping and Creating table %s' % self.parameters.thoughtspot_table_name)
+                if self.ts_controller.create_table(self.record_info_in):
+                    self.xmsg.info('Completed Dropping and Creating Table')
+                else:
+                    self.xmsg.error(self.ts_controller.status_response)
+                    self.write_server_messages()
+                    self.ts_controller.close()
                     return False
 
-            if self.parent.truncate == 'True':
-                empty_target = '--empty_target'
+            self.xmsg.info('Initiating Load Command on ThoughtSpot')
+            if self.ts_controller.initiate_load_on_thoughtspot():
+                self.xmsg.info('Completed Initiating Load Command on ThoughtSpot')
             else:
-                empty_target = ''
-
-            #cmd = 'tsload --target_database ' + self.parent.targetDatabase + ' --target_table ' + self.parent.tableName + ' --field_separator \',\' --has_header_row --date_format \'%Y-%m-%d\' --empty_target --max_ignored_rows 5'
-            cmd = 'gzip -dc | tsload --target_database ' + self.parent.targetDatabase + ' --target_table ' + self.parent.tableName + ' --field_separator \',\' --null_value \'\' --date_time_format \'%Y-%m-%d %H:%M:%S\' --has_header_row --skip_second_fraction --date_format \'%Y-%m-%d\' ' + empty_target + ' --boolean_representation \'' + self.parent.booleanString + '\' --max_ignored_rows ' + self.parent.maxIgnoredRows + ' --v ' + str(self.parent.verbosity)
-            self.parent.xmsg('Info', cmd)
-            try:
-                self.stdin, self.stdout, self.stderr = self.sshConnection.ssh.exec_command(cmd)
-                self.parent.xmsg('Info', 'Executing Load Command')
-                self.channel = self.stdout.channel
-                self.channel.settimeout(None)
-                return True
-            except socket.error as e:
-                responsetxt = ('Could not Execute Load Command:  connection error %s' % str(e))
-                self.parent.xmsg('Error', responsetxt)
+                self.xmsg.error(self.ts_controller.status_response)
+                self.write_server_messages()
+                self.ts_controller.close()
                 return False
+        self.xmsg.info('Streaming Records')
         return True
 
     def ii_push_record(self, in_record: object) -> bool:
@@ -326,7 +208,7 @@ class IncomingInterface:
         :param in_record: The data for the incoming record.
         :return: False if there's a downstream error, or if there's an error with the field name, otherwise True.
         """
-        self.counter +=1
+        self.counter += 1
 
         if not self.parent.is_valid:
             return False
@@ -334,11 +216,10 @@ class IncomingInterface:
         for field in range(self.record_info_in.num_fields):
             in_value = self.record_info_in[field].get_as_string(in_record)
             self.field_lists[field].append(in_value) if in_value is not None else self.field_lists[field].append('')
-            #self.parent.xmsg('Info', str(self.field_lists))
 
-        if self.counter == self.parent.batchSize:
-            if self.write_lists_to_TS():
-                    self.counter = 0
+        if self.counter == self.parameters.buffer_size:
+            if self.write_list_to_ts():
+                self.counter = 0
             else:
                 return False
         return True
@@ -350,8 +231,10 @@ class IncomingInterface:
         """
 
         # Inform the Alteryx engine of the tool's progress.
-        self.parent.alteryx_engine.output_tool_progress(self.parent.n_tool_id, d_percent)  # Inform the Alteryx engine of the tool's progress
-        self.parent.output_anchor.update_progress(d_percent)  # Inform the downstream tool of this tool's progress.
+        self.parent.alteryx_engine.output_tool_progress(self.parent.n_tool_id, d_percent)
+
+        # Inform the downstream tool of this tool's progress.
+        self.parent.output_anchor.update_progress(d_percent)
 
     def ii_close(self):
         """
@@ -361,11 +244,15 @@ class IncomingInterface:
             if self.parent.is_valid:
                 # First element for each list will always be the field names.
                 if len(self.field_lists[0]) > 1:
-                    self.write_lists_to_TS()
-            self.stdin.close()
-            self.channel.shutdown_write()
-            self.parent.xmsg('Info', 'Completed Streaming Rows')
-            self.writeChunks(600)
-            self.sshConnection.close()
-            self.parent.xmsg('Info', 'Connection with Destination Closed')
-            self.parent.output_anchor.close() # Close outgoing connections.
+                    self.write_list_to_ts()
+            self.ts_controller.stop_load_on_thoughtspot()
+            self.xmsg.info('Completed Streaming Rows')
+            self.ts_controller.close_connection()
+            #  Write Messages from ThoughtSpot to Downstream tool
+            self.write_server_messages()
+            if self.completed_status:
+                self.xmsg.info('Connection with Destination Closed without errors')
+            else:
+                self.xmsg.error('Connection with Destination Closed with Errors.  Please check output and log')
+            # Close outgoing connection
+            self.parent.output_anchor.close()

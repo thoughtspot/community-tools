@@ -1,0 +1,9 @@
+# Change to point to your environment.
+TOOLS_DIR="/your-path/tstools"
+pushd $TOOLS_DIR
+source ./venv/bin/activate
+pip install --upgrade git+https://github.com/thoughtspot/ddl_tools
+pip install --upgrade git+https://github.com/thoughtspot/user_tools
+pip install --upgrade git+https://github.com/thoughtspot/py-tql
+deactivate
+popd
