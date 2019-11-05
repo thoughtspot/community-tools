@@ -151,6 +151,33 @@ truncated_tables=()
 # This variable contains tables for which an sql statement has been run before loading
 run_sql_tables=()
 
+#--[function wait_to_complete ()]-----------------------------------------------------------------------------
+#
+# Waits until the process with pid has completed with a maximum of SCRIPT_MAX_ATTEMPT
+#-------------------------------------------------------------------------------------------------------------
+function wait_to_complete() {
+  pid=$1
+
+  log_this "Waiting for process ${pid} to complete" "INFO"
+
+  START=1
+  END=${SCRIPT_MAX_CHECK_ATTEMPTS}
+
+  i=$START
+  while [[ $i -le $END ]]
+  do
+      output=$(ps -p "${pid}")
+      if [ "$?" -eq 0 ]; then
+        log_this "Process ${pid} not completed yet. Check ${i}" "DEBUG"
+        sleep "${SCRIPT_CHECK_WAIT_TIME}"
+      else
+        log_this "Process ${pid} completed after ${i} checks" "INFO"
+        break
+      fi
+      ((i = i + 1))
+  done
+}
+
 #--[function run_sql ()]--------------------------------------------------------------------------------------
 #
 # Runs a sql query against the ThoughtSpot database
@@ -161,7 +188,11 @@ function run_sql() {
   log_this "Running query: ${sql}" "INFO"
   tmp_file="/tmp/$$.tmp_query.out"
 
-  echo ${sql} | tql 2>${tmp_file}
+  echo ${sql} | tql 2>${tmp_file} & export TQL_PID=$!  
+  log_this "SQL pid is ${TQL_PID}" "INFO"
+
+  wait_to_complete ${TQL_PID}
+
   if grep --quiet "Statement executed successfully." ${tmp_file}; then
     log_this "Query ran successfully" "INFO"
     return 0
@@ -201,7 +232,7 @@ function parse_tsload_results () {
 #-------------------------------------------------------------------------------------------------------------
 function load_a_file() {
   orig_file_name=$1
-   
+  
   # Determine schema name and table name
   if [[ $orig_file_name == *"/"* ]]; then
     schema_name=$(echo $orig_file_name | cut -d"/" -f 1)
@@ -261,6 +292,21 @@ function load_a_file() {
     # Need to handle spaces in names and archive_queries.  This assumes no colons in the query.
     OLD_IFS=$IFS
     IFS=$(echo -en ":\n")
+
+    # Run any pre load bash commands for this table.
+    if [[ ${#pre_load_shell[@]} > 0 ]]; then
+      if [[ ${pre_load_shell[$table_name]+abc} ]]; then
+        script="${pre_load_shell[$table_name]} -d \"${DATABASE_NAME}\" -s \"${schema_name}\" -t \"${table_name}\" -c \"${config_file}\" -l \"${TEMP_RESULTS_SUMMARY_FILE}\" -f \"${file_name}\""
+        # script="${pre_load_shell[$table_name]} -d ${DATABASE_NAME} -s ${schema_name} -t ${table_name} -c ${config_file} -l ${TEMP_RESULTS_SUMMARY_FILE} -f ${file_name}"
+  
+        log_this "Running shell script before the loading of ${DATABASE_NAME}.${schema_name}.${table_name} from file ${file_name}. The command is: ${script}" "INFO"
+        # Run command in a sub shell
+        (eval "${script}") & export SHELL_PID=$!
+        log_this "Preload Shell Script pid is ${SHELL_PID}" "INFO"
+        wait_to_complete ${SHELL_PID}
+
+      fi
+    fi
 
     if [[ ${#pre_load_tql[@]} > 0 ]]; then
       if [[ ${pre_load_tql[$table_name]+abc} ]]; then
@@ -387,12 +433,27 @@ function load_a_file() {
     if [[ ${post_load_tql[$table_name]+abc} ]]; then
       sql=${post_load_tql[$table_name]}
  
-      log_this "Running query before the loading of ${DATABASE_NAME}.${schema_name}.${table_name} from file ${file_name}. The query is: ${post_load_tql[$table_name]}" "INFO"
+      log_this "Running query after the loading of ${DATABASE_NAME}.${schema_name}.${table_name} from file ${file_name}. The query is: ${post_load_tql[$table_name]}" "INFO"
       if run_sql "${sql}"; then
         log_this "Query completed successfully." "SUCCESS"
       else
         log_this "Query failed." "ERROR"
       fi
+    fi
+  fi
+
+  # Run any post load bash commands for this table.
+  if [[ ${#post_load_shell[@]} > 0 ]]; then
+    if [[ ${post_load_shell[$table_name]+abc} ]]; then
+      script="${post_load_shell[$table_name]} -d \"${DATABASE_NAME}\" -s \"${schema_name}\" -t \"${table_name}\" -c \"${config_file}\" -l \"${TEMP_RESULTS_SUMMARY_FILE}\" -f \"${file_name}\""
+      # script="${post_load_shell[$table_name]} -d ${DATABASE_NAME} -s ${schema_name} -t ${table_name} -c ${config_file} -l ${TEMP_RESULTS_SUMMARY_FILE} -f ${source_file}"
+ 
+      log_this "Running shell script before the loading of ${DATABASE_NAME}.${schema_name}.${table_name} from file ${file_name}. The command is: ${script}" "INFO"
+      # Run command in a sub shell
+      (eval "${script}") & export SHELL_PID=$!
+      log_this "Postload Shell Script pid is ${SHELL_PID}" "INFO"
+      wait_to_complete ${SHELL_PID}
+
     fi
   fi
 
@@ -425,12 +486,22 @@ function should_ignore() {
 }
 
 function load_data_files() {
+  exclude=""
   if [[ ${SOURCE_TYPE} == "aws_s3" ]]; then
     source_location=${AWS_S3_BUCKET}
+    if [[ ${EXCLUDE_PATTERN} != "" ]]; then
+      exclude="| grep -v *${EXCLUDE_PATTERN}"
+      log_this "Excluding files of pattern *${EXCLUDE_PATTERN}" "INFO"
+    fi
     files_to_load=`aws s3 ls --recursive s3://${AWS_S3_BUCKET} | awk '{$1=$2=$3=""; print $0}' | sed 's/^[ \t]*//' | grep "${DATA_FILE_EXTENSION}$"`
   else
     source_location=${DATA_DIR}
-    files_to_load=`find ${DATA_DIR} -maxdepth 2 -iname "*${DATA_FILE_EXTENSION}" -print`
+    if [[ ${EXCLUDE_PATTERN} != "" ]]; then
+      exclude="! -iname *${EXCLUDE_PATTERN} " 
+      log_this "Excluding files of pattern *${EXCLUDE_PATTERN}" "INFO"
+    fi
+    files_to_load=`find ${DATA_DIR} -maxdepth 2 -iname "*${DATA_FILE_EXTENSION}" ${exclude} -print`
+    log_this "Executing: find ${DATA_DIR} -maxdepth 2 -iname *${DATA_FILE_EXTENSION} ${exclude} -print "
   fi
   
   if [[ $files_to_load != "" ]]; then
