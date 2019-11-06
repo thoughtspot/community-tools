@@ -90,6 +90,8 @@ The complete loading process is described in the diagram below.
 | | Create Folders | Create any required folders, if they have not been created before. |
 | |	Manual Truncate? | This is a special option for truncating which has been designed for case where input files might be delivered in parts, i.e. multiple files per table with a sequence number. In this case we cannot use the built-in truncate option as that would clear the table for every file. Setting the option ***TRUNCATE_BEFORE_LOAD*** to true will execute a manual truncate command before the `tsload` process. |
 | | Truncate Once Per Table | This will execute a manual truncate only once per table, i.e. the first time a table is ‘seen’ in this load process it will execute and not for the others. <br/><br/> Note: This is done a separate statement, which means that is for whatever reason the `tsload` process fails, the tables still would have been truncated (unlike the built-in truncate) |
+| | Run Pre Script? | This allows you to execute any shell script before loading the table. Only one shell script per table can be executed. The statements can be defined in the array pre_load_shell in the configuration file, where they key is the table name. |
+| | Run Pre Script Once Per Table | Execute a shell script before loading the table. For example: deleting some old data based on a on very custom criteria, maybe from a parameter file. |
 | | Run Pre SQL? | This allows you to execute any TQL supported SQL statement before loading the table. Only one SQL statement per table can be executed. The statements can be defined in the array pre_load_sql in the configuration file, where they key is the table name. |
 | | Run Pre SQL Once Per Table | Execute a SQL statement before loading the table. For example: deleting some old data based on a date range. |
 | | Add Columns? | This is for scenarios where you want to provide default values for columns that are not in the data. These are specified in ***extra_table_headers*** (for the column names) and ***extra_table_values*** (for the values) |
@@ -97,8 +99,23 @@ The complete loading process is described in the diagram below.
 | | Load Data File | This will execute the actual `tsload` process. All required parameters can be defined in the config file. |
 | | Run Post SQL?	| This is similar as the Pre SQL, with the difference that these are run after the `tsload`. They are defined in the post_load_sql. |
 | | Run Post SQL Once Per Table	| Run the Post SQL commands if specified for each table once. |
+| | Run Post Script? | This allows you to execute any shell script after loading the table. Only one shell script per table can be executed. The statements can be defined in the array post_load_shell in the configuration file, where they key is the table name. |
+| | Run Post Script Once Per Table | Execute a shell script after loading the table. For example: verifying some data or kicking off another unrelated process. |
 | **Cleanup From Load** | | This step will clean up all temporary files and will archive the source data and log files according to the setting in ***ARCHIVE_DATA***. <br/>It will also clean up old archives based on the number of days specified in ***NBR_DAYS_TO_KEEP_OLD_FILES***.|
 | **Send Results Notification** | | If activated on the cluster this step well send an status email to the email addresses specified in ***RESULTS_EMAIL***, with the log attached. <br/>If HTML email is enabled (***USE_HTML_EMAIL***), a nicely formatted table will be created in the body of the email, allowing an easy and quick insight into the results of the load.|
+
+#### Note on shell scripts
+
+A few comments around the use of shell scripts:
+
+- When executing shell scripts it might happen that the script times out, i.e. returns to the shell whilst it is actually still doing things. This might result on the calling script to think it failed (as no return code). There are two variables in the config file to control this. One to define on how many times it should check for completeness (SCRIPT_MAX_CHECK_ATTEMPTS) and one variable defines how long to wait between checks (SCRIPT_CHECK_WAIT_TIME)
+- For integration, a number of paramters are always passed to any script. Make sure these are interpreted in any custom script you create:
+    -d|--database DATABASE_NAME   Name of the database where the table resides
+    -s|--schema   SCHEMA_NAME     Name of the schema where the table resides
+    -t|--table    TABLE_NAME      Name of the table to execute a delete for
+    -c|--config   CONFIG_FILE     Name of the config file used in the load process
+    -l|--log      LOG_FILE        Name of the log file to write logging messages to
+    -f|--file     SOURCE_FILE     The souce file being loaded
 
 ### Deploy and configure
 
@@ -127,58 +144,64 @@ The configuration file should be passed to the script via the -f parameter. The 
 Note: The AWS parameters only need to be modified if data is loaded from AWS S3 buckets. Also note that an AWS configuration has their own parameters for ***DATA_DIR*** and archiving. 
 Parameter	Description
 
-| Parameter | Description |
-| --------- | ----------- |
-| ***SOURCE_TYPE*** | Either file_system for local file loads or aws_s3 |
-| ***DATA_FILE_EXTENSION*** | The extension of the input data files, typically .csv |
-| ***ROOT_DIR*** | The root directory from which the script will operate. The load script will typically be in a bin folder in that root directory. |
-| ***RESULTS_EMAIL*** | The email addresses to which the result notification should be sent to. |
-| ***DATABASE_NAME*** | The name of the target database. Only one database is allowed per configuration file. |
-| ***DEFAULT_SCHEMA_NAME*** | If input files are not placed in sub folders under the ***DATA_DIR***, this variable will define the name of the target schema. If no schema are used specify ‘falcon_default_schema’ here. |
-| ***IGNORE_DIRS*** | When scanning for input files the process will ignore directories with names specified in this list (space separated list) |
-| ***NBR_DAYS_TO_KEEP_OLD_FILES*** | This is the number of days archive files will be kept in the OLD directory until the process will remove them. Leave this blank to not remove old archives. |
-| ***MOVE_LOADED_FILES*** | This is the command to execute against files which have been loaded. Possible options are:<ul><li>mv    (moves the files)</li><li>cp     (copies the files)</li><li>echo (displays the file name)</li></ul>Typically you would have this on ‘mv’ to move and archive the files. The other two are typically used in troubleshooting input files issues (so you don’t have to extract and copy them from the archive each time) |
-| ***TRUNCATE_BEFORE_LOAD*** | This can be used for multi-part input files. If set to true, it will truncate the target table manually once (before the first table file). In other cases just set this to false. |
-| ***ARCHIVE_DATA*** | This defines if and how data should be archived. For larger data files archiving can be time consuming and taking up space. The options are:<ul><li>always. Files are always archived.</li><li>onerror. Files are archived when one of the files in the load failed.</li><li>onbad. Files are archived when one of the files generated bad records.</li><li>Never. Files are never archived.</li></ul>|
-| ***DATA_DIR*** | Specifies the data directory where data files will be placed. |
-| ***AWS_S3_ACCESS_KEY_ID*** | The access key from your AWS Config |
-| ***AWS_S3_SECRET_ACCESS_KEY*** | The secret access key from your AWS config |
-| ***AWS_S3_REGION*** | The region used, see: [AWS Service Endpoints](https://docs.aws.amazon.com/general/latest/gr/rande.html) |
-| ***AWS_S3_BUCKET*** | The name of the bucket for files to load |
-| ***AWS_S3_ARCHIVE_BUCKET*** | The name of the bucket to save loaded files. If blank no archiving will happen |
-| ***AWS_S3_DATA_DIR*** | The folder under the bucket to start loading from. This is the actual data root. |
-| ***AWS_S3_BUF_CAPACITY*** | The buffer for loading files. |
-| ***SEMAPHORE_FILE_NAME*** | This is the name of the semaphore file the load process will look for before initiating the load. If left empty, the process will not wait for a semaphore to be present. |
-| ***SED_PATTERNS*** | Here you can set any part of the file name that will be stripped to determine the table name (excluding the ones which are already stripped internally) The items should be separated by space. |
-| ***CLUSTER_NAME*** | This should normally not be changed. It defines how the name of the cluster should be obtained. |
-| ***RUN_DOS2UNIX*** | If set to 1, the load script will run a dos2unix command against the input file before loading it. |
-| ***DEFAULT_EMPTY_TARGET*** | (used by `tsload`) <br/>This should either be empty or –empty_target. This is used for activate the built-in truncating of the target table. If left empty, no truncating will be done. See comments on truncating in situations will multi-part files earlier in this document. |
-| ***SOURCE_DATA_FORMAT*** | (used by `tsload`) <br/>The source file format. Either csv or delimited |
-| ***FIELD_SEPARATOR*** | (used by `tsload`) <br/>The field separator used in the source data |
-| ***MAX_IGNORED_ROWS*** | (used by `tsload`) <br/>Maximum number of error rows to ignore. 0 is recommended for production. |
-| ***HAS_HEADER_ROW*** | (used by `tsload`) <br/>True if there is a header row in the input file to ignore. |
-| ***NULL_VALUE*** | (used by `tsload`) <br/>Value in the data which should be interpreted as a NULL value. |
-| ***DATE_FORMAT*** | (used by `tsload`) <br/>The format for parsing dates, e.g. %m-%d-%Y |
-| ***DATE_TIME_FORMAT*** | (used by `tsload`) <br/>The format for parsing date/times, e.g. %m-%d-%Y %H:%M:%s |
-| ***BOOLEAN_REPRESENTATION*** | (used by `tsload`) <br/>Defines how to interpret Boolean values, e.g. True_False for True and False |
-| ***THE_DATE_TIME*** | Defines the date and time stamp which is added to internal log files |
-| ***LOG_DIR*** | The directory where the log files should be written to. |
-| ***TEMP_TSLOAD_FILE*** | Temporary file where tsload output is captured |
-| ***TEMP_RESULT_FILE*** | Temporary file where detailed results are captured |
-| ***TEMP_STATS_FILE*** | Temporary file where loading stats are captured |
-| ***TEMP_RESULTS_SUMMARY_FILE*** | Temporary file where the results summary is captured |
-| ***RESULTS_FILE*** | The target file where the results of the data load are stored |
-| ***LOADING_FILE*** | Specification of the loading file which is created when a load starts (and removed on completion) |
-| ***V_LEVEL*** | Logging verbosity level. 0-6. 0 Recommended for production |
-| ***USE_HTML_EMAIL*** | Set to 1 to receive notification emails in HTML format, 0 for standard text. |
-| ***OLD_DIR_ROOT*** | The root folder for archiving |
-| ***OLD_DIR*** | The folder under the archiving root directory where the archives for the current load are stored. |
-| ***pre_load_tql*** | This array contains SQL statements which will be executed before the loading of a table. The key of the array should be the table name. |
-| ***post_load_tql*** | This array contains SQL statements which will be executed after the loading of a table. The key of the array should be the table name. |
-| ***extra_table_headers*** | This defines the column names of the columns which will be added to the data file before loading. Should be used in conjunction with ***extra_table_values***. |
-| ***extra_table_values*** | This defines the values for the columns which will be added to the data file before loading. Should be used in conjunction with ***extra_table_headers***. |
+| Section | Parameter | Description |
+| --------- | --------- | ----------- |
+| GENERAL SETTINGS | ***SOURCE_TYPE*** | Either file_system for local file loads or aws_s3 |
+| FOLDER SETTINGS | ***ROOT_DIR*** | The root directory from which the script will operate. The load script will typically be in a bin folder in that root directory. |
+| FOLDER SETTINGS | ***LOG_DIR*** | The directory where the log files should be written to. |
+| FOLDER SETTINGS | ***IGNORE_DIRS*** | When scanning for input files the process will ignore directories with names specified in this list (space separated list) |
+| FOLDER SETTINGS | ***DATA_DIR*** | Specifies the data directory where data files will be placed. |
+| FOLDER SETTINGS | ***OLD_DIR_ROOT*** | The root folder for archiving |
+| AWS S3 SETTINGS | ***AWS_S3_ACCESS_KEY_ID*** | The access key from your AWS Config |
+| AWS S3 SETTINGS | ***AWS_S3_SECRET_ACCESS_KEY*** | The secret access key from your AWS config |
+| AWS S3 SETTINGS | ***AWS_S3_REGION*** | The region used, see: [AWS Service Endpoints](https://docs.aws.amazon.com/general/latest/gr/rande.html) |
+| AWS S3 SETTINGS | ***AWS_S3_BUCKET*** | The name of the bucket for files to load |
+| AWS S3 SETTINGS | ***AWS_S3_ARCHIVE_BUCKET*** | The name of the bucket to save loaded files. If blank no archiving will happen |
+| AWS S3 SETTINGS | ***AWS_S3_DATA_DIR*** | The folder under the bucket to start loading from. This is the actual data root. |
+| AWS S3 SETTINGS | ***AWS_S3_BUF_CAPACITY*** | The buffer for loading files. |
+| FILE SETTINGS | ***DATA_FILE_EXTENSION*** | The extension of the input data files, typically .csv |
+| FILE SETTINGS | ***EXCLUDE_PATTERN*** | pattern which should be excluded in the files matched using the ***DATA_FILE_EXTENSION***
+| FILE SETTINGS | ***SED_PATTERNS*** | Here you can set any part of the file name that will be stripped to determine the table name (excluding the ones which are already stripped internally) The items should be separated by space. |
+| FILE SETTINGS | ***RUN_DOS2UNIX*** | If set to 1, the load script will run a dos2unix command against the input file before loading it. |
+| ARCHIVE SETTINGS | ***MOVE_LOADED_FILES*** | This is the command to execute against files which have been loaded. Possible options are:<ul><li>mv    (moves the files)</li><li>cp     (copies the files)</li><li>echo (displays the file name)</li></ul>Typically you would have this on ‘mv’ to move and archive the files. The other two are typically used in troubleshooting input files issues (so you don’t have to extract and copy them from the archive each time) |
+| ARCHIVE SETTINGS | ***NBR_DAYS_TO_KEEP_OLD_FILES*** | This is the number of days archive files will be kept in the OLD directory until the process will remove them. Leave this blank to not remove old archives. |
+| ARCHIVE SETTINGS | ***ARCHIVE_DATA*** | This defines if and how data should be archived. For larger data files archiving can be time consuming and taking up space. The options are:<ul><li>always. Files are always archived.</li><li>onerror. Files are archived when one of the files in the load failed.</li><li>onbad. Files are archived when one of the files generated bad records.</li><li>Never. Files are never archived.</li></ul>|
+| EMAIL SETTINGS | ***RESULTS_EMAIL*** | The email addresses to which the result notification should be sent to. |
+| EMAIL SETTINGS | ***USE_HTML_EMAIL*** | Set to 1 to receive notification emails in HTML format, 0 for standard text. |
+| DATABASE SETTINGS | ***DATABASE_NAME*** | The name of the target database. Only one database is allowed per configuration file. |
+| DATABASE SETTINGS | ***DEFAULT_SCHEMA_NAME*** | If input files are not placed in sub folders under the ***DATA_DIR***, this variable will define the name of the target schema. If no schema are used specify ‘falcon_default_schema’ here. |
+| LOAD SETTINGS | ***SEMAPHORE_FILE_NAME*** | This is the name of the semaphore file the load process will look for before initiating the load. If left empty, the process will not wait for a semaphore to be present. |
+| LOAD SETTINGS | ***TRUNCATE_BEFORE_LOAD*** | This can be used for multi-part input files. If set to true, it will truncate the target table manually once (before the first table file). In other cases just set this to false. |
+| TSLOAD SETTINGS | ***DEFAULT_EMPTY_TARGET*** | (used by `tsload`) <br/>This should either be empty or –empty_target. This is used for activate the built-in truncating of the target table. If left empty, no truncating will be done. See comments on truncating in situations will multi-part files earlier in this document. |
+| TSLOAD SETTINGS | ***SOURCE_DATA_FORMAT*** | (used by `tsload`) <br/>The source file format. Either csv or delimited |
+| TSLOAD SETTINGS | ***FIELD_SEPARATOR*** | (used by `tsload`) <br/>The field separator used in the source data |
+| TSLOAD SETTINGS | ***MAX_IGNORED_ROWS*** | (used by `tsload`) <br/>Maximum number of error rows to ignore. 0 is recommended for production. |
+| TSLOAD SETTINGS | ***HAS_HEADER_ROW*** | (used by `tsload`) <br/>True if there is a header row in the input file to ignore. |
+| TSLOAD SETTINGS | ***NULL_VALUE*** | (used by `tsload`) <br/>Value in the data which should be interpreted as a NULL value. |
+| TSLOAD SETTINGS | ***DATE_FORMAT*** | (used by `tsload`) <br/>The format for parsing dates, e.g. %m-%d-%Y |
+| TSLOAD SETTINGS | ***DATE_TIME_FORMAT*** | (used by `tsload`) <br/>The format for parsing date/times, e.g. %m-%d-%Y %H:%M:%s |
+| TSLOAD SETTINGS | ***TIME_FORMAT*** | (used by `tsload`) <br/>The format for parsing times, e.g. %H:%M:%s |
+| TSLOAD SETTINGS | ***BOOLEAN_REPRESENTATION*** | (used by `tsload`) <br/>Defines how to interpret Boolean values, e.g. True_False for True and False |
+| PRE/POST SHELL SCRIPTS SETTINGS | ***pre_load_shell*** | This array a shell script per table which will be executed before the loading of a table. The key of the array should be the table name. |
+| PRE/POST SHELL SCRIPTS SETTINGS | ***post_load_shell*** | This array a shell script per table which will be executed after the loading of a table. The key of the array should be the table name. |
+| PRE/POST SHELL SCRIPTS SETTINGS | ***SCRIPT_MAX_CHECK_ATTEMPTS*** | If a script was not completed, but returned to shell (timeout) how many times it should keep on checking before failing. |
+| PRE/POST SHELL SCRIPTS SETTINGS | ***SCRIPT_CHECK_WAIT_TIME*** | Time in seconds to wait in between attempts. |
+| PRE/POST TQL COMMANDS SETTINGS | ***pre_load_tql*** | This array contains a TQL statement per table which will be executed before the loading of a table. The key of the array should be the table name. |
+| PRE/POST TQL COMMANDS SETTINGS | ***post_load_tql*** | This array contains a TQL statement per table which will be executed after the loading of a table. The key of the array should be the table name. |
+| GENERATE EXTRA (DEFAULT) COLUMNS HEADERS | ***extra_table_headers*** | This defines the column names of the columns which will be added to the data file before loading. Should be used in conjunction with ***extra_table_values***. |
+| GENERATE EXTRA (DEFAULT) COLUMNS HEADERS | ***extra_table_values*** | This defines the values for the columns which will be added to the data file before loading. Should be used in conjunction with ***extra_table_headers***. |
+| INTERNAL SETTINGS | ***CLUSTER_NAME*** | This should normally not be changed. It defines how the name of the cluster should be obtained. |
+| INTERNAL SETTINGS | ***THE_DATE_TIME*** | Defines the date and time stamp which is added to internal log files |
+| INTERNAL SETTINGS | ***TEMP_TSLOAD_FILE*** | Temporary file where tsload output is captured |
+| INTERNAL SETTINGS | ***TEMP_RESULT_FILE*** | Temporary file where detailed results are captured |
+| INTERNAL SETTINGS | ***TEMP_STATS_FILE*** | Temporary file where loading stats are captured |
+| INTERNAL SETTINGS | ***TEMP_RESULTS_SUMMARY_FILE*** | Temporary file where the results summary is captured |
+| INTERNAL SETTINGS | ***RESULTS_FILE*** | The target file where the results of the data load are stored |
+| INTERNAL SETTINGS | ***LOADING_FILE*** | Specification of the loading file which is created when a load starts (and removed on completion) |
+| INTERNAL SETTINGS | ***V_LEVEL*** | Logging verbosity level. 0-6. 0 Recommended for production |
+| INTERNAL SETTINGS | ***OLD_DIR*** | The folder under the archiving root directory where the archives for the current load are stored. |
 
-## csv_to_sql
+# csv_to_sql
 
 (Documentation Coming soon)
 
