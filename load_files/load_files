@@ -149,7 +149,12 @@ total_attempted_files=0
 # This only supports one database.
 truncated_tables=()
 # This variable contains tables for which an sql statement has been run before loading
-run_sql_tables=()
+# run_sql_tables=()
+pre_tql_tables=()
+post_tql_tables=()
+pre_shell_tables=()
+post_shell_tables=()
+
 
 #--[function wait_to_complete ()]-----------------------------------------------------------------------------
 #
@@ -225,6 +230,56 @@ function parse_tsload_results () {
   cat ${TEMP_TSLOAD_FILE} >> ${TEMP_RESULTS_FILE}
 }
 
+#--[function run_action()]-----------------------------------------------------------------------------------
+#
+# Run an action, either a TQL command or a Shell Script
+#-------------------------------------------------------------------------------------------------------------
+function run_action() {
+  schema_name=$1
+  table_name=$2
+  config_file=$3
+  file_name=$4
+  action_type=$5
+  action_when=$6
+  action_code=$7
+  shift 7
+  processed_tables=("$@")
+
+  result=1
+  contains ${processed_tables[@]} "${schema_name}"."${table_name}"
+  if [[ $? != 0 ]]; then 
+    result=0
+
+    # Need to handle spaces in names and archive_queries.  This assumes no colons in the query.
+    OLD_IFS=$IFS
+    IFS=$(echo -en ":\n")
+
+    if [[ "${action_code}" != "" ]]; then
+      log_this "Running ${action_type} ${action_when} the loading of ${DATABASE_NAME}.${schema_name}.${table_name} from file ${file_name}. The command is: ${script}" "INFO"
+
+      if [[ "${action_type}" == "shell script" ]]; then
+        log_this "Executing shell script" "INFO"
+        script="${action_code} -d \"${DATABASE_NAME}\" -s \"${schema_name}\" -t \"${table_name}\" -c \"${config_file}\" -l \"${TEMP_RESULTS_SUMMARY_FILE}\" -f \"${file_name}\""
+        # Run command in a sub shell
+        (eval "${script}") & export SHELL_PID=$!
+        log_this "${action_type} pid is ${SHELL_PID}" "INFO"
+        wait_to_complete ${SHELL_PID}
+      elif [[ "${action_type}" == "TQL" ]]; then
+        log_this "Executing TQL" "INFO"
+        script="${action_code}"
+        if run_sql "${script}"; then
+          log_this "Query completed successfully." "SUCCESS"
+        else
+          log_this "Query failed." "ERROR"
+        fi
+      fi
+    fi
+
+    # Reset the separator to the original values.
+    IFS=$OLD_IFS
+  fi
+  return ${result}
+}
 
 #--[function load_a_file()]-----------------------------------------------------------------------------------
 #
@@ -284,48 +339,38 @@ function load_a_file() {
     fi
   fi
 
-  # See if any sql needs to be ran before loading of this table.
-  contains ${run_sql_tables[@]} "${schema_name}"."${table_name}"
-  if [[ $? != 0 ]]; then # this is the table against which the sql should be ran.
-    run_sql_tables+=("${schema_name}"."${table_name}")
-
-    # Need to handle spaces in names and archive_queries.  This assumes no colons in the query.
-    OLD_IFS=$IFS
-    IFS=$(echo -en ":\n")
-
-    # Run any pre load bash commands for this table.
-    if [[ ${#pre_load_shell[@]} > 0 ]]; then
-      if [[ ${pre_load_shell[$table_name]+abc} ]]; then
-        script="${pre_load_shell[$table_name]} -d \"${DATABASE_NAME}\" -s \"${schema_name}\" -t \"${table_name}\" -c \"${config_file}\" -l \"${TEMP_RESULTS_SUMMARY_FILE}\" -f \"${file_name}\""
-        # script="${pre_load_shell[$table_name]} -d ${DATABASE_NAME} -s ${schema_name} -t ${table_name} -c ${config_file} -l ${TEMP_RESULTS_SUMMARY_FILE} -f ${file_name}"
-  
-        log_this "Running shell script before the loading of ${DATABASE_NAME}.${schema_name}.${table_name} from file ${file_name}. The command is: ${script}" "INFO"
-        # Run command in a sub shell
-        (eval "${script}") & export SHELL_PID=$!
-        log_this "Preload Shell Script pid is ${SHELL_PID}" "INFO"
-        wait_to_complete ${SHELL_PID}
-
-      fi
-    fi
-
-    if [[ ${#pre_load_tql[@]} > 0 ]]; then
-      if [[ ${pre_load_tql[$table_name]+abc} ]]; then
-        sql=${pre_load_tql[$table_name]}
-
-        log_this "Running query before the loading of ${DATABASE_NAME}.${schema_name}.${table_name} from file ${file_name}. The query is: ${pre_load_tql[$table_name]}" "INFO"
-        if run_sql "${sql}"; then
-          log_this "Query completed successfully." "SUCCESS"
-        else
-          log_this "Query failed." "ERROR"
-        fi
-      fi
-    fi
-
-    # Reset the separator to the original values.
-    IFS=$OLD_IFS
-
+  # --------------------------------------------------------------------------------------------------
+  # Pre shell scripts
+  # --------------------------------------------------------------------------------------------------
+  if run_action "${schema_name}" \
+                "${table_name}" \
+                "${config_file}" \
+                "${file_name}" \
+                "shell script" \
+                "before" \
+                "${pre_load_shell[$table_name]}" \
+                "${pre_shell_tables[@]}" ; then
+      pre_shell_tables+=("${schema_name}"."${table_name}")
   fi
 
+
+  # --------------------------------------------------------------------------------------------------
+  # Pre TQL scripts
+  # --------------------------------------------------------------------------------------------------
+  if run_action "${schema_name}" \
+                "${table_name}" \
+                "${config_file}" \
+                "${file_name}" \
+                "TQL" \
+                "before" \
+                "${pre_load_tql[$table_name]}" \
+                "${pre_tql_tables[@]}" ; then
+      pre_tql_tables+=("${schema_name}"."${table_name}")
+  fi
+
+  # --------------------------------------------------------------------------------------------------
+  # Do the actual load process
+  # --------------------------------------------------------------------------------------------------
   # get the header flag.
   hhr=""
   if [[ ${HAS_HEADER_ROW} == "true" ]]; then
@@ -428,33 +473,33 @@ function load_a_file() {
 
   parse_tsload_results ${schema_name} ${table_name} "${file_name}"
   
-  # Run any post load commands for this table.
-  if [[ ${#post_load_tql[@]} > 0 ]]; then
-    if [[ ${post_load_tql[$table_name]+abc} ]]; then
-      sql=${post_load_tql[$table_name]}
- 
-      log_this "Running query after the loading of ${DATABASE_NAME}.${schema_name}.${table_name} from file ${file_name}. The query is: ${post_load_tql[$table_name]}" "INFO"
-      if run_sql "${sql}"; then
-        log_this "Query completed successfully." "SUCCESS"
-      else
-        log_this "Query failed." "ERROR"
-      fi
-    fi
+
+  # --------------------------------------------------------------------------------------------------
+  # Post TQL scripts
+  # --------------------------------------------------------------------------------------------------
+  if run_action "${schema_name}" \
+                "${table_name}" \
+                "${config_file}" \
+                "${file_name}" \
+                "TQL" \
+                "after" \
+                "${post_load_tql[$table_name]}" \
+                "${post_tql_tables[@]}" ; then
+      post_tql_tables+=("${schema_name}"."${table_name}")
   fi
 
-  # Run any post load bash commands for this table.
-  if [[ ${#post_load_shell[@]} > 0 ]]; then
-    if [[ ${post_load_shell[$table_name]+abc} ]]; then
-      script="${post_load_shell[$table_name]} -d \"${DATABASE_NAME}\" -s \"${schema_name}\" -t \"${table_name}\" -c \"${config_file}\" -l \"${TEMP_RESULTS_SUMMARY_FILE}\" -f \"${file_name}\""
-      # script="${post_load_shell[$table_name]} -d ${DATABASE_NAME} -s ${schema_name} -t ${table_name} -c ${config_file} -l ${TEMP_RESULTS_SUMMARY_FILE} -f ${source_file}"
- 
-      log_this "Running shell script before the loading of ${DATABASE_NAME}.${schema_name}.${table_name} from file ${file_name}. The command is: ${script}" "INFO"
-      # Run command in a sub shell
-      (eval "${script}") & export SHELL_PID=$!
-      log_this "Postload Shell Script pid is ${SHELL_PID}" "INFO"
-      wait_to_complete ${SHELL_PID}
-
-    fi
+  # --------------------------------------------------------------------------------------------------
+  # Post shell scripts
+  # --------------------------------------------------------------------------------------------------
+  if run_action "${schema_name}" \
+                "${table_name}" \
+                "${config_file}" \
+                "${file_name}" \
+                "shell script" \
+                "after" \
+                "${post_load_shell[$table_name]}" \
+                "${post_shell_tables[@]}" ; then
+      post_shell_tables+=("${schema_name}"."${table_name}")
   fi
 
   # Move the loaded files to the old directory.
@@ -765,7 +810,67 @@ touch ${TEMP_RESULTS_SUMMARY_FILE}
 # Write the header to the stats summary file
 echo "Database Name|Schema Name|Table Name|Status|Rows Total|Rows Loaded|Rows Failed|Rows Skipped|Rows Loaded %|File Name" > ${TEMP_STATS_FILE}
 
+# --------------------------------------------------------------------------------------------------
+# Pre load shell script
+# --------------------------------------------------------------------------------------------------
+log_this "Running start of process Shell"
+table_name="@LOAD"
+# Deliberately passing in this tablename in other parameters as they are not required for the one-off actions
+run_action  "${table_name}" \
+            "${table_name}" \
+            "${config_file}" \
+            "${table_name}" \
+            "shell script" \
+            "before" \
+            "${pre_load_shell[$table_name]}" \
+            "" 
+
+# --------------------------------------------------------------------------------------------------
+# Pre load TQL script
+# --------------------------------------------------------------------------------------------------
+log_this "Running start of process TQL"
+table_name="@LOAD"
+# Deliberately passing in this tablename in other parameters as they are not required for the one-off actions
+run_action  "${table_name}" \
+            "${table_name}" \
+            "${config_file}" \
+            "${table_name}" \
+            "TQL" \
+            "before" \
+            "${pre_load_tql[$table_name]}" \
+            "" 
+
 load_data_files
+
+# --------------------------------------------------------------------------------------------------
+# Post load TQL script
+# --------------------------------------------------------------------------------------------------
+log_this "Running end of process TQL"
+table_name="@LOAD"
+# Deliberately passing in this tablename in other parameters as they are not required for the one-off actions
+run_action  "${table_name}" \
+            "${table_name}" \
+            "${config_file}" \
+            "${table_name}" \
+            "TQL" \
+            "after" \
+            "${post_load_tql[$table_name]}" \
+            "" 
+
+# --------------------------------------------------------------------------------------------------
+# Post load shell script
+# --------------------------------------------------------------------------------------------------
+log_this "Running end of process Shell"
+table_name="@LOAD"
+# Deliberately passing in this tablename in other parameters as they are not required for the one-off actions
+run_action  "${table_name}" \
+            "${table_name}" \
+            "${config_file}" \
+            "${table_name}" \
+            "shell script" \
+            "after" \
+            "${post_load_shell[$table_name]}" \
+            "" 
 
 # Clean up the data loads (different for AWS S3 and local)
 if [[ ${SOURCE_TYPE} == "aws_s3" ]]; then
