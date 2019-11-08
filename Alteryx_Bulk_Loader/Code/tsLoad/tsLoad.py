@@ -120,26 +120,35 @@ class IncomingInterface:
                 del sublist[:]
         else:
             self.xmsg.error("Error Writing Data to ThoughtSpot.  Check Browse Tool or ThoughtSpot log at "
-                            "AppData/Roaming/ThoughtSpot/Logs fo ThoughtSpot Errors")
+                            "<user>/AppData/Roaming/ThoughtSpot/Logs fo ThoughtSpot Errors")
             return False
         return True
 
-    def write_server_messages(self):
-        for tsmessage in self.ts_controller.server_messages:
-            if tsmessage.find('Failed') != -1:
-                self.completed_status = False
-            self.record_info_out[0].set_from_string(self.record_creator, tsmessage)
-            out_record = self.record_creator.finalize_record()
-            self.parent.output_anchor.push_record(out_record, False)
-            self.record_creator.reset()
+    def write_to_output_anchor(self, ts_message):
+        """
+        Writes messages to the output anchor to be passed to the next tool
+        :param ts_message: A ThoughtSpot sdtin or sdout message
+        :return: NA
+        """
+        if ts_message.find('Failed') != -1:
+            self.completed_status = False
+        self.record_info_out[0].set_from_string(self.record_creator, ts_message)
+        out_record = self.record_creator.finalize_record()
+        self.parent.output_anchor.push_record(out_record, False)
+        self.record_creator.reset()
 
-        for tsmessage in self.ts_controller.server_errors:
-            if tsmessage.find('Failed') != -1:
-                self.completed_status = False
-            self.record_info_out[0].set_from_string(self.record_creator, tsmessage)
-            out_record = self.record_creator.finalize_record()
-            self.parent.output_anchor.push_record(out_record, False)
-            self.record_creator.reset()
+    def write_server_messages(self):
+        """
+        Write both stdout and stderr to the output anchor
+        :return: NA
+        """
+        #  Writing stdout to browser tool
+        for ts_message in self.ts_controller.server_messages:
+            self.write_to_output_anchor(ts_message)
+
+        #  Writing stdin to browser tool
+        for ts_message in self.ts_controller.server_errors:
+            self.write_to_output_anchor(ts_message)
 
     def ii_init(self, record_info_in: object) -> bool:
         """
