@@ -15,7 +15,7 @@
       <Description>Load a file into ThoughtSpot instance using the the ThoughtSpot Bulk Loader from Alteryx.</Description>
       <CategoryName>ThoughtSpot</CategoryName>
       <SearchTags>python, sdk, recordid, record, id, python sdk, optional input</SearchTags>
-      <ToolVersion>2.0</ToolVersion>
+      <ToolVersion>2.5</ToolVersion>
       <Author>ThoughtSpot</Author>
       <Company>ThoughtSpot, Inc.</Company>
       <Copyright>2019</Copyright>

@@ -31,7 +31,8 @@ class ThoughtSpotTable(object):
     add_constraints()
         Creates the DDL for the alter table statements that are specific to ThoughtSpot
     """
-    def __init__(self, logger, database, schema, table_name, columns, primary_keys, foreign_keys):
+    def __init__(self, logger, database, schema, table_name, columns, primary_keys, foreign_keys, partition_keys,
+                 hash_number):
         """
         :param logger:
             An instance of the python Logger class
@@ -47,6 +48,10 @@ class ThoughtSpotTable(object):
             A comma separated string that represents the primary keys.
         :param foreign_keys:
             A series of foreign keys and the appropriate metadata for the alter table commands
+        :param partition_keys:
+            A series of columns and the appropriate metadata for the partition statement
+        :param hash_number:
+            The number of shards for the table
         """
         self.logger = logger
         self.database = database
@@ -55,6 +60,8 @@ class ThoughtSpotTable(object):
         self.columns = columns
         self.primary_key = primary_keys
         self.foreign_keys = foreign_keys
+        self.partition_keys = partition_keys
+        self.hash_number = hash_number
         self.ddl_string = ""
         self.alter_statements = ""
         self.__init__table()
@@ -76,11 +83,20 @@ class ThoughtSpotTable(object):
         self.ddl_string += "\nDROP TABLE %s;\n" % self.table_name
         self.ddl_string += ("\n%s" % self.get_schema(self.table_name, self.columns))
         if self.primary_key is not None:
-            self.ddl_string += ("PRIMARY KEY (\"%s\")\n" % self.primary_key)
+            self.ddl_string += ("CONSTRAINT PRIMARY KEY (\"%s\")\n" % self.primary_key)
         else:
             self.ddl_string = self.ddl_string[:-4]
-        self.ddl_string = self.ddl_string + ");\n"
-        self.logger.debug(self.ddl_string)
+        self.ddl_string = self.ddl_string + ")\n"
+        self.logger.info(self.ddl_string)
+        if self.hash_number > 1:
+            self.ddl_string += ("PARTITION BY HASH (%d)\n " % self.hash_number)
+            if self.partition_keys is not None:
+                self.ddl_string += ("KEY (\"%s\")\n" % self.partition_keys)
+            # else:
+            #     self.ddl_string = self.ddl_string[:-4]
+        self.ddl_string = self.ddl_string + ";\n"
+
+        self.logger.info(self.ddl_string)
         self.add_constraints()
 
     @staticmethod

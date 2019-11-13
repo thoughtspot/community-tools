@@ -12,10 +12,11 @@
   </head>
   <body onload="main()">
     <header class="ts_Header">Move Data to ThoughtSpot Instance</header>
-    <! -- Menu Items at top of page starts -->
+    <!-- Menu Items at top of page -->
     <div class="tab">
         <button id="btn_connection" class="tablinks" onclick="openTabContent('Connection');">Connection</button>
         <button id="btn_table" class="tablinks" onclick="openTabContent('Table');">Target Table</button>
+        <button id="btn_partition" class="tablinks" onclick="openTabContent('Partition');">Partition</button>
     </div>
 
     <!-- Tab Content Starts -->
@@ -35,7 +36,7 @@
                  data-item-props="{dataName: 'DestinationPort', dataType: 'SimpleInt'}"></ayx>
           </div>
           <div class='leftCon'>
-            <label>XMSG("Buffer Size")</label>
+            <label>XMSG("Row Buffer Size")</label>
             <ayx data-ui-props="{type: 'TextBox'}"
                  data-item-props="{dataName: 'BufferSize', dataType: 'SimpleInt'}"></ayx>
           </div>
@@ -60,7 +61,7 @@
                    data-item-props="{dataName: 'UserName'}"></ayx>
           </div>
           <fieldset>
-            <!-- Can be used for unencrypted password
+            <!-- Can be used for unencrypted password.  Comment out next <div></div> section if used.
             <div class='leftCon'>
               <label><span id="Password">XMSG("Password")</span></label>
                 <ayx data-ui-props="{type: 'TextBox'}" data-item-props="{dataName: 'Password'}"></ayx>
@@ -113,12 +114,32 @@
           <div class='leftCon' id="createTableBox">
             <label><span id="CreateTable">XMSG("Create Table")</span></label>
               <ayx data-ui-props="{type: 'CheckBox', widgetId:'createTableBox'}"
-                   data-item-props="{dataName: 'CreateTable'}"></ayx>
+                   data-item-props="{dataName: 'CreateTable'}">
+              </ayx>
           </div>
           <div class='leftCon'>
             <label>XMSG("Optional Primary Key(s)")</label>
               <ayx data-ui-props="{type: 'ListBox', clearable: true}"
                    data-item-props="{dataName: 'PrimaryKey',dataType: 'FieldSelectorMulti',anchorIndex: '0',connectionIndex:'0'}">
+              </ayx>
+          </div>
+        </fieldset>
+      </form>
+    </div>
+    <div id="ts_partition_div" class="tabcontent">
+      <h3>Partition Definition</h3>
+      <form>
+        <fieldset>
+          <div class='leftCon'>
+            <label>XMSG("Optional HASH Value")</label>
+              <ayx data-ui-props="{type: 'TextBox'}"
+                   data-item-props="{dataName: 'HashValue'}">
+              </ayx>
+          </div>
+          <div class='leftCon'>
+            <label>XMSG("Optional Partition Key(s)")</label>
+              <ayx data-ui-props="{type: 'ListBox', clearable: true}"
+                   data-item-props="{dataName: 'PartitionKey',dataType: 'FieldSelectorMulti',anchorIndex: '0',connectionIndex:'0'}">
               </ayx>
           </div>
         </fieldset>
@@ -161,6 +182,7 @@
       localStorage.setItem('UserName', manager.getDataItem('UserName').getValue());
       localStorage.setItem('Password', manager.getDataItem('Password').getValue());
       localStorage.setItem('rsaFilePath', manager.getDataItem('rsaFilePath').getValue())
+      manager.getDataItem('CreateTable').registerPropertyListener('value', unhidePartitionTab)
     }
   </script>
   <script src="main.js"></script>
