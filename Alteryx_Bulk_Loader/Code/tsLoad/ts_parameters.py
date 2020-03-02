@@ -91,7 +91,7 @@ class Parameters(object):
                 self.error = "A Password or Key file Must be Entered"
                 return
             else:
-                #  Can be used for unencrypted passwords
+                #  Can be used for unencrypted passwords.  remove # on line 95 and place a # on lines 97 and 98
                 #  setattr(self, 'thoughtspot_password', password)
                 setattr(self, 'use_key_file', False)
                 setattr(self, 'thoughtspot_password', self.alteryx_engine.decrypt_password(
@@ -103,11 +103,12 @@ class Parameters(object):
             self.error = "Please Enter a ThoughtSpot Table Name"
             return
 
-        setattr(self, 'thoughtspot_port', int(Et.fromstring(self.input_xml).find('DestinationPort').text)
-                if 'DestinationPort' in self.input_xml else None)
-        if self.thoughtspot_port is None:
-            self.error = "Please Enter a SSH port number for the ThoughtSpot Server"
-            return
+        port_test = Et.fromstring(self.input_xml).find('DestinationPort').text
+        self.logger.info(port_test)
+        if port_test is None:
+            setattr(self, 'thoughtspot_port', 22)
+        else:
+            setattr(self, 'thoughtspot_port', int(port_test))
 
         setattr(self, 'buffer_size', int(Et.fromstring(self.input_xml).find('BufferSize').text)
                 if 'BufferSize' in self.input_xml else None)
@@ -127,7 +128,24 @@ class Parameters(object):
                 if 'BooleanString' in self.input_xml else 'T_F')
         setattr(self, 'ts_create_table', Et.fromstring(self.input_xml).find('CreateTable').text
                 if 'CreateTable' in self.input_xml else False)
+
         primary_keys = Et.fromstring(self.input_xml).find('PrimaryKey').text \
             if 'PrimaryKey' in self.input_xml else None
         if primary_keys is not None:
             setattr(self, 'primary_keys', '","'.join(primary_keys.split(",")))
+        else:
+            setattr(self, 'primary_keys', None)
+
+        hash_test = Et.fromstring(self.input_xml).find('HashValue').text
+        self.logger.info(hash_test)
+        if hash_test is None:
+            setattr(self, 'hash_number', 0)
+            setattr(self, 'partition_keys', None)
+        else:
+            setattr(self, 'hash_number', int(hash_test))
+            partition_keys = Et.fromstring(self.input_xml).find('PartitionKey').text \
+                if 'PartitionKey' in self.input_xml else None
+            if partition_keys is not None:
+                setattr(self, 'partition_keys', '","'.join(partition_keys.split(",")))
+            else:
+                setattr(self, 'partition_keys', None)

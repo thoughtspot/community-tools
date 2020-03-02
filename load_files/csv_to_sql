@@ -24,7 +24,7 @@ function show_usage() {
 }
 
 delimiter=","
-extension=".csv"
+extension="csv"
 filename="${PWD##*/}.sql"
 # get the options for the extension and file name.
 while getopts 'd:e:f:h' opt

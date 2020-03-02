@@ -25,7 +25,7 @@ class ThoughtSpotController(object):
         return True
 
     def __init__controller(self):
-        self.logger = AppLogger('alteryx_ts_logger', 2)
+        self.logger = AppLogger('alteryx_ts_logger', 1)
         if self.logger is None:
             self.status = 'bad'
             self.status_response = 'Please add a HOMEPATH environment variable for logging'
@@ -93,7 +93,8 @@ class ThoughtSpotController(object):
         foreign_keys = pd.DataFrame(columns=column_names)
         self.table = ThoughtSpotTable(self.logger, self.parameters.thoughtspot_database_name,
                                       self.parameters.thoughtspot_schema, self.parameters.thoughtspot_table_name,
-                                      column_dictionary, self.parameters.primary_keys, foreign_keys)
+                                      column_dictionary, self.parameters.primary_keys, foreign_keys,
+                                      self.parameters.partition_keys, self.parameters.hash_number)
         #  self.logger.info(self.table.ddl_string)
         self.logger.info('Executing Drop and Create Table Statements')
         self.thoughtspot_connection.execute_sql(self.table.ddl_string)
@@ -113,7 +114,7 @@ class ThoughtSpotController(object):
         self.server_errors = self.thoughtspot_connection.thoughtspot_errors
         for tsmessage in self.server_messages:
             self.logger.debug(tsmessage)
-        for tsmessage in self.thoughtspot_connection.thoughtspot_errors:
+        for tsmessage in self.server_errors:
             self.logger.debug(tsmessage)
 
     def initiate_load_on_thoughtspot(self):

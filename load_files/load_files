@@ -389,8 +389,15 @@ function load_a_file() {
     source_file="/aws/default/${orig_file_name}"
 
     # If configured, run a dos2unix on the source file before loading
-    if [[ ${RUN_DOS2UNIX} == 1 ]]; then
-      dos2unix "${source_file}"
+    # if [[ ${RUN_DOS2UNIX} == 1 ]]; then
+    #   dos2unix "${source_file}"
+    # fi
+
+    # If there are no access keys, then don't set the credentials.
+    if [[ ${AWS_S3_ACCESS_KEY_ID} == "" ]]; then  # not using access keys
+      AWS_CREDENTIALS=""
+    else
+      AWS_CREDENTIALS="--aws_s3_credentials \"${AWS_S3_ACCESS_KEY_ID};${AWS_S3_SECRET_ACCESS_KEY}\""
     fi
     
     # The specific flags are set in the configuration file, q.v..
@@ -411,7 +418,7 @@ function load_a_file() {
       --skip_second_fraction \
       -v ${V_LEVEL} \
       --aws_s3_bucket_name "${AWS_S3_BUCKET}" \
-      --aws_s3_credentials "${AWS_S3_ACCESS_KEY_ID};${AWS_S3_SECRET_ACCESS_KEY}" \
+      ${AWS_CREDENTIALS} \
       --aws_s3_region "${AWS_S3_REGION}" \
       --aws_s3_root "${AWS_S3_DATA_DIR}" \
       --buf_capacity ${AWS_S3_BUF_CAPACITY} \
@@ -658,7 +665,11 @@ function cleanup_from_s3_load() {
 
   rm ${LOADING_FILE} # remove the loading semaphore file
 
-  aws s3 rm s3://${AWS_S3_BUCKET}/${SEMAPHORE_FILE_NAME} 
+  # if the semaphore exists, remove it.  Need to only do if it exists since otherwise can cause issues.
+  aws s3 ls s3://${AWS_S3_BUCKET}/${SEMAPHORE_FILE_NAME} 
+  if [[ $? == 0 ]]; then  # semaphore exists.
+    aws s3 rm s3://${AWS_S3_BUCKET}/${SEMAPHORE_FILE_NAME} 
+  fi
 }
 
 #--[function send_results_notification()]---------------------------------------------------------------------
@@ -790,7 +801,7 @@ fi
 # Read the configuration file
 source ${config_file}
 
-if [[ ${SOURCE_TYPE} == "aws_s3" ]]; then
+if [[ ${SOURCE_TYPE} == "aws_s3" && "${AWS_S3_ACCESS_KEY_ID}" != ""  ]]; then
   export AWS_ACCESS_KEY_ID=${AWS_S3_ACCESS_KEY_ID}
   export AWS_SECRET_ACCESS_KEY=${AWS_S3_SECRET_ACCESS_KEY}
 fi

@@ -251,11 +251,6 @@ class ThoughtSpotInstance(object):
               '--date_time_format \'%Y-%m-%d %H:%M:%S\' --skip_second_fraction ' + \
               '--date_format \'%Y-%m-%d\' ' + empty_target + ' --boolean_representation \'' + boolean_string + \
               '\' --max_ignored_rows ' + str(max_ignored_rows) + ' --v ' + str(verbosity)
-        # cmd = 'gzip -dc | tsload --target_database ' + thoughtspot_database + ' --target_table ' + \
-        #       thoughtspot_table + ' --field_separator \',\' --null_value \'\' ' + \
-        #       '--date_time_format \'%Y-%m-%d %H:%M:%S\' --skip_second_fraction --has_header_row ' + \
-        #       '--date_format \'%Y-%m-%d\' ' + empty_target + ' --boolean_representation \'' + boolean_string + \
-        #       '\' --max_ignored_rows ' + str(max_ignored_rows) + ' --v ' + str(verbosity)
         self.logger_debug(cmd)
         try:
             self.stdin, self.stdout, self.stderr = self.ssh.exec_command(cmd)
