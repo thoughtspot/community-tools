@@ -1,10 +1,12 @@
+#!/usr/bin/env bash
+
 # The following must be in the virtual environment (see tst)
 
 # Change to point to your environment.
-TSTOOLS_DIR='/your-path/tstools'
+TSTOOLS_DIR="/Users/misha.beek/Documents/05_ThoughtSpot"
 
 # Set up aliases for environment and navigation.
-source $TSTOOLS_DIR/venv/bin/activate
+source "${TSTOOLS_DIR}/00_venv/bin/activate"
 alias cdtst='cd $TSTOOLS_DIR'
 
 # Set up aliases for tools.
