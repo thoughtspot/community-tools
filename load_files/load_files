@@ -409,6 +409,7 @@ function load_a_file() {
       ${hhr} \
       --source_data_format ${SOURCE_DATA_FORMAT} \
       --field_separator "${FIELD_SEPARATOR}" \
+      --enclosing_character "${ENCLOSING_CHARACTER}" \
       --max_ignored_rows ${MAX_IGNORED_ROWS} \
       --null_value "${NULL_VALUE}" \
       --date_format "${DATE_FORMAT}" \
@@ -458,6 +459,7 @@ function load_a_file() {
       ${hhr} \
       --source_data_format ${SOURCE_DATA_FORMAT} \
       --field_separator "${FIELD_SEPARATOR}" \
+      --enclosing_character "${ENCLOSING_CHARACTER}" \
       --max_ignored_rows ${MAX_IGNORED_ROWS} \
       --null_value "${NULL_VALUE}" \
       --date_format "${DATE_FORMAT}" \
