@@ -33,6 +33,7 @@ Before using this resources, you will need to have these artefacts ready with yo
 :point_right:Please create a new bucket in S3 and upload the below files (place within the root folder to minimise editing the terraform scripts)
   - [release_version].offline.ansible.tar.gz
   - [release_version].tar.gz
+
 :point_right:Copy the above two files into your S3 bucket and note down the path.
 
   - The cluster ID  
@@ -73,12 +74,12 @@ vim terraform.tfvars.tf
 ```
 * Cluster specific variables (example values below):
   - customer_name           = "customer"
-  - cluster_id              = "999X888099"
+  - cluster_id              = "ABCX9999000"
   - cluster_name            = "custALCluster03"
-  - alert_email             = "alert-prod@thoughtspot.com"
+  - alert_email             = "alertingprod@myalertemail.com"
   - release                 = "6.1.1-2"
-  - subnet_id               = "subnet-742692742e"
-  - vpc_id                  = "vpc-81b6284645f8"
+  - subnet_id               = "subnet-74269272342e"
+  - vpc_id                  = "vpc-81b6284643235f8"
   - ami                     = "ami-0d66216454c01e8c2de2c"
   - vpc_security_group_ids  = ["sg-886dfw98ecf7","sg-ec86jd654f293"]
   - no_of_instance          = 10
