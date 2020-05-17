@@ -25,10 +25,9 @@ Before using this resources, you will need to have these artefacts ready with yo
       * This must provide permissions to access SSM, EC2, S3 bucket etc.
       https://docs.aws.amazon.com/systems-manager/latest/userguide/setup-instance-profile.html
 
-
 * Obtain below files and details from ThoughtSpot Support:
 
-:point_right:Please create a new bucket in S3 and upload the below files (place within the root folder to minimise editing the terraform scripts)
+:point_right:Please create a new bucket in S3 and upload the below files
   - [release_version].offline.ansible.tar.gz
   - [release_version].tar.gz
 
@@ -42,17 +41,7 @@ Before using this resources, you will need to have these artefacts ready with yo
 
 :warning: **Please do not proceed without the above details in hand**
 
-### Provisioning infra and installing ThoughtSpot
-#### Get the code repository
-Clone this repo
-```
-$ git clone https://github.com/thoughtspot/community-tools.git
-$ cd community-tools/ThoughtSpot_Cloud_deployments/community-tools/ThoughtSpot_Cloud_deployments/AWS/template_Homogeneous_cluster_ssm/without_role_creation/ts_cluster_ssm/
-
-```
-:point_right:Please do not move any of the files around in this directory
-
-#### Setup the deployment environment/host
+### Setup the deployment server
 
 Setup an environment where you have terraform version 0.12.24 installed.
 set up environment
@@ -60,18 +49,16 @@ set up environment
 export AWS_SECRET_ACCESS_KEY="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 export AWS_ACCESS_KEY_ID="yyyyyyyyyyyyyyyyy"
 ```
-
-If you are using credentials through .aws/cred file. Please update providers.tf file with below entry
-
-```
-provider "aws" {
-  region                  = "us-west-2"
-  shared_credentials_file = "/Users/tf_user/.aws/creds"
-  profile                 = "customprofile"
-}
-```
-
   - Would require internet access from this host to get provider binaries for terraform
+
+### Provisioning infra and installing ThoughtSpot
+#### Get the code repository
+Clone this repo
+```
+$ git clone https://github.com/thoughtspot/community-tools.git
+$ cd community-tools/ThoughtSpot_Cloud_deployments/template_Homogeneous_cluster_ssm/
+```
+:point_right:Please do not move any of the files around in this directory
 
 #### Provide inputs for the provisioning and installation
 :point_right: Only terraform.tfvars.tf file need to be modified.
@@ -80,7 +67,6 @@ No other file should require any change for this to work.
 Update the variable file terraform.tfvars.tf with details as described.
 Some of them already has some default values which can be used as such.
 ```
-mv terraform.tfvars.template terraform.tfvars
 vim terraform.tfvars.tf
 ```
 * Cluster specific variables (example values below):
@@ -94,36 +80,21 @@ vim terraform.tfvars.tf
   - ami                     = "ami-0d66216454c01e8c2de2c"
   - vpc_security_group_ids  = ["sg-886dfw98ecf7","sg-ec86jd654f293"]
   - no_of_instance          = 10
-  - instance_profile        = "instanceprofilename"
   - instance_type           = "r4.16xlarge"
-  - root_vol_size           = "100"
-  - export_vol_size         = "200"
-  - data_vol_size           = "1024"
+  - vol_size                = "1024"
   - ssm_document_name       = "SSM-SessionManagerRunShell-customer09"
   - s3_bucket_name          = "bucket-name"
   - user_data               = "./scripts/user_data.sh"
+  - s3_path_of_tar          = "bucket-name/subfolder" --> enter s3/subfolder. If no subfolder provide only s3 name
+  - offline_ansible_tar     = "6.1.1-2.offline.ansible.tar.gz"
+  - release_tar             = "6.1.1-2.tar.gz"
 
-#### Modify the associated shell scripts
-There are a couple of shell scripts which would be used to bootstrap the instance
-preparation and installation process.
+#### Note about auto generation of the scripts
+Terraform auto generates needed scripts and uploads to S3 bucket.
+:point_right:Please ensure S3 bucket has proper access and permissions for the instances.
 
-- ./scripts/prepare_host_ts.sh
-- ./scripts/install_ts.sh
-
-Modify these sed replace strings matching the required information specific to your environment
-```
-cd scripts/
-sed -i 's/<OFFLINE_ANSIBLE_TARBALL_FILE>/6.1.1-2.offline.ansible.tar.gz/g' prepare_host_ts.sh
-sed -i 's/<S3_BUCKET_WITH_FOLDER_IF_ANY>/bucket-name/g' prepare_host_ts.sh
-
-sed -i 's/<TS_RELEASE_TARBALL>/6.1.1-2.tar.gz/g' install_ts.sh
-sed -i 's/<RELEASE>/6.1.1-2/g' install_ts.sh
-sed -i 's/<S3_BUCKET>/bucket-name/g' install_ts.sh
-sed -i 's/<S3_BUCKET_WITH_FOLDER>/bucket-name/g' install_ts.sh
-```
-
-:point_right:Please note these files will be automatically uploaded to your S3 bucket by terraform
-The S3 bucket should have proper permissions enabled for this.
+* The auto generated files are uploaded to the s3 bucket and not into any sub-folders.
+* This is to minimise uncertainty with respect to customer's environment and keeping this repo generic.
 
 ### Initialise terraform
 As first step initialise terraform to get necessary binaries and setup backends
@@ -142,7 +113,7 @@ This step creates the infrastructure as defined in the tf files
 ```
 terraform apply
 ```
-:point_right: **This will trigger two SSM commands**
+:point_right: **This will trigger two jobs**
 1. **first prepare provisioned instances with offline ansible tar**
 2. **Then the installation is kick-started which can be monitored from SSM**
 
@@ -152,6 +123,7 @@ This file needs to be managed properly.
 There are a number of ways to do it, This repo implements local state file.
 https://www.terraform.io/docs/state/index.html
 https://blog.gruntwork.io/how-to-manage-terraform-state-28f5697e68fa
+
 
 ## Troubleshooting
 
