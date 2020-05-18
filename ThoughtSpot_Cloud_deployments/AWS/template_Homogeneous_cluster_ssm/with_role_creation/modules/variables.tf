@@ -51,12 +51,6 @@ variable "no_of_instance" {
   default     = ""
 }
 
-variable "vol_size" {
-  type        = string
-  description = "The size of disks."
-  default     = ""
-}
-
 variable "ssm_document_name" {
   default     = ""
   type        = string
@@ -97,4 +91,41 @@ variable "tags" {
   default     = {}
   type        = map(string)
   description = "A mapping of tags to assign to all resources."
+}
+
+variable "root_vol_size" {
+  type        = string
+  description = "The size of root filesystem."
+  default     = ""
+}
+variable "export_vol_size" {
+  type        = string
+  description = "The size of export partiton."
+  default     = ""
+}
+variable "data_vol_size" {
+  type        = string
+  description = "The size of data disks."
+  default     = ""
+}
+
+variable "s3_path_of_tar" {
+  default     = ""
+  type        = string
+  description = "The path in S3 where tar files are kept."
+}
+variable "offline_ansible_tar" {
+  default     = ""
+  type        = string
+  description = "File name of the ansible tar file."
+}
+variable "release_tar" {
+  default     = ""
+  type        = string
+  description = "File name of the release tar file."
+}
+variable "release" {
+  default     = ""
+  type        = string
+  description = "Release version of TS."
 }
