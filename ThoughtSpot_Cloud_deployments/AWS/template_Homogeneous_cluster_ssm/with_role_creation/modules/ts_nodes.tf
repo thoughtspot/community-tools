@@ -15,26 +15,26 @@ resource "aws_instance" "ts_cluster_instance" {
   ebs_block_device{
     device_name                 = "/dev/xvdb"
     volume_type                 = "gp2"
-    volume_size                 = var.vol_size
+    volume_size                 = var.data_vol_size
     delete_on_termination       = true
     encrypted                   = false
   }
   ebs_block_device{
     device_name                 = "/dev/xvdc"
     volume_type                 = "gp2"
-    volume_size                 = 200
+    volume_size                 = var.export_vol_size
     delete_on_termination       = true
     encrypted                   = false
   }
     ebs_block_device{
     device_name                 = "/dev/xvdd"
     volume_type                 = "gp2"
-    volume_size                 = var.vol_size
+    volume_size                 = var.data_vol_size
     delete_on_termination       = true
     encrypted                   = false
   }
   root_block_device{
-    volume_size               = 200
+    volume_size               = var.root_vol_size
     delete_on_termination     = true
   }
 

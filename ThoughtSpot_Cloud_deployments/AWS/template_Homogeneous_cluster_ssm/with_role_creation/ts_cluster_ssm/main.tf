@@ -1,6 +1,6 @@
 
 terraform {
-  required_version = "0.12.24"
+  required_version = "~> 0.12.24"
 }
 
 data "aws_s3_bucket" "selected_s3" {
@@ -51,14 +51,20 @@ module "ts_cluster_ssm" {
   ami                           = var.ami
   vpc_security_group_ids        = var.vpc_security_group_ids
   user_data                     = file("${path.module}/${var.user_data}")
-  vol_size                      = var.vol_size
+  root_vol_size                 = var.root_vol_size
+  export_vol_size               = var.export_vol_size
+  data_vol_size                 = var.data_vol_size
 
   ssm_document_name             = var.ssm_document_name
-  s3_bucket_name                = var.s3_bucket_name
 
   iam_policy                    = data.aws_iam_policy_document.default.json
   iam_path                      = "/service-role/"
   description                   = var.description
+  s3_bucket_name                = var.s3_bucket_name
+  s3_path_of_tar                = var.s3_path_of_tar
+  offline_ansible_tar           = var.offline_ansible_tar
+  release_tar                   = var.release_tar
+  release                       = var.release
 
   tags = {
     Environment = "prod"
