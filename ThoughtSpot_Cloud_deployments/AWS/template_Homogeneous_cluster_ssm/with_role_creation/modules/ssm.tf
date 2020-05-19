@@ -27,13 +27,18 @@ resource "aws_ssm_document" "ssm_doc_for_tssetup" {
 {
   "schemaVersion": "2.2",
   "description": "Prepare node for TS",
-  "parameters": {},
+  "parameters": {
+     "executionTimeout":{
+        "type": "String",
+        "default": "7200"
+      }
+  },
   "mainSteps": [
     {
       "action": "aws:runShellScript",
       "name": "default",
       "inputs": {
-        "timeoutSeconds": "7200",
+        "timeoutSeconds": "{{ executionTimeout }}",
         "runCommand": [
             "mkdir -p /tmp/setup",
             "cd /tmp/setup",
@@ -92,13 +97,18 @@ resource "aws_ssm_document" "ssm_doc_for_tsinstall" {
 {
   "schemaVersion": "2.2",
   "description": "Installing TS Cluster",
-  "parameters": {},
+  "parameters": {
+     "executionTimeout":{
+        "type": "String",
+        "default": "7200"
+      }
+  },
   "mainSteps": [
     {
       "action": "aws:runShellScript",
       "name": "default",
       "inputs": {
-        "timeoutSeconds": "7200",
+        "timeoutSeconds": "{{ executionTimeout }}",
         "runCommand": [
             "mkdir -p /tmp/install",
             "cd /tmp/install",
