@@ -289,6 +289,9 @@ function run_action() {
 function load_a_file() {
   orig_file_name=$1
   
+  # Initialise ts load parameters array
+  tsload_params=()
+
   # Determine schema name and table name
   if [[ $orig_file_name == *"/"* ]]; then
     schema_name=$(echo $orig_file_name | cut -d"/" -f 1)
@@ -302,11 +305,12 @@ function load_a_file() {
   # see if the file name overrides the default empty target.
   # use all of the patterns to get the table name from the file name.
   if [[ ${file_name} == *"_full"* ]]; then
-    empty_target="--empty_target"
+    log_this "Full load option activated" "INFO"
+    tsload_params+=(--empty_target)
   elif [[ ${file_name} == *"_incremental"* ]]; then
-    empty_target=""
+    log_this "Incremental load activated" "INFO"
   else
-    empty_target=${DEFAULT_EMPTY_TARGET}
+    tsload_params+=(${DEFAULT_EMPTY_TARGET})
   fi
 
   table_name="`echo ${file_name} | sed s/${DATA_FILE_EXTENSION}// | sed s/-.*// | sed s/_full// | sed s/_incremental//`"
@@ -373,9 +377,27 @@ function load_a_file() {
   # Do the actual load process
   # --------------------------------------------------------------------------------------------------
   # get the header flag.
-  hhr=""
   if [[ ${HAS_HEADER_ROW} == "true" ]]; then
-    hhr="--has_header_row"
+    tsload_params+=(--has_header_row)
+  fi
+
+  # Check if a format file is specified and whether it can be found, if so create the setting
+  if [[ "${FORMAT_FILE_DIR}" != "" ]]; then
+    if [ -d "${FORMAT_FILE_DIR}" ]; then
+      format_file="${FORMAT_FILE_DIR}/${table_name}.json"
+
+      if [ -f "${format_file}" ]; then
+        log_this "Found format file. Using format file ${format_file}" "INFO"
+        tsload_params+=(--format_file ${format_file})
+      else
+        log_this "No format file found for table ${table_name}(${format_file}). No format file will be used" "WARNING"
+      fi
+
+    else
+      log_this "Format file folder ${FORMAT_FILE_DIR} does not exist. Format files will not be used" "WARNING"
+    fi    
+  else
+    log_this "No format file dir specified. No format files will be used" "INFO"
   fi
 
 
@@ -383,48 +405,42 @@ function load_a_file() {
   # i.e. for while file the details are shown
   log_this "Detailed loading results for input file: ${file_name}" "INFO" ${TEMP_RESULTS_FILE}
 
+  # Standard parameters
+  tsload_params+=(--target_database ${DATABASE_NAME})
+  tsload_params+=(--target_schema ${schema_name})
+  tsload_params+=(--target_table "${table_name}")
+  tsload_params+=(--source_data_format ${SOURCE_DATA_FORMAT})
+  tsload_params+=(--field_separator "${FIELD_SEPARATOR}")
+  tsload_params+=(--max_ignored_rows ${MAX_IGNORED_ROWS})
+  tsload_params+=(--null_value "${NULL_VALUE}")
+  tsload_params+=(--date_format "${DATE_FORMAT}")
+  tsload_params+=(--date_time_format "${DATE_TIME_FORMAT}")
+  tsload_params+=(--time_format "${TIME_FORMAT}")
+  tsload_params+=(--boolean_representation ${BOOLEAN_REPRESENTATION})
+  tsload_params+=(--boolean_representation ${BOOLEAN_REPRESENTATION})
+  tsload_params+=(--skip_second_fraction)
+  tsload_params+=(-v ${V_LEVEL})
 
   # Define the settings required for the tsload depending on whether this is local or AWS loading
   if [[ ${SOURCE_TYPE} == "aws_s3" ]]; then
     log_this "Running tsload for AWS S3 load" "INFO"
-    source_file="/aws/default/${orig_file_name}"
-
-    # If configured, run a dos2unix on the source file before loading
-    # if [[ ${RUN_DOS2UNIX} == 1 ]]; then
-    #   dos2unix "${source_file}"
-    # fi
+    source_file="/s3a/default/${orig_file_name}"
 
     # If there are no access keys, then don't set the credentials.
     if [[ ${AWS_S3_ACCESS_KEY_ID} == "" ]]; then  # not using access keys
-      AWS_CREDENTIALS=""
+      log_this "AWS S3 credentials are not being used."
     else
-      AWS_CREDENTIALS="--aws_s3_credentials \"${AWS_S3_ACCESS_KEY_ID};${AWS_S3_SECRET_ACCESS_KEY}\""
+      tsload_params+=(--aws_s3_credentials "${AWS_S3_ACCESS_KEY_ID};${AWS_S3_SECRET_ACCESS_KEY}")
     fi
     
-    # The specific flags are set in the configuration file, q.v..
-    tsload --source_file ${source_file} \
-      --target_database ${DATABASE_NAME} \
-      --target_schema ${schema_name} \
-      --target_table "${table_name}" \
-      ${empty_target} \
-      ${hhr} \
-      --source_data_format ${SOURCE_DATA_FORMAT} \
-      --field_separator "${FIELD_SEPARATOR}" \
-      --enclosing_character "${ENCLOSING_CHARACTER}" \
-      --max_ignored_rows ${MAX_IGNORED_ROWS} \
-      --null_value "${NULL_VALUE}" \
-      --date_format "${DATE_FORMAT}" \
-      --date_time_format "${DATE_TIME_FORMAT}" \
-      --time_format "${TIME_FORMAT}" \
-      --boolean_representation ${BOOLEAN_REPRESENTATION} \
-      --skip_second_fraction \
-      -v ${V_LEVEL} \
-      --aws_s3_bucket_name "${AWS_S3_BUCKET}" \
-      ${AWS_CREDENTIALS} \
-      --aws_s3_region "${AWS_S3_REGION}" \
-      --aws_s3_root "${AWS_S3_DATA_DIR}" \
-      --buf_capacity ${AWS_S3_BUF_CAPACITY} \
-       > ${TEMP_TSLOAD_FILE} 2>&1
+    # Specific AWS flags
+    tsload_params+=(--s3a_bucket_name "${AWS_S3_BUCKET}")    
+    tsload_params+=(--s3a_region "${AWS_S3_REGION}")
+    tsload_params+=(--s3a_root "${AWS_S3_DATA_DIR}")
+    tsload_params+=(--buf_capacity ${AWS_S3_BUF_CAPACITY})
+
+    # Run the tsload command
+    tsload --source_file ${source_file} "${tsload_params[@]}"  > ${TEMP_TSLOAD_FILE} 2>&1
 
   else
     log_this "Running tsload for file system load" "INFO"
@@ -449,27 +465,14 @@ function load_a_file() {
         values=${extra_table_values[$table_name]}
       fi
     fi
+
+    # File system specific flags
+    tsload_params+=(--bad_records_file ${move_dir}/${table_name}_bad_records.csv)
+
+    # Run the TSLoad command
     cat ${source_file} | 
       awk -v h="${header}" -v val="${values}" -v sep="${FIELD_SEPARATOR}" '{ if(h!="") { if(NR==1){ print $0 sep h } else { print $0 sep val } } else { print $0 } }' | 
-      tsload \
-      --target_database ${DATABASE_NAME} \
-      --target_schema ${schema_name} \
-      --target_table "${table_name}" \
-      --bad_records_file ${move_dir}/${table_name}_bad_records.csv \
-      ${empty_target} \
-      ${hhr} \
-      --source_data_format ${SOURCE_DATA_FORMAT} \
-      --field_separator "${FIELD_SEPARATOR}" \
-      --enclosing_character "${ENCLOSING_CHARACTER}" \
-      --max_ignored_rows ${MAX_IGNORED_ROWS} \
-      --null_value "${NULL_VALUE}" \
-      --date_format "${DATE_FORMAT}" \
-      --date_time_format "${DATE_TIME_FORMAT}" \
-      --time_format "${TIME_FORMAT}" \
-      --boolean_representation ${BOOLEAN_REPRESENTATION} \
-      --skip_second_fraction \
-      -v ${V_LEVEL} \
-       > ${TEMP_TSLOAD_FILE} 2>&1
+      tsload "${tsload_params[@]}" > ${TEMP_TSLOAD_FILE} 2>&1
   fi
  
   if [[ $? != 0 ]]; then
@@ -514,13 +517,21 @@ function load_a_file() {
 
   # Move the loaded files to the old directory.
   if [[ ${SOURCE_TYPE} == "aws_s3" ]]; then
-    # Currently only mv and cp is supported for S3.  Others will probably fail.
-    echo "copying from bucket ${AWS_S3_BUCKET}"
-    if [[ ${schema_name} != ${DEFAULT_SCHEMA_NAME} ]]; then
-      aws s3 ${MOVE_LOADED_FILES} s3://${AWS_S3_BUCKET}/${schema_name}/${file_name} ${OLD_DIR}/${schema_name}/${file_name}
-    else
-      aws s3 ${MOVE_LOADED_FILES} s3://${AWS_S3_BUCKET}/${file_name} ${OLD_DIR}/${schema_name}/${file_name}
-    fi  
+    # Only copy if there is an archive location set
+    if [[ ${ARCHIVE_LOCATION} != "" && ${MOVE_LOADED_FILES} != "echo" ]]; then
+      # Currently only mv and cp is supported for S3.  Others will probably fail.
+      if [[ ${AWS_S3_DATA_DIR} != "/" && ${AWS_S3_DATA_DIR} != "" ]]; then
+        source_file_name="${AWS_S3_DATA_DIR}${file_name}"
+      else
+        source_file_name="/${file_name}"
+      fi
+      log_this "Copying/moving loaded files ${source_file_name} from bucket ${AWS_S3_BUCKET} to ${OLD_DIR}" "INFO"
+      if [[ ${schema_name} != ${DEFAULT_SCHEMA_NAME} ]]; then
+        aws s3 ${MOVE_LOADED_FILES} s3://${AWS_S3_BUCKET}/${schema_name}${source_file_name} ${OLD_DIR}/${schema_name}/${file_name}
+      else
+        aws s3 ${MOVE_LOADED_FILES} s3://${AWS_S3_BUCKET}${source_file_name} ${OLD_DIR}/${schema_name}/${file_name}
+      fi  
+    fi
   else
     ${MOVE_LOADED_FILES} "${source_file}" "${move_dir}"
   fi
@@ -544,19 +555,26 @@ function load_data_files() {
   exclude=""
   if [[ ${SOURCE_TYPE} == "aws_s3" ]]; then
     source_location=${AWS_S3_BUCKET}
+    if [[ ${AWS_S3_DATA_DIR} != "/" ]]; then
+	    source_location=${source_location}${AWS_S3_DATA_DIR}
+    fi
+
     if [[ ${EXCLUDE_PATTERN} != "" ]]; then
-      exclude="| grep -v *${EXCLUDE_PATTERN}"
+      exclude="| grep -v ${EXCLUDE_PATTERN}"  
       log_this "Excluding files of pattern *${EXCLUDE_PATTERN}" "INFO"
     fi
-    files_to_load=`aws s3 ls --recursive s3://${AWS_S3_BUCKET} | awk '{$1=$2=$3=""; print $0}' | sed 's/^[ \t]*//' | grep "${DATA_FILE_EXTENSION}$"`
+    # fix to get the optional 2nd grep to work. Open to better options
+    #files_to_load_cmd="aws s3 ls --recursive s3://${AWS_S3_BUCKET} | awk '{\$1=\$2=\$3=\"\"; print \$0}' | sed 's/^[ \t]*//' | grep "${DATA_FILE_EXTENSION}$" ${exclude}"
+    files_to_load_cmd="aws s3 ls --recursive s3://${source_location} | awk '{\$1=\$2=\$3=\"\"; print \$0}' | sed 's/^[ \t]*//' | grep "${DATA_FILE_EXTENSION}$" ${exclude}"
+    files_to_load=$(eval "${files_to_load_cmd}")
   else
     source_location=${DATA_DIR}
     if [[ ${EXCLUDE_PATTERN} != "" ]]; then
       exclude="! -iname *${EXCLUDE_PATTERN} " 
       log_this "Excluding files of pattern *${EXCLUDE_PATTERN}" "INFO"
     fi
-    files_to_load=`find ${DATA_DIR} -maxdepth 2 -iname "*${DATA_FILE_EXTENSION}" ${exclude} -print`
-    log_this "Executing: find ${DATA_DIR} -maxdepth 2 -iname *${DATA_FILE_EXTENSION} ${exclude} -print "
+    files_to_load=`find ${DATA_DIR} -maxdepth 2 -iname "*${DATA_FILE_EXTENSION}" ${exclude} -print | sort`
+    log_this "Executing: find ${DATA_DIR} -maxdepth 2 -iname *${DATA_FILE_EXTENSION} ${exclude} -print | sort"
   fi
   
   if [[ $files_to_load != "" ]]; then
@@ -566,13 +584,18 @@ function load_data_files() {
     for fn in ${files_to_load}; do
       local schema_name=${DEFAULT_SCHEMA_NAME}
       
+      # For file system loads remove the data dir
       if [[ ${SOURCE_TYPE} == "file_system" ]]; then
-        # for local files remove the base data dir
         fn=${fn#"$DATA_DIR"}
         # and potentially the last forward slash
         fn=${fn#"/"}
+      # For S3 loads from sub folders do the same
+      elif [[ ${AWS_S3_DATA_DIR} != "/" && "${AWS_S3_DATA_DIR}" != "" ]]; then
+        # Add a forward slash to the file and then remove the data dir
+        fn="/${fn}"
+        fn=${fn#"$AWS_S3_DATA_DIR"}
       fi
-       
+      
       should_ignore ${fn}  # makes sure not an ignore directory.
       if [[ $? != 0 ]]; then
         load_a_file "${fn}"
@@ -663,13 +686,17 @@ function cleanup_from_s3_load() {
     cat ${TEMP_RESULTS_FILE} >> ${RESULTS_FILE}
 
     results_file_name=`echo "${RESULTS_FILE}" | sed 's/.*\///'`
-    aws s3 cp ${RESULTS_FILE} ${OLD_DIR}/${results_file_name}
+    # Only copy log to aws s3 if there is an archive bucket
+    # if [[ ${AWS_S3_ARCHIVE_BUCKET} != "" ]]; then
+    if [[ ${ARCHIVE_LOCATION} != "" ]]; then
+      aws s3 cp ${RESULTS_FILE} ${OLD_DIR}/${results_file_name}
+    fi
   fi
 
   rm ${LOADING_FILE} # remove the loading semaphore file
 
   # if the semaphore exists, remove it.  Need to only do if it exists since otherwise can cause issues.
-  aws s3 ls s3://${AWS_S3_BUCKET}/${SEMAPHORE_FILE_NAME} 
+  aws s3 ls s3://${AWS_S3_BUCKET}/${SEMAPHORE_FILE_NAME} >>/dev/null 2>&1
   if [[ $? == 0 ]]; then  # semaphore exists.
     aws s3 rm s3://${AWS_S3_BUCKET}/${SEMAPHORE_FILE_NAME} 
   fi

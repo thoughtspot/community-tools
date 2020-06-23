@@ -36,7 +36,7 @@ Obviously, you can schedule this using any type of scheduler.
 
 - The database has been created in ThoughtSpot using TQL
 - The table names are the same as the names of the files with some allowed deviations (see below), e.g. SalesData.csv goes into a SalesData table.
-- The formats for dates, datetimes, boolean, and nulls are the same for all files.
+- The formats for dates, datetimes, boolean, and nulls are the same for all files. This is the best practice. However, we do support now format files allowing you to define different formats for different files
 - (optional) Email has been configured on the cluster so that load results can be sent to indicate status of the load.
 
 #### File names
@@ -152,12 +152,13 @@ Parameter	Description
 | FOLDER SETTINGS | ***IGNORE_DIRS*** | When scanning for input files the process will ignore directories with names specified in this list (space separated list) |
 | FOLDER SETTINGS | ***DATA_DIR*** | Specifies the data directory where data files will be placed. |
 | FOLDER SETTINGS | ***OLD_DIR_ROOT*** | The root folder for archiving |
-| AWS S3 SETTINGS | ***AWS_S3_ACCESS_KEY_ID*** | The access key from your AWS Config |
-| AWS S3 SETTINGS | ***AWS_S3_SECRET_ACCESS_KEY*** | The secret access key from your AWS config |
+| AWS S3 SETTINGS | ***AWS_S3_ACCESS_KEY_ID*** | The access key from your AWS Config. Note: recommended process is using IAM roles instead of these. Note that IAM role should have als write/delete access for load_files to work. |
+| AWS S3 SETTINGS | ***AWS_S3_SECRET_ACCESS_KEY*** | The secret access key from your AWS config Note: recommended process is using IAM roles instead of these. Note that IAM role should have als write/delete access for load_files to work. |
 | AWS S3 SETTINGS | ***AWS_S3_REGION*** | The region used, see: [AWS Service Endpoints](https://docs.aws.amazon.com/general/latest/gr/rande.html) |
 | AWS S3 SETTINGS | ***AWS_S3_BUCKET*** | The name of the bucket for files to load |
 | AWS S3 SETTINGS | ***AWS_S3_ARCHIVE_BUCKET*** | The name of the bucket to save loaded files. If blank no archiving will happen |
 | AWS S3 SETTINGS | ***AWS_S3_DATA_DIR*** | The folder under the bucket to start loading from. This is the actual data root. |
+| AWS S3 SETTINGS | ***AWS_S3_ARCHIVE_DIR*** | The folder under the bucket to archive data files to after loading. This can be either on the source or archive bucket. |
 | AWS S3 SETTINGS | ***AWS_S3_BUF_CAPACITY*** | The buffer for loading files. |
 | FILE SETTINGS | ***DATA_FILE_EXTENSION*** | The extension of the input data files, typically .csv |
 | FILE SETTINGS | ***EXCLUDE_PATTERN*** | pattern which should be excluded in the files matched using the ***DATA_FILE_EXTENSION***
@@ -182,6 +183,7 @@ Parameter	Description
 | TSLOAD SETTINGS | ***DATE_TIME_FORMAT*** | (used by `tsload`) <br/>The format for parsing date/times, e.g. %m-%d-%Y %H:%M:%s |
 | TSLOAD SETTINGS | ***TIME_FORMAT*** | (used by `tsload`) <br/>The format for parsing times, e.g. %H:%M:%s |
 | TSLOAD SETTINGS | ***BOOLEAN_REPRESENTATION*** | (used by `tsload`) <br/>Defines how to interpret Boolean values, e.g. True_False for True and False |
+| TSLOAD SETTINGS | ***FORMAT_FILE_DIR*** | (used by `tsload`) <br/>This allows you to use format files. These json files can define format overrides for particular tables. The json files should be stored in this folder and have the exact same name as the table, with the extension .json. If no format files are found or when this directory is empty it will use the settings from the main configuration file |
 | PRE/POST SHELL SCRIPTS SETTINGS | ***pre_load_shell*** | This array a shell script per table which will be executed before the loading of a table. The key of the array should be the table name. Note if you specify @LOAD as the table name then the script will be executed at the beginning/end of the complete load process. |
 | PRE/POST SHELL SCRIPTS SETTINGS | ***post_load_shell*** | This array a shell script per table which will be executed after the loading of a table. The key of the array should be the table name. Note if you specify @LOAD as the table name then the script will be executed at the beginning/end of the complete load process. |
 | PRE/POST SHELL SCRIPTS SETTINGS | ***SCRIPT_MAX_CHECK_ATTEMPTS*** | If a script was not completed, but returned to shell (timeout) how many times it should keep on checking before failing. |
