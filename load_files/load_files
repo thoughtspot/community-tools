@@ -255,11 +255,11 @@ function run_action() {
     IFS=$(echo -en ":\n")
 
     if [[ "${action_code}" != "" ]]; then
-      log_this "Running ${action_type} ${action_when} the loading of ${DATABASE_NAME}.${schema_name}.${table_name} from file ${file_name}. The command is: ${script}" "INFO"
 
       if [[ "${action_type}" == "shell script" ]]; then
         log_this "Executing shell script" "INFO"
         script="${action_code} -d \"${DATABASE_NAME}\" -s \"${schema_name}\" -t \"${table_name}\" -c \"${config_file}\" -l \"${TEMP_RESULTS_SUMMARY_FILE}\" -f \"${file_name}\""
+        log_this "Running ${action_type} ${action_when} the loading of ${DATABASE_NAME}.${schema_name}.${table_name} from file ${file_name}. The command is: ${script}" "INFO"
         # Run command in a sub shell
         (eval "${script}") & export SHELL_PID=$!
         log_this "${action_type} pid is ${SHELL_PID}" "INFO"
@@ -267,6 +267,7 @@ function run_action() {
       elif [[ "${action_type}" == "TQL" ]]; then
         log_this "Executing TQL" "INFO"
         script="${action_code}"
+        log_this "Running ${action_type} ${action_when} the loading of ${DATABASE_NAME}.${schema_name}.${table_name} from file ${file_name}. The command is: ${script}" "INFO"
         if run_sql "${script}"; then
           log_this "Query completed successfully." "SUCCESS"
         else
@@ -472,7 +473,6 @@ function load_a_file() {
     cat ${source_file} | 
       awk -v h="${header}" -v val="${values}" -v sep="${FIELD_SEPARATOR}" '{ if(h!="") { if(NR==1){ print $0 sep h } else { print $0 sep val } } else { print $0 } }' | 
       tsload "${tsload_params[@]}" > ${TEMP_TSLOAD_FILE} 2>&1
-
   fi
  
   if [[ $? != 0 ]]; then

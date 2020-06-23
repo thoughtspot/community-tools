@@ -17,7 +17,7 @@ alias ddldiff='python -m ddltools.ddldiff'
 
 ## user tools
 alias delete_ugs='python -m user_tools.delete_ugs'
-alias get_user='python -m user_tools.get_user'
+alias get_users='python -m user_tools.get_users'
 alias sync_from_excel='python -m user_tools.sync_from_excel'
 alias transfer_ownership='python -m user_tools.transfer_ownership'
 alias validate_json='python -m user_tools.validate_json'
