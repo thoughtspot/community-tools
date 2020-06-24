@@ -477,9 +477,11 @@ function load_a_file() {
  
   if [[ $? != 0 ]]; then
     has_tsload_error=true
+    failed=1
     log_this "tsload failed to load ${file_name} into ${DATABASE_NAME}.${schema_name}.${table_name}" "ERROR"
     number_failed_loads=$((number_failed_loads+1))
   else
+    failed=0
     log_this "${file_name} loaded successfully into ${DATABASE_NAME}.${schema_name}.${table_name}" "SUCCESS"
     number_successful_loads=$((number_successful_loads+1))
   fi
@@ -516,24 +518,28 @@ function load_a_file() {
   fi
 
   # Move the loaded files to the old directory.
-  if [[ ${SOURCE_TYPE} == "aws_s3" ]]; then
-    # Only copy if there is an archive location set
-    if [[ ${ARCHIVE_LOCATION} != "" && ${MOVE_LOADED_FILES} != "echo" ]]; then
-      # Currently only mv and cp is supported for S3.  Others will probably fail.
-      if [[ ${AWS_S3_DATA_DIR} != "/" && ${AWS_S3_DATA_DIR} != "" ]]; then
-        source_file_name="${AWS_S3_DATA_DIR}${file_name}"
-      else
-        source_file_name="/${file_name}"
-      fi
-      log_this "Copying/moving loaded files ${source_file_name} from bucket ${AWS_S3_BUCKET} to ${OLD_DIR}" "INFO"
-      if [[ ${schema_name} != ${DEFAULT_SCHEMA_NAME} ]]; then
-        aws s3 ${MOVE_LOADED_FILES} s3://${AWS_S3_BUCKET}/${schema_name}${source_file_name} ${OLD_DIR}/${schema_name}/${file_name}
-      else
-        aws s3 ${MOVE_LOADED_FILES} s3://${AWS_S3_BUCKET}${source_file_name} ${OLD_DIR}/${schema_name}/${file_name}
-      fi  
-    fi
+  if [[ ${ARCHIVE_DATA} == "onsuccess" && ${failed} == 1 ]]; then
+    log_this "Keeping failed file ${source_file} in data directory"
   else
-    ${MOVE_LOADED_FILES} "${source_file}" "${move_dir}"
+    if [[ ${SOURCE_TYPE} == "aws_s3" ]]; then
+      # Only copy if there is an archive location set
+      if [[ ${ARCHIVE_LOCATION} != "" && ${MOVE_LOADED_FILES} != "echo" ]]; then
+        # Currently only mv and cp is supported for S3.  Others will probably fail.
+        if [[ ${AWS_S3_DATA_DIR} != "/" && ${AWS_S3_DATA_DIR} != "" ]]; then
+          source_file_name="${AWS_S3_DATA_DIR}${file_name}"
+        else
+          source_file_name="/${file_name}"
+        fi
+        log_this "Copying/moving loaded files ${source_file_name} from bucket ${AWS_S3_BUCKET} to ${OLD_DIR}" "INFO"
+        if [[ ${schema_name} != ${DEFAULT_SCHEMA_NAME} ]]; then
+          aws s3 ${MOVE_LOADED_FILES} s3://${AWS_S3_BUCKET}/${schema_name}${source_file_name} ${OLD_DIR}/${schema_name}/${file_name}
+        else
+          aws s3 ${MOVE_LOADED_FILES} s3://${AWS_S3_BUCKET}${source_file_name} ${OLD_DIR}/${schema_name}/${file_name}
+        fi  
+      fi
+    else
+      ${MOVE_LOADED_FILES} "${source_file}" "${move_dir}"
+    fi
   fi
 }
 
