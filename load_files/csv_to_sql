@@ -59,7 +59,7 @@ touch ${filename}  # create new file for SQL.
 for f in `ls *${extension}`; do
   echo "parsing $f"
   fn=`echo $f | sed s/${extension}// | sed s/\\.$//`
-  head -1000 $f | csvsql --tables "${fn}" -i "postgresql" --blanks >> ${filename}
+  head -1000 $f | csvsql --tables "${fn}" -i "postgresql" -d "${delimeter}" --blanks >> ${filename}
 done
 
 # open for editing / inspection
