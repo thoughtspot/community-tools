@@ -1,7 +1,7 @@
 asn1crypto==0.24.0
 bcrypt==3.1.6
 cffi==1.12.2
-cryptography==2.6.1
+cryptography==3.2
 paramiko==2.4.2
 pyasn1==0.4.5
 pycparser==2.19
