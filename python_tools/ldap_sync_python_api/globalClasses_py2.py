@@ -1,10 +1,10 @@
-#! /usr/bin/env python3
+#!/usr/bin/env python
 # Copyright: ThoughtSpot Inc. 2016
 # Author: Vishwas B Sharma (vishwas.sharma@thoughtspot.com)
 """File to define classes which are used globally."""
 
 
-class Constants():
+class Constants(object):
     """Class to define constants in. Used as enumerations."""
     # Authentication Constants
     AUTHENTICATION_SUCCESS = 1
@@ -19,7 +19,7 @@ class Constants():
     PRIVILEGE_ADMINSTRATION = "ADMINISTRATION"
 
 
-class Result():
+class Result(object):
     """Class to send back the results in."""
 
     def __init__(self, status, data=None):

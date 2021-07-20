@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#! /usr/bin/env python3
 # Copyright: ThoughtSpot Inc. 2016
 # Author: Vishwas B Sharma (vishwas.sharma@thoughtspot.com)
 """Script to sync users and groups from LDAP System to TS System."""
@@ -21,7 +21,7 @@ from globalClasses import Constants
 ######################### Helper Classes/Functions ############################
 
 
-class Argument(object):
+class Argument():
     """Class used to define argument values for reuse."""
 
     def __init__(self, flag, help_str, action=None, default=None):
@@ -36,7 +36,7 @@ class Argument(object):
         self.default = default
 
 
-class ScriptArguments(object):
+class ScriptArguments():
     """Argument values are abstracted as static class constants to ensure code
        re-use is possible.
     """
@@ -171,7 +171,7 @@ def prompt_string(msg):
        @param msg: Message to display to user.
        @return: User's input or None.
     """
-    return raw_input("\n%s: " % msg).strip(" \n") or None
+    return input("\n%s: " % msg).strip(" \n") or None
 
 
 def yes_no(msg):
@@ -179,10 +179,10 @@ def yes_no(msg):
        @param msg: Message to be displayed to the user.
        @return: Boolean True or False value based on user choice or None.
     """
-    choice = raw_input("\n%s (y/n): " % msg)
+    choice = input("\n%s (y/n): " % msg)
     if choice == "y":
         return True
-    elif choice == "n":
+    if choice == "n":
         return False
     return None
 
@@ -207,7 +207,7 @@ def fetch_interactively(args_to_fetch):
 ######################### Core Classes/Functions ##############################
 
 
-class SyncTree(object):
+class SyncTree():
     """Class which encapsulates the logic for fetching entities from LDAP
        system and syncing them with ThoughtSpot system.
     """
@@ -231,7 +231,7 @@ class SyncTree(object):
         self.file_handle.write(
             "============================================\n"
         )
-        self.file_handle.write("Terminology : \n")
+        self.file_handle.write("Terminology :\n")
         self.file_handle.write("created => New entity created in TS System\n")
         self.file_handle.write(
             "synced => Entity already exists in TS System\n"
@@ -288,10 +288,8 @@ class SyncTree(object):
             self.file_handle.close()
             logging.error(msg)
             return
-        logging.info(
-            "Successfully verified admin privileges of "
-            + "ThoughtSpot login user.\n"
-        )
+        logging.info("Successfully verified admin privileges of "
+                     "ThoughtSpot login user.\n")
 
         # Other important information
         self.basedn = user_args["basedn"]
@@ -302,9 +300,9 @@ class SyncTree(object):
         self.purge_groups = user_args["purge_groups"]
         self.include_nontree_members = user_args["include_nontree_members"]
         self.user_identifier = user_args["user_identifier"]
-        self.member_str = user_args["member_str"]
         self.authdomain_identifier = user_args["authdomain_identifier"]
         self.email_identifier = user_args["email_identifier"]
+        self.member_str = user_args["member_str"]
         self.ldap_type = user_args["ldap_type"]
         self.keep_local_membership = user_args["keep_local_membership"]
         self.upsert_group = user_args["upsert_group"]
@@ -455,10 +453,8 @@ class SyncTree(object):
                 self.authdomain_identifier,
                 self.member_str
             )
-            if (
-                result.status != Constants.OPERATION_SUCCESS
-                or result.data is None
-            ):
+            if (result.status != Constants.OPERATION_SUCCESS
+                    or result.data is None):
                 logging.debug(
                     "Failed to obtain user object for user DN (%s)", userdn
                 )
@@ -467,6 +463,7 @@ class SyncTree(object):
             dn_to_obj_ldap_map[user.dn] = user
             ldap_user_names.append(user.name)
             prop = {"mail": user.email} if user.email else None
+
             result = self.ts_handle.sync_user(
                 user.name,
                 user.display_name,
@@ -508,10 +505,8 @@ class SyncTree(object):
                                                 self.email_identifier,
                                                 self.authdomain_identifier,
                                                 self.member_str)
-            if (
-                result.status != Constants.OPERATION_SUCCESS
-                or result.data is None
-            ):
+            if (result.status != Constants.OPERATION_SUCCESS
+                    or result.data is None):
                 logging.debug(
                     "Failed to obtain group object for group DN (%s)", groupdn
                 )
@@ -551,11 +546,8 @@ class SyncTree(object):
         domain_name = self.ldap_handle.fetch_domain_name_from_dn(self.basedn)
 
         # Fetch user info from ThoughtSpot system.
-        logging.debug(
-            "Fetching current users from ThoughtSpot system"
-            + " in domain (%s) including recently created.",
-            domain_name,
-        )
+        logging.debug("Fetching current users from ThoughtSpot system in "
+                      "domain (%s) including recently created.", domain_name)
         result = self.ts_handle.list_users()
         if result.status == Constants.OPERATION_SUCCESS:
             for user in result.data:
@@ -577,11 +569,8 @@ class SyncTree(object):
             logging.error("Failed to fetch users from ThoughtSpot system.\n")
 
         # Fetch group info from ThoughtSpot system.
-        logging.debug(
-            "Fetching current groups from ThoughtSpot system"
-            + " in domain (%s) including recently created.",
-            domain_name,
-        )
+        logging.debug("Fetching current groups from ThoughtSpot system in "
+                      "domain (%s) including recently created.", domain_name)
         result = self.ts_handle.list_groups()
         if result.status == Constants.OPERATION_SUCCESS:
             for group in result.data:
@@ -609,7 +598,7 @@ class SyncTree(object):
         # 3. ts_user_names, ts_group_names
         name_to_id_ts_map = defaultdict(
             lambda: None,
-            [(k.lower(), v) for k, v in name_to_id_ts_map.iteritems()],
+            [(k.lower(), v) for k, v in name_to_id_ts_map.items()],
         )
         ldap_user_names = [x.lower() for x in ldap_user_names]
         ldap_group_names = [x.lower() for x in ldap_group_names]
@@ -653,7 +642,7 @@ class SyncTree(object):
         if not parent_id_to_member_user_id_ts_map:
             logging.debug("No member user to group relationship to create.\n")
         else:
-            for parent_id in parent_id_to_member_user_id_ts_map.keys():
+            for parent_id in list(parent_id_to_member_user_id_ts_map.keys()):
                 result = self.ts_handle.update_users_to_group(
                     list(parent_id_to_member_user_id_ts_map[parent_id]),
                     parent_id,
@@ -678,8 +667,7 @@ class SyncTree(object):
             else:
                 logging.error(
                     "One or more member users to group relationship(s)"
-                    + " could not be created.\n"
-                )
+                    " could not be created.\n")
 
         # Create member group relationship in ThoughtSpot system.
         failed_relationships = 0
@@ -687,7 +675,7 @@ class SyncTree(object):
         if not parent_id_to_member_group_id_ts_map:
             logging.debug("No member group to group relationship to create.\n")
         else:
-            for parent_id in parent_id_to_member_group_id_ts_map.keys():
+            for parent_id in list(parent_id_to_member_group_id_ts_map.keys()):
                 self.ts_handle.update_groups_to_group(
                     list(parent_id_to_member_group_id_ts_map[parent_id]),
                     parent_id,
@@ -713,8 +701,7 @@ class SyncTree(object):
             else:
                 logging.error(
                     "One or more member groups to group relationship(s)"
-                    + " could not be created.\n"
-                )
+                    " could not be created.\n")
 
         # Delete others
         if self.purge or self.purge_users:
@@ -806,10 +793,10 @@ class SyncTree(object):
         logging.debug("Groups synced: %s", groups_synced)
         if self.purge or self.purge_users:
             logging.debug("Users deleted: %s", users_deleted)
-        if self.purge or self.purge_groups:
+        elif self.purge or self.purge_groups:
             logging.debug("Groups deleted: %s", groups_deleted)
 
-       # print "Refer to {} for details.".format(self.file_handle.name)
+        print("Refer to {} for details.".format(self.file_handle.name))
 
 
 def main(non_optional_args):
@@ -855,9 +842,8 @@ if __name__ == "__main__":
         "script", help="Takes all the required values as command line flags."
     )
 
-    for arg in chain(
-        ScriptArguments.non_optional_arguments, ScriptArguments.sync_arguments
-    ):
+    for arg in chain(ScriptArguments.non_optional_arguments,
+                     ScriptArguments.sync_arguments):
         script.add_argument(
             "--" + arg.flag,
             help=arg.help_str,
@@ -879,9 +865,8 @@ if __name__ == "__main__":
         logging.basicConfig(level=logging.INFO)
 
     # If any of the non_optional_arguments are left empty we need to quit.
-    if None in [
-        arguments[arg.flag] for arg in ScriptArguments.non_optional_arguments
-    ]:
+    if None in [arguments[arg.flag] for arg
+                in ScriptArguments.non_optional_arguments]:
         logging.error("One or more non-optional parameters are left empty.")
         sys.exit(1)
 

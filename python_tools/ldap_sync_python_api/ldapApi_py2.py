@@ -1,4 +1,4 @@
-#! /usr/bin/env python3
+#!/usr/bin/env python
 # Copyright: ThoughtSpot Inc. 2016
 # Author: Vishwas B Sharma (vishwas.sharma@thoughtspot.com)
 """Classes and Functions to log into and use LDAP System."""
@@ -11,13 +11,6 @@ import ldap
 from entityClasses import EntityType
 from globalClasses import Constants, Result
 
-def safe_str(inp):
-    """Python3 version of python-ldap library returns information as bytes.
-    This method is needed to ensure we convert bytes to string before using.
-    """
-    if isinstance(inp, bytes):
-        return inp.decode("utf-8")
-    return inp
 
 def pre_check(function):
     """A decorator to check for user authentication before executing the given
@@ -47,10 +40,10 @@ def pre_check(function):
     return wrapper
 
 
-class LDAPApiWrapper():
+class LDAPApiWrapper(object):
     """Wrapper class to connect to and fetch information from LDAP System."""
 
-    class User():
+    class User(object):
         """Entity class to hold most important details of User object."""
 
         def __init__(self, dn, name, display_name, email=None):
@@ -67,13 +60,15 @@ class LDAPApiWrapper():
             self.display_name = display_name
             self.email = email
 
+
+
         def __repr__(self):
             prn = "Type: {} DN: {} Name: {} DisplayName: {} email: {}"
             return prn.format(
                 self.type, self.dn, self.name, self.display_name, self.email
             )
 
-    class Group():
+    class Group(object):
         """Entity class to hold most important details of Group object."""
 
         def __init__(self, dn, name, display_name, members):
@@ -96,9 +91,10 @@ class LDAPApiWrapper():
                 self.type, self.dn, self.name, self.display_name, self.members
             )
 
- # LdapType Strings
+    # LdapType Strings
     OPEN_LDAP = "openldap"
     AD = "AD"
+
     # Filter Strings
     USER_FILTER_OPEN_LDAP = "(objectClass=inetOrgPerson)"
     GROUP_FILTER_OPEN_LDAP = \
@@ -135,7 +131,7 @@ class LDAPApiWrapper():
 
     def __del__(self):
         """On destructor call unbind and clear connection pool."""
-        for (_, conn) in list(self.connection_pool.items()):
+        for (_, conn) in self.connection_pool.items():
             if conn:
                 conn.unbind_s()
         self.connection_pool.clear()
@@ -188,7 +184,6 @@ class LDAPApiWrapper():
         # connection again and hence prevent an unnecessary network call to AD.
         if self.connection_pool[hostport]:
             return self.connection_pool[hostport]
-
         logging.debug("Returning default connection for %s.", hostport)
         return self.connection_pool["default"]
 
@@ -250,16 +245,16 @@ class LDAPApiWrapper():
 
     @pre_check
     def list_users(
-            self,
-            basedn,
-            ldap_type,
-            user_identifier,
-            email_identifier,
-            scope=None,
-            filter_str=None,
-            log_entities=True,
-            authdomain_identifier=None,
-            member_str=None
+        self,
+        basedn,
+        ldap_type,
+        user_identifier,
+        email_identifier,
+        scope=None,
+        filter_str=None,
+        log_entities=True,
+        authdomain_identifier=None,
+        member_str=None
     ):
         """Fetches users present in LDAP System.
 
@@ -279,7 +274,7 @@ class LDAPApiWrapper():
                 attr_uid = LDAPApiWrapper.OPEN_LDAP_ATTR_UID
             else:
                 attr_uid = user_identifier
-                user_filter = LDAPApiWrapper.USER_FILTER_OPEN_LDAP
+            user_filter = LDAPApiWrapper.USER_FILTER_OPEN_LDAP
         else:
             attr_uid = LDAPApiWrapper.AD_ATTR_UID
             user_filter = LDAPApiWrapper.USER_FILTER_AD
@@ -292,8 +287,7 @@ class LDAPApiWrapper():
                 LDAPApiWrapper.ATTR_CN,
                 LDAPApiWrapper.ATTR_EMAIL,
             ]
-
-        entity_list = []
+            entity_list = []
 
         # Add user_identifier to attr_list if not already in retrieval list.
         if user_identifier is not None and user_identifier not in attr_list:
@@ -304,8 +298,6 @@ class LDAPApiWrapper():
 
         if scope is None:
             scope = ldap.SCOPE_SUBTREE
-        if member_str is None:
-            member_str = LDAPApiWrapper.ATTR_MEMBER
 
         # If filter string is not specified we use default user filters.
         # If a filter is being provided we need to stitch together the
@@ -350,7 +342,7 @@ class LDAPApiWrapper():
             # Default attributes to be used as unique names.
             if user_identifier in entry:
                 name = (
-                    safe_str(entry[user_identifier][0])
+                    entry[user_identifier][0].decode('utf-8')
                     + self._get_domain_name(
                         dn,
                         user_identifier,
@@ -361,6 +353,7 @@ class LDAPApiWrapper():
                     "Using `" + user_identifier + "` for"
                     + " constructing unique name.\n"
                 )
+
             elif LDAPApiWrapper.AD_ATTR_UID in entry:
                 # If userPrincipalName not present then use sAMAccountName to
                 # construct user name.
@@ -390,6 +383,7 @@ class LDAPApiWrapper():
             email = None
             if email_identifier in entry:
                 email = entry[email_identifier][0]
+
             # Unique name is required to login. Hence any user without
             # a userPrincipalName/sAMAccountName would not be created
             # as such a user cannot log into the system.
@@ -399,17 +393,6 @@ class LDAPApiWrapper():
                 msg += "No unique name found for entry\n"
                 continue
 
-            if "displayName" in entry:
-                display_name = safe_str(entry["displayName"][0])
-            elif "name" in entry:
-                display_name = safe_str(entry["name"][0])
-            elif "cn" in entry:
-                display_name = safe_str(entry["cn"][0])
-            else:
-                display_name = name
-            email = None
-            if email_identifier in entry:
-                email = safe_str(entry[email_identifier][0])
             entity_list.append(
                 LDAPApiWrapper.User(dn, name, display_name, email)
             )
@@ -421,14 +404,14 @@ class LDAPApiWrapper():
 
     @pre_check
     def list_groups(
-            self,
-            basedn,
-            ldap_type,
-            user_identifier,
-            scope=None,
-            filter_str=None,
-            log_entities=True,
-            member_str=None
+        self,
+        basedn,
+        ldap_type,
+        user_identifier,
+        scope=None,
+        filter_str=None,
+        log_entities=True,
+        member_str=None
     ):
         """Fetches groups present in LDAP System.
 
@@ -452,7 +435,6 @@ class LDAPApiWrapper():
                 LDAPApiWrapper.ATTR_CN,
                 LDAPApiWrapper.ATTR_MEMBER,
             ]
-           # "name","displayName","cn",
             group_filter = LDAPApiWrapper.GROUP_FILTER_OPEN_LDAP
             member_str = LDAPApiWrapper.ATTR_MEMBER
         else:
@@ -509,16 +491,24 @@ class LDAPApiWrapper():
                 )
                 if not i_list:
                     if log_entities:
-                        logging.debug("Empty return for basedn %s with member "
-                                      "range %s filter_str %s.", basedn,
-                                      memberrange, filter_str)
+                        logging.debug(
+                            "Empty return for "
+                            + "basedn %s with member range %s filter_str %s.",
+                            basedn,
+                            memberrange,
+                            filter_str,
+                        )
                     break
                 item_list.extend(i_list)
             except Exception as e:
                 if log_entities:
-                    logging.debug("Threw exception for basedn %s with member "
-                                  "range %s filter_str %s.", basedn,
-                                  memberrange, filter_str)
+                    logging.debug(
+                        "Threw exception for "
+                        + "basedn %s with member range %s filter_str %s.",
+                        basedn,
+                        memberrange,
+                        filter_str,
+                    )
                     logging.error(e)
                 break
 
@@ -562,8 +552,6 @@ class LDAPApiWrapper():
                     member.extend(entry[member_key])
             if not member:
                 logging.debug("Group DN(%s) has no key `member`.", dn)
-            else:
-                member = [safe_str(mem) for mem in member]
 
             entity_list.append(
                 LDAPApiWrapper.Group(dn, name, display_name, member)
@@ -585,7 +573,7 @@ class LDAPApiWrapper():
             else:
                 entity_map[entity.dn] = entity
 
-        return Result(Constants.OPERATION_SUCCESS, list(entity_map.values()))
+        return Result(Constants.OPERATION_SUCCESS, entity_map.values())
 
     # Helper Functions #
 
@@ -650,6 +638,8 @@ class LDAPApiWrapper():
 
         if scope is None:
             scope = ldap.SCOPE_SUBTREE
+        # if filter_str is None:
+        #     filter_str = "(cn=*)"
         if filter_str is None:
             filter_str = LDAPApiWrapper.LIST_MEM_FILTER
 
@@ -671,14 +661,14 @@ class LDAPApiWrapper():
         return Result(Constants.OPERATION_SUCCESS, entity_list)
 
     def dn_to_obj(
-            self,
-            basedn,
-            ldap_type=None,
-            user_identifier=None,
-            email_identifier=None,
-            authdomain_identifier=None,
-            member_str=None,
-            log_entities=True
+        self,
+        basedn,
+        ldap_type=None,
+        user_identifier=None,
+        email_identifier=None,
+        authdomain_identifier=None,
+        member_str=None,
+        log_entities=True
     ):
         """Fetches if the node represented by basedn is of type user or group.
 
@@ -694,12 +684,15 @@ class LDAPApiWrapper():
         components = ldap.dn.explode_dn(basedn)
         # LDAP doesn't provide an information object when queried for just the
         # domain component.
-        if (components == []
-                or components[0].startswith("DC")
-                or components[0].startswith("dc")):
+        if (
+            components == []
+            or components[0].startswith("DC")
+            or components[0].startswith("dc")
+        ):
             return Result(Constants.OPERATION_SUCCESS)
 
         filter_str = "({})".format(components[0])
+
 
         result = self.list_groups(basedn,
                                   ldap_type,
@@ -714,15 +707,15 @@ class LDAPApiWrapper():
             return Result(Constants.AUTHENTICATION_FAILURE)
 
         result = self.list_users(
-            basedn,
-            ldap_type,
-            user_identifier,
-            email_identifier,
-            2,
-            filter_str,
-            log_entities,
-            authdomain_identifier,
-            member_str)
+                    basedn,
+                    ldap_type,
+                    user_identifier,
+                    email_identifier,
+                    2,
+                    filter_str,
+                    log_entities,
+                    authdomain_identifier,
+                    member_str)
         if result.status == Constants.OPERATION_SUCCESS and result.data:
             return Result(Constants.OPERATION_SUCCESS, result.data[0])
         if result.status == Constants.AUTHENTICATION_FAILURE:
