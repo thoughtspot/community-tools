@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#! /usr/bin/env python3
 # Copyright: ThoughtSpot Inc. 2016
 # Author: Vishwas B Sharma (vishwas.sharma@thoughtspot.com)
 
@@ -47,7 +47,7 @@ class TestLDAPApi(unittest.TestCase):
     def test_list_users(self):
         ldap_handle = LDAPApiWrapper()
         ldap_handle.login(HOSTPORT, USERNAME, PASSWORD)
-        result = ldap_handle.list_users(USER_DN)
+        result = ldap_handle.list_users(USER_DN, user_identifier="objectGUID")
         self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
 
     def test_list_groups(self):
@@ -76,10 +76,10 @@ class TestLDAPApi(unittest.TestCase):
 
         # Use this to search directly to ensure that when unhandled, an error
         # is thrown for bad filters.
-        conn = ldap_handle.conn
+        conn = ldap_handle.connection_pool["default"]
 
         # Assert ldap_handle search can handle various bad filters
-        bad_filters = ["(cn=\,)", "(cn=\)", "(cn=\\)"]
+        bad_filters = [r"(cn=\,)", r"(cn=\)", r"(cn=\\)"]
         for bad_filter in bad_filters:
             # Assert that search with unhandled filters raises error.
             with self.assertRaises(ldap.FILTER_ERROR):

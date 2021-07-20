@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#! /usr/bin/env python3
 # Copyright: ThoughtSpot Inc. 2016
 # Author: Vishwas B Sharma (vishwas.sharma@thoughtspot.com)
 
@@ -385,7 +385,7 @@ class TestTSApi(unittest.TestCase):
         ]
         invalid_guid_list = [None, "a", 1, "acdf1234-1-1-1-3", ""]
         test_input = valid_guid_list + invalid_guid_list
-        test_output = filter(is_valid_uuid, test_input)
+        test_output = list(filter(is_valid_uuid, test_input))
         self.assertEqual(len(test_output), 2)
         self.assertEqual(test_output[0], valid_guid_list[0])
         self.assertEqual(test_output[1], valid_guid_list[1])
@@ -455,10 +455,8 @@ class TestTSApi(unittest.TestCase):
                 sleep_time *= 2
                 create_count += 1
 
-        user_ids = set(
-            [ts.get_userid_with_name(user_name).data
-             for user_name in users]
-            ) # - set([None])
+        user_ids = {ts.get_userid_with_name(user_name).data
+                    for user_name in users} # - set([None])
         # Check that all users were successfully created
         self.assertEqual(len(users), len(user_ids))
 
@@ -494,21 +492,18 @@ class TestTSApi(unittest.TestCase):
         # Create ts user objects
         for u in users:
             ts.create_user(u, u)
-        user_ids = set(
-            [ts.get_userid_with_name(user_name).data
-             for user_name in users]
-            )
+        user_ids = {ts.get_userid_with_name(user_name).data
+                    for user_name in users}
 
         # Test batched entities call with offset
         offset = 3
         batchsize = 2
         users_list_ids = [u.id for u in ts.list_users().data]
         users_batched = ts._get_batched_entities(
-                            "User", offset, batchsize
-                             ).data[0]
+            "User", offset, batchsize).data[0]
         users_batched_ids = [u.id for u in users_batched]
         self.assertEqual(users_batched_ids,
-                        users_list_ids[offset:offset+batchsize])
+                         users_list_ids[offset:offset+batchsize])
 
         # Cleanup
         ts.delete_users(list(user_ids))

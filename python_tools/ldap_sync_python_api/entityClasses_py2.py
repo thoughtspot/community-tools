@@ -1,10 +1,10 @@
-#! /usr/bin/env python3
+#!/usr/bin/env python
 # Copyright: ThoughtSpot Inc. 2016
 # Author: Vishwas B Sharma (vishwas.sharma@thoughtspot.com)
 """Classes to define and use Entity types we support in TS."""
 
 
-class EntityType():
+class EntityType(object):
     """Entity Class to define and use different types of entities.
        Used like enumerations.
     """
@@ -12,7 +12,7 @@ class EntityType():
     GROUP = "Group"
 
 
-class EntityProperty():
+class EntityProperty(object):
     """Property class to act as a place holder for Entity properties.
        Both Users and Groups have certain properties. Some of these
        can be used to uniquely identify the User/Group. Two of them

@@ -1,8 +1,8 @@
-#!/usr/bin/env python
+#! /usr/bin/env python3
 # Copyright: ThoughtSpot Inc. 2016
 # Author: Vishwas B Sharma (vishwas.sharma@thoughtspot.com)
 """Classes and Functions to log into and use TS app."""
-import httplib
+import http.client
 import json
 import logging
 import string
@@ -16,16 +16,15 @@ from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from entityClasses import EntityProperty, EntityType
 from globalClasses import Constants, Result
 
-
 def password_gen():
     """Generates random string of length 10 characters for password.
        @return: Password with random characters of specified length.
     """
     chars = string.ascii_letters + string.digits + string.punctuation
     passwd = ("".join(choice(chars) for _ in range(7))
-            + choice(string.digits)
-            + choice(string.ascii_uppercase)
-            + choice(string.ascii_lowercase))
+              + choice(string.digits)
+              + choice(string.ascii_uppercase)
+              + choice(string.ascii_lowercase))
     return passwd
 
 
@@ -69,7 +68,7 @@ def pre_check(function):
     return wrapper
 
 
-class TSApiWrapper(object):
+class TSApiWrapper():
     """Wrapper class to log in and execute commands in TS system."""
 
     # URL end points used for various calls.
@@ -131,7 +130,7 @@ class TSApiWrapper(object):
                 data={"username": username,
                       "password": password},
             )
-            if response.status_code == httplib.OK:
+            if response.status_code == http.client.OK:
                 self.authenticated = True
                 logging.debug(TSApiWrapper.USER_AUTHENTICATION_SUCCESS)
                 return Result(Constants.OPERATION_SUCCESS)
@@ -167,7 +166,7 @@ class TSApiWrapper(object):
             response = self.session.get(
                 TSApiWrapper.INFO.format(hostport=self.hostport)
             )
-            if response.status_code == httplib.OK:
+            if response.status_code == http.client.OK:
                 logging.debug("Info object procured.")
                 return Result(
                     Constants.OPERATION_SUCCESS, json.loads(response.text)
@@ -190,13 +189,13 @@ class TSApiWrapper(object):
 
     @pre_check
     def sync_group(
-        self,
-        name,
-        display_name,
-        grouptype=None,
-        description=None,
-        privileges=None,
-        upsert_group=False
+            self,
+            name,
+            display_name,
+            grouptype=None,
+            description=None,
+            privileges=None,
+            upsert_group=False
     ):
         """Creates new group and adds it to TS system.
            @param name: Name of the new group.
@@ -227,15 +226,17 @@ class TSApiWrapper(object):
                     TSApiWrapper.CREATE_GROUP.format(hostport=self.hostport),
                     data=params,
                 )
-            if response.status_code == httplib.OK:
+            if response.status_code == http.client.OK:
                 logging.debug("New group %s added.", name)
                 return Result(Constants.OPERATION_SUCCESS)
-            if ((upsert_group and response.status_code == httplib.NO_CONTENT) or
-                    ((not upsert_group)
-                     and response.status_code == httplib.CONFLICT)):
+            if ((upsert_group
+                 and response.status_code == http.client.NO_CONTENT)
+                    or ((not upsert_group)
+                        and response.status_code == http.client.CONFLICT)):
                 logging.debug("Group %s already exists.", name)
                 return Result(Constants.GROUP_ALREADY_EXISTS)
-            logging.error("New group %s not added.", name)
+            logging.error("New group %s not added. Response: %s", name,
+                          response.text)
             return Result(Constants.OPERATION_FAILURE, response)
         except Exception as e:
             logging.error(e.message)
@@ -243,14 +244,14 @@ class TSApiWrapper(object):
 
     @pre_check
     def sync_user(
-        self,
-        name,
-        display_name,
-        usertype=None,
-        password=None,
-        properties=None,
-        groups=None,
-        upsert_user=False
+            self,
+            name,
+            display_name,
+            usertype=None,
+            password=None,
+            properties=None,
+            groups=None,
+            upsert_user=False
     ):
         """Creates new user and adds it to TS system.
            @param name: Name of the new user.
@@ -288,15 +289,16 @@ class TSApiWrapper(object):
                     TSApiWrapper.CREATE_USER.format(hostport=self.hostport),
                     data=params,
                 )
-            if response.status_code == httplib.OK:
+            if response.status_code == http.client.OK:
                 logging.debug("New user %s added.", name)
                 return Result(Constants.OPERATION_SUCCESS)
-            if ((upsert_user and response.status_code == httplib.NO_CONTENT) or
-                    ((not upsert_user)
-                     and response.status_code == httplib.CONFLICT)):
+            if ((upsert_user and response.status_code == http.client.NO_CONTENT)
+                    or ((not upsert_user)
+                        and response.status_code == http.client.CONFLICT)):
                 logging.debug("User %s already exists.", name)
                 return Result(Constants.USER_ALREADY_EXISTS)
-            logging.error("New user %s not added.", name)
+            logging.error("New user %s not added. Response %s", name,
+                          response.text)
             return Result(Constants.OPERATION_FAILURE, response)
         except Exception as e:
             logging.error(e.message)
@@ -313,7 +315,7 @@ class TSApiWrapper(object):
            set to None.
         """
         # Filter irregular input objects from entity_list
-        entity_list = filter(is_valid_uuid, entity_list)
+        entity_list = list(filter(is_valid_uuid, entity_list))
 
         if not entity_list:
             logging.debug(TSApiWrapper.NO_OPERATION_NEEDED)
@@ -334,7 +336,7 @@ class TSApiWrapper(object):
                 end_point.format(hostport=self.hostport),
                 data={"ids": json.dumps(entity_list)},
             )
-            if response.status_code == httplib.NO_CONTENT:
+            if response.status_code == http.client.NO_CONTENT:
                 logging.debug(success_msg)
                 return Result(Constants.OPERATION_SUCCESS)
             logging.error(failure_msg)
@@ -385,20 +387,19 @@ class TSApiWrapper(object):
 
         try:
             response = self.session.get(
-                   end_point.format(hostport=self.hostport), params=params
-                   )
-            if response.status_code == httplib.OK:
+                end_point.format(hostport=self.hostport), params=params)
+            if response.status_code == http.client.OK:
                 responseDict = json.loads(response.text)
                 for item in responseDict["headers"]:
                     assert "id" in item, "id not in item"
                     assert "name" in item, ("name not present for {}"
-                        .format(
-                            item["id"]
-                        ))
+                                            .format(
+                                                item["id"]
+                                            ))
                     assert "type" in item, ("type not present for {} {}"
-                        .format(
-                            item["id"], item["name"]
-                        ))
+                                            .format(
+                                                item["id"], item["name"]
+                                            ))
                     ent_property_obj = EntityProperty(
                         item["id"], item["name"], item["type"]
                     )
@@ -441,6 +442,7 @@ class TSApiWrapper(object):
                 batch_fail_msg = " Failed at batch number: {}".format(
                     batch_count
                     )
+                #pylint:disable=logging-not-lazy
                 logging.error(failure_msg + batch_fail_msg)
                 return result_obj
         logging.debug(success_msg)
@@ -482,7 +484,7 @@ class TSApiWrapper(object):
                 TSApiWrapper.ADD_USER_TO_GROUP.format(hostport=self.hostport),
                 data={"userid": uid, "groupid": gid},
             )
-            if response.status_code == httplib.NO_CONTENT:
+            if response.status_code == http.client.NO_CONTENT:
                 logging.debug(success_msg)
                 return Result(Constants.OPERATION_SUCCESS)
             logging.error(failure_msg)
@@ -500,7 +502,7 @@ class TSApiWrapper(object):
            set to None.
         """
         # Filter irregular input objects from principalids
-        principalids = filter(is_valid_uuid, principalids)
+        principalids = list(filter(is_valid_uuid, principalids))
 
         if not principalids:
             logging.debug(TSApiWrapper.NO_OPERATION_NEEDED)
@@ -519,7 +521,7 @@ class TSApiWrapper(object):
                     "groupid": gid,
                 },
             )
-            if response.status_code == httplib.NO_CONTENT:
+            if response.status_code == http.client.NO_CONTENT:
                 logging.debug(success_msg)
                 return Result(Constants.OPERATION_SUCCESS)
             logging.error(failure_msg)
@@ -564,7 +566,7 @@ class TSApiWrapper(object):
                     if user.type == "LOCAL_USER":
                         entity_list.append(user.id)
         # Filter irregular input objects from entity_list
-        entity_list = filter(is_valid_uuid, entity_list)
+        entity_list = list(filter(is_valid_uuid, entity_list))
 
         if entity == EntityType.GROUP:
             id_list_key = "principalids"
@@ -584,7 +586,7 @@ class TSApiWrapper(object):
                 end_point.format(hostport=self.hostport),
                 data={id_list_key: json.dumps(entity_list), "groupid": gid},
             )
-            if response.status_code == httplib.NO_CONTENT:
+            if response.status_code == http.client.NO_CONTENT:
                 logging.debug(success_msg)
                 return Result(Constants.OPERATION_SUCCESS)
             logging.error(failure_msg)
@@ -653,7 +655,7 @@ class TSApiWrapper(object):
             response = self.session.get(
                 end_point.format(hostport=self.hostport, groupid=gid)
             )
-            if response.status_code == httplib.OK:
+            if response.status_code == http.client.OK:
                 for item in json.loads(response.text):
                     ent_property_obj = EntityProperty(
                         item["header"]["id"],
