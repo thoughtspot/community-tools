@@ -109,7 +109,10 @@ class TSApiWrapper():
         if disable_ssl:
             requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
             self.session.verify = False
-        self.session.headers = {"X-Requested-By": "ThoughtSpot"}
+        self.session.headers = {
+            "X-Requested-By": "ThoughtSpot",
+            "User-Agent": "python/requests"
+        }
         self.authenticated = False
 
     # Authentication Functions #
