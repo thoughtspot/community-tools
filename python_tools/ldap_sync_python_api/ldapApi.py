@@ -366,7 +366,7 @@ class LDAPApiWrapper():
                 # construct user name.
                 # For sAMAccountName, also append domain name in user name.
                 name = (
-                    entry[LDAPApiWrapper.AD_ATTR_UID][0]
+                    safe_str(entry[LDAPApiWrapper.AD_ATTR_UID][0])
                     + self._get_domain_name(
                         dn,
                         LDAPApiWrapper.AD_ATTR_UID,
