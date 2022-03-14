@@ -131,7 +131,8 @@ class TSApiWrapper():
             response = self.session.post(
                 TSApiWrapper.LOGIN.format(hostport=self.hostport),
                 data={"username": username,
-                      "password": password},
+                      "password": password,
+                      "rememberme": "true"},
             )
             if response.status_code == http.client.OK:
                 self.authenticated = True
