@@ -17,7 +17,6 @@ import tsApi
 from entityClasses import EntityType
 from globalClasses import Constants
 
-
 ######################### Helper Classes/Functions ############################
 
 
@@ -133,6 +132,18 @@ class ScriptArguments():
             flag="email_identifier",
             help_str="Email identifier key for user creation or sync",
             default="mail",
+        ),
+        Argument(
+            flag="user_display_name_identifier",
+            help_str="User display name identifier key "
+            + "for user creation or sync",
+            default="displayName",
+        ),
+        Argument(
+            flag="group_display_name_identifier",
+            help_str="Group display name identifier key "
+            + "for group creation or sync",
+            default="displayName",
         ),
         Argument(
             flag="ldap_type",
@@ -302,6 +313,13 @@ class SyncTree():
         self.user_identifier = user_args["user_identifier"]
         self.authdomain_identifier = user_args["authdomain_identifier"]
         self.email_identifier = user_args["email_identifier"]
+
+        self.user_display_name_identifier = user_args[
+            "user_display_name_identifier"]
+
+        self.group_display_name_identifier = user_args[
+            "group_display_name_identifier"]
+
         self.member_str = user_args["member_str"]
         self.ldap_type = user_args["ldap_type"]
         self.keep_local_membership = user_args["keep_local_membership"]
@@ -332,18 +350,30 @@ class SyncTree():
         """Add group with distinguished name to group creation list.
            @param group_dn: Group's distinguished name.
         """
-        logging.debug(
-            "Group added to the creation list. Group DN: %s", group_dn
-        )
-        self.groups_to_create.add(group_dn)
 
-        result = self.ldap_handle.dn_to_obj(group_dn,
-                                            self.ldap_type,
-                                            self.user_identifier,
-                                            self.email_identifier,
-                                            self.authdomain_identifier,
-                                            self.member_str,
-                                            log_entities=True)
+        if group_dn in self.groups_to_create:
+            logging.debug(
+                "Group already exists in the creation list. Group DN: %s",
+                group_dn
+            )
+            return
+
+        self.groups_to_create.add(group_dn)
+        logging.debug(
+            "Group added to the creation list. Group DN: %s",
+            group_dn
+        )
+
+        result = self.ldap_handle.dn_to_obj(
+            group_dn,
+            self.ldap_type,
+            self.user_identifier,
+            self.email_identifier,
+            self.user_display_name_identifier,
+            self.group_display_name_identifier,
+            self.authdomain_identifier,
+            self.member_str,
+            log_entities=True)
         if result.status != Constants.OPERATION_SUCCESS or result.data is None:
             logging.debug(
                 "Failed to obtain group object for group DN (%s)", group_dn
@@ -357,13 +387,16 @@ class SyncTree():
         else:
             logging.debug("Adding members of the group (%s).", group_dn)
             for member_dn in group.members:
-                my_type = self.ldap_handle.isOfType(member_dn,
-                                                    self.ldap_type,
-                                                    self.user_identifier,
-                                                    self.email_identifier,
-                                                    self.member_str,
-                                                    self.authdomain_identifier
-                                                    ).data
+                my_type = self.ldap_handle.isOfType(
+                    member_dn,
+                    self.ldap_type,
+                    self.user_identifier,
+                    self.email_identifier,
+                    self.user_display_name_identifier,
+                    self.group_display_name_identifier,
+                    self.member_str,
+                    self.authdomain_identifier).data
+
                 if my_type == EntityType.USER:
                     logging.debug(
                         "Adding relationship User(%s) to Group(%s)",
@@ -412,12 +445,23 @@ class SyncTree():
             return
 
         for member_dn in result.data:
-            my_type = self.ldap_handle.isOfType(member_dn,
-                                                self.ldap_type,
-                                                self.user_identifier,
-                                                self.email_identifier,
-                                                self.member_str,
-                                                self.authdomain_identifier).data
+
+            if (member_dn in self.groups_to_create) \
+                    or (member_dn in self.users_to_create):
+                logging.debug(
+                    "Member already exists in the creation list. Member DN: %s",
+                    member_dn
+                )
+                continue
+            my_type = self.ldap_handle.isOfType(
+                member_dn,
+                self.ldap_type,
+                self.user_identifier,
+                self.email_identifier,
+                self.user_display_name_identifier,
+                self.group_display_name_identifier,
+                self.member_str,
+                self.authdomain_identifier).data
             logging.debug("member_dn entity type (%s) (%s)", my_type, member_dn)
             if my_type == EntityType.USER:
                 self.add_user_to_create(member_dn)
@@ -450,6 +494,8 @@ class SyncTree():
                 self.ldap_type,
                 self.user_identifier,
                 self.email_identifier,
+                self.user_display_name_identifier,
+                self.group_display_name_identifier,
                 self.authdomain_identifier,
                 self.member_str
             )
@@ -499,12 +545,15 @@ class SyncTree():
         groups_created, groups_synced = 0, 0
         logging.info("Syncing groups to ThoughtSpot system.")
         for groupdn in self.groups_to_create:
-            result = self.ldap_handle.dn_to_obj(groupdn,
-                                                self.ldap_type,
-                                                self.user_identifier,
-                                                self.email_identifier,
-                                                self.authdomain_identifier,
-                                                self.member_str)
+            result = self.ldap_handle.dn_to_obj(
+                groupdn,
+                self.ldap_type,
+                self.user_identifier,
+                self.email_identifier,
+                self.user_display_name_identifier,
+                self.group_display_name_identifier,
+                self.authdomain_identifier,
+                self.member_str)
             if (result.status != Constants.OPERATION_SUCCESS
                     or result.data is None):
                 logging.debug(
@@ -860,9 +909,15 @@ if __name__ == "__main__":
         arguments.update(arg_strs)
 
     if "debug" in arguments and arguments["debug"]:
-        logging.basicConfig(level=logging.DEBUG)
+        logging.basicConfig(
+            format='%(asctime)s %(levelname)-8s %(message)s',
+            level=logging.DEBUG,
+            datefmt='%Y-%m-%d %H:%M:%S')
     else:
-        logging.basicConfig(level=logging.INFO)
+        logging.basicConfig(
+            format='%(asctime)s %(levelname)-8s %(message)s',
+            level=logging.INFO,
+            datefmt='%Y-%m-%d %H:%M:%S')
 
     # If any of the non_optional_arguments are left empty we need to quit.
     if None in [arguments[arg.flag] for arg

@@ -104,7 +104,8 @@ class LDAPApiWrapper():
     GROUP_FILTER_OPEN_LDAP = \
         "(|(objectClass=group)(objectClass=groupOfUniqueNames))"
     USER_FILTER_AD = "(|(objectClass=user)(objectClass=person))"
-    GROUP_FILTER_AD = "(|(objectClass=group)(objectClass=container))"
+    GROUP_FILTER_AD = "(|(objectClass=group)(objectClass=container)" \
+                      "(objectClass=groupOfUniqueNames))"
     FILTER_ADD = "(&{}{})"
     FILTER_OR = "(|{}{})"
     ATTR_UPN = "userPrincipalName"
@@ -113,6 +114,8 @@ class LDAPApiWrapper():
     ATTR_CN = "cn"
     ATTR_EMAIL = "mail"
     ATTR_MEMBER = "member"
+    ATTR_CATRECID = "catrecid"
+    ATTR_UM = "uniqueMember"
     LIST_MEM_FILTER = "(cn=*)"
 
     #AD Attribute settings
@@ -255,6 +258,7 @@ class LDAPApiWrapper():
             ldap_type,
             user_identifier,
             email_identifier,
+            user_display_name_identifier,
             scope=None,
             filter_str=None,
             log_entities=True,
@@ -271,6 +275,8 @@ class LDAPApiWrapper():
         :param authdomain_identifier: Custom domain name to be appended to
         user identifier key for user name.
         :param email_identifier: Identifier key to be used for user email.
+        :param user_display_name_identifier: Identifier key to be used for
+        displaying user's name
         :return: Result object with operation status and data. Here data is
         a list of User objects present in LDAP System.
         """
@@ -284,14 +290,15 @@ class LDAPApiWrapper():
             attr_uid = LDAPApiWrapper.AD_ATTR_UID
             user_filter = LDAPApiWrapper.USER_FILTER_AD
 
-            attr_list = [
-                attr_uid,
-                LDAPApiWrapper.ATTR_UPN,
-                LDAPApiWrapper.ATTR_NAME,
-                LDAPApiWrapper.ATTR_DISPLAY_NAME,
-                LDAPApiWrapper.ATTR_CN,
-                LDAPApiWrapper.ATTR_EMAIL,
-            ]
+        attr_list = [
+            attr_uid,
+            LDAPApiWrapper.ATTR_UPN,
+            LDAPApiWrapper.ATTR_NAME,
+            LDAPApiWrapper.ATTR_DISPLAY_NAME,
+            LDAPApiWrapper.ATTR_CN,
+            LDAPApiWrapper.ATTR_EMAIL,
+            LDAPApiWrapper.ATTR_CATRECID
+        ]
 
         entity_list = []
 
@@ -301,6 +308,12 @@ class LDAPApiWrapper():
         # Add email_identifier to attr_list if not already in retrieval list.
         if email_identifier is not None and email_identifier not in attr_list:
             attr_list.append(email_identifier)
+        # Add display_name_identifier to attr_list if not already
+        # in retrieval list.
+        if user_display_name_identifier is not None:
+            if user_display_name_identifier not in attr_list:
+                attr_list.append(user_display_name_identifier)
+
 
         if scope is None:
             scope = ldap.SCOPE_SUBTREE
@@ -378,18 +391,21 @@ class LDAPApiWrapper():
                     + " constructing unique name.\n"
                 )
 
-            if LDAPApiWrapper.ATTR_DISPLAY_NAME in entry:
-                display_name = entry[LDAPApiWrapper.ATTR_DISPLAY_NAME][0]
+            if user_display_name_identifier in entry:
+                display_name = safe_str(entry[user_display_name_identifier][0])
+            elif LDAPApiWrapper.ATTR_DISPLAY_NAME in entry:
+                display_name = safe_str(
+                    entry[LDAPApiWrapper.ATTR_DISPLAY_NAME][0])
             elif LDAPApiWrapper.ATTR_NAME in entry:
-                display_name = entry[LDAPApiWrapper.ATTR_NAME][0]
+                display_name = safe_str(entry[LDAPApiWrapper.ATTR_NAME][0])
             elif LDAPApiWrapper.ATTR_CN in entry:
-                display_name = entry[LDAPApiWrapper.ATTR_CN][0]
+                display_name = safe_str(entry[LDAPApiWrapper.ATTR_CN][0])
             else:
                 display_name = name
 
             email = None
             if email_identifier in entry:
-                email = entry[email_identifier][0]
+                email = safe_str(entry[email_identifier][0])
             # Unique name is required to login. Hence any user without
             # a userPrincipalName/sAMAccountName would not be created
             # as such a user cannot log into the system.
@@ -399,17 +415,6 @@ class LDAPApiWrapper():
                 msg += "No unique name found for entry\n"
                 continue
 
-            if "displayName" in entry:
-                display_name = safe_str(entry["displayName"][0])
-            elif "name" in entry:
-                display_name = safe_str(entry["name"][0])
-            elif "cn" in entry:
-                display_name = safe_str(entry["cn"][0])
-            else:
-                display_name = name
-            email = None
-            if email_identifier in entry:
-                email = safe_str(entry[email_identifier][0])
             entity_list.append(
                 LDAPApiWrapper.User(dn, name, display_name, email)
             )
@@ -425,6 +430,7 @@ class LDAPApiWrapper():
             basedn,
             ldap_type,
             user_identifier,
+            group_display_name_identifier,
             scope=None,
             filter_str=None,
             log_entities=True,
@@ -436,6 +442,8 @@ class LDAPApiWrapper():
         :param scope: Scope to limit the search to (0:base, 1:one, 2:tree).
         :param filter_str: Filter string to apply to search.
         :param log_entities: Flag if entity logging should be done.
+        :param group_display_name_identifier key is to be used for displaying
+        group name
         :return: Result object with operation status and data. Here data is
         a list of Group objects present in LDAP System.
         """
@@ -451,10 +459,10 @@ class LDAPApiWrapper():
                 LDAPApiWrapper.ATTR_DISPLAY_NAME,
                 LDAPApiWrapper.ATTR_CN,
                 LDAPApiWrapper.ATTR_MEMBER,
+                LDAPApiWrapper.ATTR_UM
             ]
            # "name","displayName","cn",
             group_filter = LDAPApiWrapper.GROUP_FILTER_OPEN_LDAP
-            member_str = LDAPApiWrapper.ATTR_MEMBER
         else:
             common_attrs = [
                 LDAPApiWrapper.AD_ATTR_UID,
@@ -463,9 +471,9 @@ class LDAPApiWrapper():
                 LDAPApiWrapper.ATTR_DISPLAY_NAME,
                 LDAPApiWrapper.ATTR_CN,
                 LDAPApiWrapper.ATTR_MEMBER,
+                LDAPApiWrapper.ATTR_UM
             ]
             group_filter = LDAPApiWrapper.GROUP_FILTER_AD
-            member_str = LDAPApiWrapper.ATTR_MEMBER
         entity_list = []
 
         if scope is None:
@@ -496,6 +504,11 @@ class LDAPApiWrapper():
             st, en = ind, ind + window
             memberrange = "member;range={}-{}".format(st, en)
             attr_list = common_attrs + [memberrange]
+
+            if group_display_name_identifier is not None:
+                if group_display_name_identifier is not attr_list:
+                    attr_list.append(group_display_name_identifier)
+
             if log_entities:
                 logging.debug(
                     "Basedn %s with member range %s filter_str %s.",
@@ -546,12 +559,15 @@ class LDAPApiWrapper():
             ) + self.fetch_domain_name_from_dn(dn)
             # If name follows a consistant rule then we can use patterns
             # to create good looking display names.
-            if LDAPApiWrapper.ATTR_DISPLAY_NAME in entry:
-                display_name = entry[LDAPApiWrapper.ATTR_DISPLAY_NAME][0]
+            if group_display_name_identifier in entry:
+                display_name = safe_str(entry[group_display_name_identifier][0])
+            elif LDAPApiWrapper.ATTR_DISPLAY_NAME in entry:
+                display_name = safe_str(
+                    entry[LDAPApiWrapper.ATTR_DISPLAY_NAME][0])
             elif LDAPApiWrapper.ATTR_NAME in entry:
-                display_name = entry[LDAPApiWrapper.ATTR_NAME][0]
+                display_name = safe_str(entry[LDAPApiWrapper.ATTR_NAME][0])
             elif LDAPApiWrapper.ATTR_CN in entry:
-                display_name = entry[LDAPApiWrapper.ATTR_CN][0]
+                display_name = safe_str(entry[LDAPApiWrapper.ATTR_CN][0])
             else:
                 display_name = dn
 
@@ -561,7 +577,7 @@ class LDAPApiWrapper():
                 if member_key.startswith(member_str):
                     member.extend(entry[member_key])
             if not member:
-                logging.debug("Group DN(%s) has no key `member`.", dn)
+                logging.debug("Group DN(%s) has no key: %s.", dn, member_str)
             else:
                 member = [safe_str(mem) for mem in member]
 
@@ -676,6 +692,8 @@ class LDAPApiWrapper():
             ldap_type=None,
             user_identifier=None,
             email_identifier=None,
+            user_display_name_identifier=None,
+            group_display_name_identifier=None,
             authdomain_identifier=None,
             member_str=None,
             log_entities=True
@@ -688,6 +706,10 @@ class LDAPApiWrapper():
         :param authdomain_identifier: Custom domain name to be appended to
         user identifier key for user name.
         :param email_identifier: Identifier key to be used for user email.
+        :param user_display_name_identifier: Identifier key to be used for
+        displaying user's name
+        :param group_display_name_identifier: Identifier key to be used for
+        displaying group's name
         :return: Result object with operation status and data. Here data is
         a LDAP user/group object corresponding to the basedn. None for others.
         """
@@ -704,6 +726,7 @@ class LDAPApiWrapper():
         result = self.list_groups(basedn,
                                   ldap_type,
                                   user_identifier,
+                                  group_display_name_identifier,
                                   2,
                                   filter_str,
                                   log_entities,
@@ -718,6 +741,7 @@ class LDAPApiWrapper():
             ldap_type,
             user_identifier,
             email_identifier,
+            user_display_name_identifier,
             2,
             filter_str,
             log_entities,
@@ -735,11 +759,17 @@ class LDAPApiWrapper():
                  ldap_type,
                  user_identifier,
                  email_identifier,
+                 user_display_name_identifier,
+                 group_display_name_identifier,
                  member_str,
                  authdomain_identifier):
         """Fetches if the node represented by basedn is of type user or group.
 
         :param basedn: Distinguished name for the base in LDAP System.
+        :param user_display_name_identifier: Identifier key to be used for
+        displaying user's name
+        :param group_display_name_identifier: Identifier key to be used for
+        displaying group's name
         :return: Result object with operation status and data. Here data is
         EntityType.User for User, EntityType.Group for Group, None for DC
         and others.
@@ -748,6 +778,8 @@ class LDAPApiWrapper():
                                 ldap_type,
                                 user_identifier,
                                 email_identifier,
+                                user_display_name_identifier,
+                                group_display_name_identifier,
                                 member_str,
                                 authdomain_identifier)
         if result.status == Constants.OPERATION_SUCCESS:
