@@ -618,7 +618,8 @@ class LDAPApiWrapper():
         # the user identifier
         name = ''
         if authdomain_identifier is not None:
-            name += '@' + authdomain_identifier
+           if authdomain_identifier != "":
+              name += '@' + authdomain_identifier
         elif user_identifier == LDAPApiWrapper.AD_ATTR_UID:
             name += self.fetch_domain_name_from_dn(dn)
         return name
