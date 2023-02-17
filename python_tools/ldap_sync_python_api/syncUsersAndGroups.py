@@ -92,6 +92,13 @@ class ScriptArguments():
             action="store_true",
             default=False,
         ),
+        Argument(
+            flag="dry_run",
+            help_str="Dry Run to check which users,groups will be added,"
+            + "synced, deleted",
+            action="store_true",
+            default=False,
+        ),
     ]
     sync_arguments = [
         Argument(
@@ -227,11 +234,16 @@ class SyncTree():
 
     def __init__(self, user_args):
         """@param arguments: Arguments provided by user."""
+        self.dry_run = user_args["dry_run"]
         # Prerequisites for reporting.
+
         timestamp = datetime.datetime.fromtimestamp(time.time())
         file_name = (
             "sync_report_" + timestamp.strftime("%Y_%m_%d_%H_%M") + ".txt"
         )
+        if self.dry_run:
+            file_name = ("dry_run_" + file_name)
+
         self.file_handle = open(file_name, "w")
         self.file_handle.write(
             "============================================\n"
@@ -335,7 +347,11 @@ class SyncTree():
 
         # Update the fetched users, groups and their relationships to
         # ThoughtSpot.
-        self.update_thoughtspot()
+        if self.dry_run:
+            self.dryRun()
+        else:
+            self.update_thoughtspot()
+
 
     def add_user_to_create(self, user_dn):
         """Add user with distinguished name to user creation list.
@@ -847,6 +863,138 @@ class SyncTree():
 
         print("Refer to {} for details.".format(self.file_handle.name))
 
+
+    def dryRun(self):
+        """Perform dry run and report the users/groups
+        that will be added/synced/deleted to/from TS
+        """
+
+        ldap_user_names, ldap_group_names = [], []
+        ts_user_names, ts_group_names = [], []
+        ts_user_names_domin, ts_group_names_domin = [], []
+
+        self.file_handle.write("\n===== Dry Run =====\n\n")
+
+        domain_name = self.ldap_handle.fetch_domain_name_from_dn(self.basedn)
+
+        logging.info("Syncing users to ThoughtSpot system.")
+        for userdn in self.users_to_create:
+            result = self.ldap_handle.dn_to_obj(
+                userdn,
+                self.ldap_type,
+                self.user_identifier,
+                self.email_identifier,
+                self.user_display_name_identifier,
+                self.group_display_name_identifier,
+                self.authdomain_identifier,
+                self.member_str
+            )
+            if (result.status != Constants.OPERATION_SUCCESS
+                    or result.data is None):
+                logging.debug(
+                    "Failed to obtain user object for user DN (%s)", userdn
+                )
+                continue
+            user = result.data
+            ldap_user_names.append(user.name.lower())
+
+        result = self.ts_handle.list_users()
+
+        if result.status == Constants.OPERATION_SUCCESS:
+            for user in result.data:
+                ts_user_names.append(user.name.lower())
+                if user.name.endswith(domain_name):
+                    ts_user_names_domin.append(user.name.lower())
+            if not ts_user_names:
+                logging.debug(
+                    "No users fetched from thoughtspot")
+            else:
+                logging.debug(
+                    "Users fetched [%s]: \n%s\n",
+                    len(ts_user_names),
+                    ",\n".join(ts_user_names),
+                )
+        else:
+            logging.error("Failed to fetch users from ThoughtSpot system.\n")
+
+        users_to_create = list(set(ldap_user_names) - set(ts_user_names))
+
+        self.file_handle.write("\n\nUsers Created: \n\n\n {}\n"
+        .format(users_to_create))
+
+        users_to_sync = list(set(ldap_user_names) - set(users_to_create))
+
+        self.file_handle.write("\n\nUsers Sync: \n\n\n {}\n"
+        .format(users_to_sync))
+
+        logging.info("Syncing groups to ThoughtSpot system.")
+        for groupdn in self.groups_to_create:
+            result = self.ldap_handle.dn_to_obj(
+                groupdn,
+                self.ldap_type,
+                self.user_identifier,
+                self.email_identifier,
+                self.user_display_name_identifier,
+                self.group_display_name_identifier,
+                self.authdomain_identifier,
+                self.member_str)
+            if (result.status != Constants.OPERATION_SUCCESS
+                    or result.data is None):
+                logging.debug(
+                    "Failed to obtain group object for group DN (%s)", groupdn
+                )
+                continue
+            group = result.data
+            ldap_group_names.append(group.name.lower())
+
+        result = self.ts_handle.list_groups()
+
+        if result.status == Constants.OPERATION_SUCCESS:
+            for group in result.data:
+                ts_group_names.append(group.name.lower())
+                if group.name.endswith(domain_name):
+                    ts_group_names_domin.append(group.name.lower())
+            if not ts_group_names:
+                logging.debug(
+                    "No groups fetched from thoughtspot")
+            else:
+                logging.debug(
+                    "Groups fetched [%s]: \n%s\n",
+                    len(ts_group_names),
+                    ",\n".join(ts_group_names),
+                )
+        else:
+            logging.error("Failed to fetch groups from ThoughtSpot system.\n")
+
+        group_to_create = list(set(ldap_group_names) - set(ts_group_names))
+
+        self.file_handle.write("\n\nGroup Created: \n\n\n {}\n"
+        .format(group_to_create))
+
+        groups_to_sync = list(set(ldap_group_names) - set(group_to_create))
+
+        self.file_handle.write("\n\nGroup Sync: \n\n\n {}\n"
+        .format(groups_to_sync))
+
+        if self.purge or self.purge_users:
+            self.file_handle.write("\n===== User Deletion Phase =====\n\n")
+            logging.info("Deleting users not in current sync path.")
+            users_to_delete = list(set(ts_user_names_domin)
+            .union(set(users_to_create)) - set(ldap_user_names))
+
+            self.file_handle.write("\n\nUsers Deleted: \n\n\n {}\n"
+            .format(users_to_delete))
+
+        if self.purge or self.purge_groups:
+            self.file_handle.write("\n===== Group Deletion Phase =====\n\n")
+            logging.info("Deleting groups not in current sync path.")
+            groups_to_delete = list(set(ts_group_names_domin)
+            .union(set(group_to_create)) - set(ldap_group_names))
+
+            self.file_handle.write("\n\nGroup Deleted: \n\n\n {}\n"
+            .format(groups_to_delete))
+
+        print("Refer to {} for details.".format(self.file_handle.name))
 
 def main(non_optional_args):
     """Function to act as starting point to all other calls needed to sync.
