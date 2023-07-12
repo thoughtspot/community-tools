@@ -560,12 +560,8 @@ def delete_groups(
                 org_sync_tree.file_handle.write(msg)
                 logging.debug(msg)
             else:
-                logging.debug(
-                    "Group deleted :\n%s\n",
-                    ",\n".join(
-                        group_id_to_name_ts_map[group_id]
-                    ),
-                )
+                logging.debug("Group Deleted: %s",
+                              group_id_to_name_ts_map[group_id])
         groups_deleted[0] += group_deleted
         if group_deleted == 1:
             msg = "\n{} Group deleted\n" \
