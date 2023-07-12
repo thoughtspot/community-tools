@@ -81,7 +81,7 @@ python3 syncUsersAndGroups.py script --ts_hostport TS_HOSTPORT --ts_uname TS_USE
 1. If the <b>org_mapping</b> flag is added. The script will exit if none of <b>org_file_input</b>
    or <b>org_attr</b> flags are provided.
 2. For any parent-member relationship, if the member doesn't exist in each of parent't org the script
-   will throw org conflict, unless ni org mapping for the member is given. Example: <br/>
+   will throw org conflict, unless no org mapping for the member is given. Example: <br/>
    Case1:
     ```json
    [
@@ -202,6 +202,9 @@ No users to delete
 Removed moo_100@ldap.thoughtspot.com User from orgs ['org3']
 Removed tsadmin@ldap.thoughtspot.com User from orgs ['org3']
 ```
+### Dry Run
+We also support a dry run step, which report metrics of users to be created/synced, Groups to be created/synced, Groups and Users to be purged and Groups and Users to be removed from specific orgs.
+
 ## Summary Reporting
 **Reported Metrics:** </br>
 Number of Orgs created</br>

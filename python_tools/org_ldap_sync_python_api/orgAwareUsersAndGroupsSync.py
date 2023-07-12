@@ -183,6 +183,8 @@ class OrgAwareSyncTree(syncUsersAndGroups.SyncTree):
         """
         Populated org mapping from the given input file
         """
+        logging.info("Reading Input from the %s file",
+                     self.org_file_input)
         try:
             with open(self.org_file_input) as file:
                 parsed_json = json.load(file)
@@ -437,19 +439,19 @@ class OrgAwareSyncTree(syncUsersAndGroups.SyncTree):
         ts_user_names = [x.lower() for x in ts_user_names]
         ts_group_names = [x.lower() for x in ts_group_names]
         ldap_group_name_to_org = defaultdict(
-            lambda: None,
+            lambda: set(),
             [(k.lower(), v) for k, v in ldap_group_name_to_org.items()],
         )
         ldap_user_name_to_org = defaultdict(
-            lambda: None,
+            lambda: set(),
             [(k.lower(), v) for k, v in ldap_user_name_to_org.items()],
         )
         ts_group_name_to_org = defaultdict(
-            lambda: None,
+            lambda: set(),
             [(k.lower(), v) for k, v in ts_group_name_to_org.items()],
         )
         ts_user_name_to_org = defaultdict(
-            lambda: None,
+            lambda: set(),
             [(k.lower(), v) for k, v in ts_user_name_to_org.items()],
         )
 
