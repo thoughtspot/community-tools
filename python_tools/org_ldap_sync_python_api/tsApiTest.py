@@ -509,6 +509,225 @@ class TestTSApi(unittest.TestCase):
         ts.delete_users(list(user_ids))
 
 
+    def test_switch_org(self):
+        """
+        Tests switch org api.
+        """
+
+        # Login
+        ts = TSApiWrapper(DISABLE_SSL)
+        ts.login(HOSTPORT, USERNAME, PASSWORD)
+
+        # try to create orgs from Default org context
+        result = ts.switch_org(int(Constants.DEFAULT_ORG_ID))
+        self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
+
+        # create org should fail as we can't create orgs from
+        # default org context
+        result = ts.create_org("TestOrg", "TestOrg_des")
+        self.assertEqual(result.status, Constants.OPERATION_FAILURE)
+
+        # switch org to -1
+        result = ts.switch_org(int(Constants.ALL_ORG_ID))
+        self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
+
+        # create org should return Success
+        result = ts.create_org("TestOrg", "TestOrg_des")
+        self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
+
+
+    def test_create_org(self):
+        """
+        tests that an org is created and upon re-creation
+        the api throws conflict
+        """
+
+        # Login
+        ts = TSApiWrapper(DISABLE_SSL)
+        ts.login(HOSTPORT, USERNAME, PASSWORD)
+
+        result = ts.switch_org(int(Constants.ALL_ORG_ID))
+        self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
+
+        # create orgs
+        orgs = ["test_create_org" + str(i) for i in range(2)]
+        for org in orgs:
+            result = ts.create_org(org, org + "_desc")
+            self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
+
+        for org in orgs:
+            result = ts.create_org(org, org + "_desc")
+            self.assertEqual(result.status, Constants.ORG_ALREADY_EXISTS)
+
+    def test_list_orgs(self):
+        """
+        Tests if the correct org list is getting returned
+        """
+
+        # Login
+        ts = TSApiWrapper(DISABLE_SSL)
+        ts.login(HOSTPORT, USERNAME, PASSWORD)
+
+        result = ts.switch_org(int(Constants.ALL_ORG_ID))
+        self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
+        # create orgs
+        orgs = ["test_list_orgs" + str(i) for i in range(2)]
+        for org in orgs:
+            result = ts.create_org(org, org + "_desc")
+            self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
+
+        result = ts.switch_org(int(Constants.ALL_ORG_ID))
+        self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
+        result = ts.list_orgs()
+        self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
+
+        ts_org_list = []
+        for org in result.data:
+            ts_org_list.append(org.name)
+
+        for org in orgs:
+            self.assertTrue(org in ts_org_list)
+
+    def test_search_user(self):
+        """
+        Tests search user api
+        """
+
+        # Login
+        ts = TSApiWrapper(DISABLE_SSL)
+        ts.login(HOSTPORT, USERNAME, PASSWORD)
+
+        result = ts.switch_org(int(Constants.ALL_ORG_ID))
+        self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
+        # create orgs
+        orgs = ["test_search_user" + str(i) for i in range(2)]
+        for org in orgs:
+            result = ts.create_org(org, org + "_desc")
+            self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
+
+        result = ts.switch_org(int(Constants.DEFAULT_ORG_ID))
+        self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
+
+        # search for tsadmin user
+        result = ts.search_user(USERNAME)
+        self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
+
+        # search for a random user
+        result = ts.search_user("randomUser")
+        self.assertEqual(result.status, Constants.OPERATION_FAILURE)
+
+
+    def test_update_user_orgs(self):
+        """
+        tests for a users if the orgs gets updated
+        """
+
+        # Login
+        ts = TSApiWrapper(DISABLE_SSL)
+        ts.login(HOSTPORT, USERNAME, PASSWORD)
+
+        result = ts.switch_org(int(Constants.DEFAULT_ORG_ID))
+        self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
+
+        # create a user in default org
+        users = ["test_update_user" + str(i) for i in range(3)]
+        for user in users:
+            result = ts.sync_user(user, user)
+            self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
+
+        result = ts.switch_org(int(Constants.ALL_ORG_ID))
+        self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
+        org_name = "test_update_user_orgs"
+        result = ts.create_org(org_name, org_name)
+        self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
+
+        # fetch org list for mapping org name with orgId
+        result = ts.list_orgs()
+        self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
+
+        org_id = []
+        for org in result.data:
+            if org.name == org_name:
+                org_id.append(org.id)
+
+        self.assertFalse(len(org_id) < 1)
+
+        user_name = "test_update_user1"
+
+        # add user1 to {org_id}
+        result = ts.update_user_org(
+            user_name,
+            "ADD",
+            '[' + ','.join(str(id) for id in org_id) + ']'
+            )
+        self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
+
+        # verify that the user is added to {org_id}
+        result = ts.list_users()
+        self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
+
+        user_found = 0
+        user_ids = []
+        for user in result.data:
+            if user.name == user_name:
+                user_found = 1
+                self.assertTrue(org_id[0] in user.orgIds)
+            if user.name in users:
+                user_ids.append(user.id)
+
+        self.assertEqual(user_found, 1)
+
+        # remove user from {org_id}
+        result = ts.update_user_org(
+            user_name,
+            "REMOVE",
+            '[' + ','.join(str(id) for id in org_id) + ']'
+            )
+        self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
+
+        # verify that the user is removed from {org_id}
+        result = ts.list_users()
+        self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
+
+        user_found = 0
+        for user in result.data:
+            if user.name == user_name:
+                user_found = 1
+                self.assertTrue(org_id[0] not in user.orgIds)
+
+        self.assertEqual(user_found, 1)
+
+        # CleanUp users in -1 context
+        result = ts.delete_users(user_ids)
+        self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
+
+
+    def test_list_users_groups_org_aware(self):
+        """
+        tests that the metadata list of users and groups
+        has list of orgIds.
+        """
+
+        # Login
+        ts = TSApiWrapper(DISABLE_SSL)
+        ts.login(HOSTPORT, USERNAME, PASSWORD)
+
+        result = ts.switch_org(int(Constants.ALL_ORG_ID))
+        self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
+
+        result = ts.list_users()
+        self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
+        for user in result.data:
+            org_list = user.orgIds
+            self.assertTrue(len(org_list) > 0)
+
+        result = ts.list_groups()
+        self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
+        for group in result.data:
+            org_list = group.orgIds
+            self.assertTrue(len(org_list) == 1)
+
+
 if __name__ == "__main__":
     logging.disable(logging.CRITICAL)
     parser = argparse.ArgumentParser()
