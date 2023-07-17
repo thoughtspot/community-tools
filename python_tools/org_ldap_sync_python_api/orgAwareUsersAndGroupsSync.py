@@ -52,11 +52,12 @@ class OrgAwareSyncTree(syncUsersAndGroups.SyncTree):
         """
 
         if group_dn in self.groups_to_create:
-            logging.debug(
-                "Group already exists in the creation list. Group DN: %s",
-                group_dn
-            )
-            return
+            if not self.add_recursive_org_membership:
+                logging.debug(
+                    "Group already exists in the creation list. Group DN: %s",
+                    group_dn
+                )
+                return
 
         self.groups_to_create.add(group_dn)
         logging.debug(

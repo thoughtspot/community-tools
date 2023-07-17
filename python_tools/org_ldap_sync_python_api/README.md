@@ -3,18 +3,42 @@
 
 ## Table of Contents
 
-- [Usage]($Usage)
+- [Preconditions](#Preconditions)
+- [Usage](#Usage)
 - [Flags](#Flags)
 - [Validations](#Validations)
 - [Script Break Down](#Script_Break_Down)
 - [Summary Reporting](#Summary_Reporting)
 
+## Preconditions
+1. Python environment having required modules installed
+2. Compatibility with ThoughtSpot API versions. The script uses APIs introduced in versions >= 9.0.0, make sure the target 
+   ThoughtSpot Clusters support the required APIs
+
 ## Usage
+
+### Virtual Environment
+Source "env.sh" to create a virtual environment with all the required modules.</br>
+This step will create and activate the virtual environment.
+
+```shell
+source env.sh
+```
+_**Note: In case of any missing modules, please add them to the dependencies list in the env.sh file**_
+
+### Run Ldap Script
+In the virtual environment, run the ldap script with the required arguments. Below is sample ldap script cmd.
 ```shell
 python3 syncUsersAndGroups.py script --ts_hostport TS_HOSTPORT --ts_uname TS_USERNAME --ts_pass TS_PASSWORD 
 --disable_ssl --ldap_hostport LDAP_HOSTPORT --ldap_uname LDAP_USERNAME --ldap_pass LDAP_PASSWORD 
 --basedn LDAP_BASEDN --filter_str FILTER_STR --include_nontree_members --sync --purge --debug 
---org_mapping --org_file_input ORG_FILE_INPUT_PATH --remove_user_orgs --remove_group_orgs --purge
+--org_mapping --org_file_input ORG_FILE_INPUT_PATH --remove_user_orgs --remove_group_orgs --purge --add_recursive_org_mapping
+```
+
+### Exit The Virtual Environment
+Once the script is completed, exit from the virtual environment with cmd:
+```shell
+deactivate
 ```
 
 ## Flags
@@ -77,6 +101,7 @@ python3 syncUsersAndGroups.py script --ts_hostport TS_HOSTPORT --ts_uname TS_USE
 9. <b>remove_group_orgs</b>: Flag to remove groups from orgs which are not there in the present
    sync.
 
+For more info on the existing sync flags: [https://docs.thoughtspot.com/software/latest/ldap-sync-users-groups](https://docs.thoughtspot.com/software/latest/ldap-sync-users-groups)
 ## Validations
 1. If the <b>org_mapping</b> flag is added. The script will exit if none of <b>org_file_input</b>
    or <b>org_attr</b> flags are provided.
@@ -203,7 +228,8 @@ Removed moo_100@ldap.thoughtspot.com User from orgs ['org3']
 Removed tsadmin@ldap.thoughtspot.com User from orgs ['org3']
 ```
 ### Dry Run
-We also support a dry run step, which report metrics of users to be created/synced, Groups to be created/synced, Groups and Users to be purged and Groups and Users to be removed from specific orgs.
+We also support a dry run step, which report metrics of users to be created/synced, Groups to be created/synced, Groups 
+and Users to be purged and Groups and Users to be removed from specific orgs.
 
 ## Summary Reporting
 **Reported Metrics:** </br>
