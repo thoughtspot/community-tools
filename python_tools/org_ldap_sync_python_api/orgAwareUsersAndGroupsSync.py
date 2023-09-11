@@ -237,7 +237,6 @@ class OrgAwareSyncTree(syncUsersAndGroups.SyncTree):
                 logging.error(msg)
                 self.error_file.write(msg)
                 self.file_handle.write(msg)
-                sys.exit(1)
 
 
     def process_org_mapping(self, group_dns, user_dns):
@@ -645,7 +644,6 @@ class OrgAwareSyncTree(syncUsersAndGroups.SyncTree):
 
         # Orgs to be created/ Orgs already exist
         logging.info("Syncing Orgs in ThoughtSpot system")
-        self.switch_org(Constants.ALL_ORG_ID)
         result = self.ts_handle.list_orgs()
         if result.status == Constants.OPERATION_SUCCESS:
             for org in result.data:
@@ -697,7 +695,6 @@ class OrgAwareSyncTree(syncUsersAndGroups.SyncTree):
             ldap_user_name_orgs[user.name.lower()]\
                 .update(self.org_map[user_dn])
 
-        self.switch_org(Constants.ALL_ORG_ID)
         result = self.ts_handle.list_users()
         if result.status == Constants.OPERATION_SUCCESS:
             for user in result.data:
@@ -758,7 +755,6 @@ class OrgAwareSyncTree(syncUsersAndGroups.SyncTree):
             ldap_group_name_orgs[group.name.lower()]\
                 .update(self.org_map[group_dn])
 
-        self.switch_org(Constants.ALL_ORG_ID)
         result = self.ts_handle.list_groups()
 
         if result.status == Constants.OPERATION_SUCCESS:
