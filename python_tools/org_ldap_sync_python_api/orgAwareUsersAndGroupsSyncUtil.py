@@ -9,6 +9,7 @@ from entityClasses import EntityType
 from globalClasses import Constants
 import tsApi
 
+# pylint: disable=R0903, R0902, R0912, R0915, R1702, C0302, W0108
 def sync_orgs(
         org_sync_tree,
         org_created,
@@ -17,7 +18,6 @@ def sync_orgs(
     Method to sync orgs to TS
     """
     logging.info("Syncing Orgs in ThoughtSpot system")
-    org_sync_tree.switch_org(Constants.ALL_ORG_ID)
     for org_name in org_sync_tree.orgs_to_create:
         result = org_sync_tree.ts_handle.create_org(
             org_name,
@@ -50,7 +50,6 @@ def fetch_ts_org_list(
     fetches org list from system and fills out
     org name to id / org id to name mapping
     """
-    org_sync_tree.switch_org(Constants.ALL_ORG_ID)
     logging.debug("Fetching current orgs from ThoughtSpot system")
     result = org_sync_tree.ts_handle.list_orgs()
     if result.status == Constants.OPERATION_SUCCESS:
@@ -120,7 +119,6 @@ def sync_users(
             org_sync_tree.file_handle.write(msg)
             continue
         user_org_ids = '[' + ','.join(str(id) for id in user_org_id) + ']'
-        org_sync_tree.switch_org(Constants.ALL_ORG_ID)
         result = org_sync_tree.ts_handle.search_user(
             user.name
         )
@@ -156,6 +154,7 @@ def sync_users(
                 prop,
                 None,  # groups
                 org_sync_tree.upsert_user,
+                True # all org scope
             )
         else:
             # create user in given orgs
@@ -167,6 +166,7 @@ def sync_users(
                 prop,
                 None,  # groups
                 user_org_ids,
+                True # all org scope
             )
             if result.status == Constants.OPERATION_SUCCESS:
                 msg = "\n{} User created in {} orgs\n".format(user.name,
@@ -295,7 +295,6 @@ def fetch_ts_user_list(
     logging.debug("Fetching current users from ThoughtSpot "
                   "system in domain (%s) including recently "
                   "created.", domain_name)
-    org_sync_tree.switch_org(Constants.ALL_ORG_ID)
     result = org_sync_tree.ts_handle.list_users()
     if result.status == Constants.OPERATION_SUCCESS:
         for user in result.data:
@@ -336,7 +335,6 @@ def fetch_ts_group_list(
     logging.debug("Fetching current groups from ThoughtSpot "
                   "system in domain (%s) including recently "
                   "created.", domain_name)
-    org_sync_tree.switch_org(Constants.ALL_ORG_ID)
     result = org_sync_tree.ts_handle.list_groups()
     if result.status == Constants.OPERATION_SUCCESS:
         for group in result.data:
@@ -648,7 +646,6 @@ def delete_users(
             users_to_delete \
                 .append(user_name_to_id_ts_map[user_name])
 
-    org_sync_tree.switch_org(Constants.ALL_ORG_ID)
     result = org_sync_tree.ts_handle.delete_users(users_to_delete)
     users_deleted[0] = len(users_to_delete)
     if result.status != Constants.OPERATION_SUCCESS:
@@ -697,7 +694,6 @@ def remove_users_from_orgs(
     Remove Users from orgs which are not there in present sync
     """
     user_org_removal = 0
-    org_sync_tree.switch_org(Constants.ALL_ORG_ID)
     org_sync_tree.file_handle.write("\n===== User Org Removal =====\n\n")
     logging.info("Removing users from orgs not in current "
                  "sync path.")
@@ -709,13 +705,10 @@ def remove_users_from_orgs(
         if ts_org_list.issubset(ldap_org_list):
             continue
         user_org_removal = 1
-        org_id_list = [id for id in
-                       ts_org_list if id not in ldap_org_list]
-        org_sync_tree.switch_org(Constants.ALL_ORG_ID)
         result = org_sync_tree.ts_handle.update_user_org(
             user_name,
-            Constants.Remove,
-            '[' + ','.join(str(id) for id in org_id_list) + ']'
+            Constants.Replace,
+            '[' + ','.join(str(id) for id in ldap_org_list) + ']'
         )
         org_list = [org_id_to_org_name[id] for id in
                     ts_org_list if id not in ldap_org_list]

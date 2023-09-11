@@ -518,21 +518,21 @@ class TestTSApi(unittest.TestCase):
         ts = TSApiWrapper(DISABLE_SSL)
         ts.login(HOSTPORT, USERNAME, PASSWORD)
 
-        # try to create orgs from Default org context
-        result = ts.switch_org(int(Constants.DEFAULT_ORG_ID))
-        self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
-
-        # create org should fail as we can't create orgs from
-        # default org context
-        result = ts.create_org("TestOrg", "TestOrg_des")
-        self.assertEqual(result.status, Constants.OPERATION_FAILURE)
-
-        # switch org to -1
-        result = ts.switch_org(int(Constants.ALL_ORG_ID))
-        self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
-
         # create org should return Success
         result = ts.create_org("TestOrg", "TestOrg_des")
+        self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
+
+        org_id = -1
+        result = ts.list_orgs()
+        self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
+        for org in result.data:
+            if org.name == "TestOrg":
+                org_id = org.id
+
+        self.assertFalse(org_id == -1)
+
+        # try to switch to created org
+        result = ts.switch_org(org_id)
         self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
 
 
@@ -545,9 +545,6 @@ class TestTSApi(unittest.TestCase):
         # Login
         ts = TSApiWrapper(DISABLE_SSL)
         ts.login(HOSTPORT, USERNAME, PASSWORD)
-
-        result = ts.switch_org(int(Constants.ALL_ORG_ID))
-        self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
 
         # create orgs
         orgs = ["test_create_org" + str(i) for i in range(2)]
@@ -563,21 +560,16 @@ class TestTSApi(unittest.TestCase):
         """
         Tests if the correct org list is getting returned
         """
-
         # Login
         ts = TSApiWrapper(DISABLE_SSL)
         ts.login(HOSTPORT, USERNAME, PASSWORD)
 
-        result = ts.switch_org(int(Constants.ALL_ORG_ID))
-        self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
         # create orgs
         orgs = ["test_list_orgs" + str(i) for i in range(2)]
         for org in orgs:
             result = ts.create_org(org, org + "_desc")
             self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
 
-        result = ts.switch_org(int(Constants.ALL_ORG_ID))
-        self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
         result = ts.list_orgs()
         self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
 
@@ -597,24 +589,46 @@ class TestTSApi(unittest.TestCase):
         ts = TSApiWrapper(DISABLE_SSL)
         ts.login(HOSTPORT, USERNAME, PASSWORD)
 
-        result = ts.switch_org(int(Constants.ALL_ORG_ID))
-        self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
         # create orgs
-        orgs = ["test_search_user" + str(i) for i in range(2)]
+        orgs = ["test_search_user" + str(i) for i in range(3)]
         for org in orgs:
             result = ts.create_org(org, org + "_desc")
             self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
 
-        result = ts.switch_org(int(Constants.DEFAULT_ORG_ID))
+        result = ts.list_orgs()
         self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
 
-        # search for tsadmin user
-        result = ts.search_user(USERNAME)
-        self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
+        user_list = []
+        for org in result.data:
+            result = ts.switch_org(org.id)
+            self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
+            result = ts.create_user("user" + str(len(user_list)), "user")
+            self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
+            user_list.append("user" + str(len(user_list)))
+
+        # search for users, since this executes in allOrg context
+        # it should be able to search all users
+        for user in user_list:
+            result = ts.search_user(user)
+            self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
 
         # search for a random user
         result = ts.search_user("randomUser")
         self.assertEqual(result.status, Constants.OPERATION_FAILURE)
+
+        # cleanup
+        result = ts.list_users()
+        self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
+
+        user_ids = []
+        for user in result.data:
+            if user.name in user_list:
+                user_ids.append(user.id)
+
+        self.assertEqual(len(user_list), len(user_ids))
+        result = ts.delete_users(user_ids)
+        self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
+
 
 
     def test_update_user_orgs(self):
@@ -635,8 +649,6 @@ class TestTSApi(unittest.TestCase):
             result = ts.sync_user(user, user)
             self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
 
-        result = ts.switch_org(int(Constants.ALL_ORG_ID))
-        self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
         org_name = "test_update_user_orgs"
         result = ts.create_org(org_name, org_name)
         self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
@@ -697,7 +709,7 @@ class TestTSApi(unittest.TestCase):
 
         self.assertEqual(user_found, 1)
 
-        # CleanUp users in -1 context
+        # CleanUp users
         result = ts.delete_users(user_ids)
         self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
 
@@ -711,9 +723,6 @@ class TestTSApi(unittest.TestCase):
         # Login
         ts = TSApiWrapper(DISABLE_SSL)
         ts.login(HOSTPORT, USERNAME, PASSWORD)
-
-        result = ts.switch_org(int(Constants.ALL_ORG_ID))
-        self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
 
         result = ts.list_users()
         self.assertEqual(result.status, Constants.OPERATION_SUCCESS)

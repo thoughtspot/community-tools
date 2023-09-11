@@ -16,6 +16,7 @@ from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from entityClasses import EntityProperty, EntityType
 from globalClasses import Constants, Result
 
+# pylint: disable=R0903, R0902, R0912, R0915, R1702, C0302, C0301, W0108
 def password_gen():
     """Generates random string of length 10 characters for password.
        @return: Password with random characters of specified length.
@@ -73,20 +74,23 @@ class TSApiWrapper():
 
     # URL end points used for various calls.
     SERVER_URL = "{hostport}/callosum/v1"
-    LOGIN = SERVER_URL + "/session/login"
-    INFO = SERVER_URL + "/session/info"
+
+    # All org endpoints
     UPSERT_USER = SERVER_URL + "/session/ldap/users"
-    UPSERT_GROUP = SERVER_URL + "/session/ldap/groups"
     CREATE_USER = SERVER_URL + "/session/user/create"
-    CREATE_GROUP = SERVER_URL + "/session/group/create"
-    CREATE_ORG = SERVER_URL + "/tspublic/v1/org/"
-    DELETE_USERS = SERVER_URL + "/session/user/deleteusers"
-    DELETE_GROUPS = SERVER_URL + "/session/group/deletegroups"
+    DELETE_USERS = SERVER_URL + "/session/user/deleteusers?orgId=-1"
     GET_MEMBERS = SERVER_URL + "/metadata/list"
-    GET_ORGS = SERVER_URL + "/tspublic/v1/org/search"
-    SWITCH_ORG = SERVER_URL + "/session/orgs"
+    CREATE_ORG = SERVER_URL + "/tspublic/v1/org?orgScope=ALL"
+    GET_ORGS = SERVER_URL + "/tspublic/v1/org/search?orgScope=ALL"
     SEARCH_USER = SERVER_URL + "/v2/users/search"
     UPDATE_USER_ORG = SERVER_URL + "/v2/users/{user_identifier}?operation={op}"
+
+    LOGIN = SERVER_URL + "/session/login"
+    INFO = SERVER_URL + "/session/info"
+    UPSERT_GROUP = SERVER_URL + "/session/ldap/groups"
+    CREATE_GROUP = SERVER_URL + "/session/group/create"
+    DELETE_GROUPS = SERVER_URL + "/session/group/deletegroups"
+    SWITCH_ORG = SERVER_URL + "/session/orgs"
     UPDATE_USERS_IN_GROUPS = SERVER_URL + "/session/group/updateusersingroup"
     UPDATE_GROUPS_IN_GROUPS = SERVER_URL + "/session/group/updategroupsingroup"
     LIST_USERS_IN_A_GROUP = SERVER_URL + "/session/group/listuser/{groupid}"
@@ -284,7 +288,8 @@ class TSApiWrapper():
         @param user_identifier: user to be searched
         """
         params = {
-            "user_identifier": user_identifier
+            "user_identifier": user_identifier,
+            "org_scope": "ALL"
         }
         try:
             response = self.session.post(
@@ -319,7 +324,8 @@ class TSApiWrapper():
         """
         params = {
             "user_identifier": user_identifier,
-            "org_identifiers": org_identifiers
+            "org_identifiers": org_identifiers,
+            "org_scope": "ALL",
         }
 
         success_msg = "Successfully {} {} orgs".format(
@@ -353,7 +359,8 @@ class TSApiWrapper():
             password=None,
             properties=None,
             groups=None,
-            upsert_user=False
+            upsert_user=False,
+            all_org_scope=False,
     ):
         """Creates new user and adds it to TS system.
            @param name: Name of the new user.
@@ -364,6 +371,7 @@ class TSApiWrapper():
            user email etc.
            @param groups: List of group ids the user belongs to.
            @param upsert_user: Upsert the users if true else only create.
+           @param all_org_scope: if the sync call is in all org scope.
            @return: Result object with operation status and data. Here data is
            set to None.
         """
@@ -382,13 +390,23 @@ class TSApiWrapper():
 
         try:
             if upsert_user:
+                endpoint_url = (
+                    TSApiWrapper.UPSERT_USER.format(hostport=self.hostport) + "?orgId=-1"
+                    if all_org_scope
+                    else TSApiWrapper.UPSERT_USER.format(hostport=self.hostport)
+                )
                 response = self.session.post(
-                    TSApiWrapper.UPSERT_USER.format(hostport=self.hostport),
+                    endpoint_url,
                     data=params,
                 )
             else:
+                endpoint_url = (
+                    TSApiWrapper.CREATE_USER.format(hostport=self.hostport) + "?orgId=-1"
+                    if all_org_scope
+                    else TSApiWrapper.CREATE_USER.format(hostport=self.hostport)
+                )
                 response = self.session.post(
-                    TSApiWrapper.CREATE_USER.format(hostport=self.hostport),
+                    endpoint_url,
                     data=params,
                 )
             if response.status_code == http.client.OK:
@@ -416,6 +434,7 @@ class TSApiWrapper():
             properties=None,
             groups=None,
             orgids=None,
+            all_org_scope=False
     ):
         """
         Creates a user.
@@ -427,6 +446,7 @@ class TSApiWrapper():
         user email etc.
         @param groups: List of group ids the user belongs to.
         @param orgids: orgs in which user belongs
+        @param all_org_scope: if the call is in all org scope.
         """
         params = {"name": name, "displayname": display_name}
         if usertype is not None:
@@ -444,8 +464,13 @@ class TSApiWrapper():
             params["orgids"] = orgids
 
         try:
+            endpoint_url = (
+                TSApiWrapper.CREATE_USER.format(hostport=self.hostport) + "?orgId=-1"
+                if all_org_scope
+                else TSApiWrapper.CREATE_USER.format(hostport=self.hostport)
+            )
             response = self.session.post(
-                TSApiWrapper.CREATE_USER.format(hostport=self.hostport),
+                endpoint_url,
                 data=params,
             )
             if response.status_code == http.client.OK:
@@ -663,13 +688,9 @@ class TSApiWrapper():
         """
         success_msg = "Successfully returning {} list.".format(EntityType.ORG)
         failure_msg = "Failed to procure {} list.".format(EntityType.ORG)
-        payload = {
-            "orgScope": "ALL"
-        }
         try:
             response = self.session.post(
-                TSApiWrapper.GET_ORGS.format(hostport=self.hostport),
-                data=payload,
+                TSApiWrapper.GET_ORGS.format(hostport=self.hostport)
             )
             if response.status_code == http.client.OK:
                 response_obj = json.loads(response.text)
