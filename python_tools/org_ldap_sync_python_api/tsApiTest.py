@@ -54,15 +54,15 @@ class TestTSApi(unittest.TestCase):
 
         # Test for LOCAL_USER create/delete.
         # Assert user doesnt exist in TS.
-        flag = new_user in [user.name for user in ts.list_users().data]
+        flag = new_user in [user.name for user in ts.list_users(allOrgs=False).data]
         self.assertFalse(flag)
         # Create LOCAL user
         ts.create_user(new_user, new_user)
         # Assert user exists in TS now.
-        flag = new_user in [user.name for user in ts.list_users().data]
+        flag = new_user in [user.name for user in ts.list_users(allOrgs=False).data]
         self.assertTrue(flag)
         # Assert by default user type is set to LOCAL_USER.
-        for user in ts.list_users().data:
+        for user in ts.list_users(allOrgs=False).data:
             if user.name == new_user:
                 self.assertEqual(TSApiWrapper.LOCAL_USER, user.type)
         # Create user again and check we get USER_ALREADY_EXISTS status.
@@ -74,22 +74,22 @@ class TestTSApi(unittest.TestCase):
         # Delete user.
         ts.delete_users([user_id])
         # Assert user no longer exists in TS System.
-        flag = new_user in [user.name for user in ts.list_users().data]
+        flag = new_user in [user.name for user in ts.list_users(allOrgs=False).data]
         self.assertFalse(flag)
 
         #######################################################################
 
         # Test for LDAP_USER create/delete.
         # Assert user doesnt exist in TS.
-        flag = new_user in [user.name for user in ts.list_users().data]
+        flag = new_user in [user.name for user in ts.list_users(allOrgs=False).data]
         self.assertFalse(flag)
         # Create LDAP user
         ts.create_user(new_user, new_user, TSApiWrapper.LDAP_USER)
         # Assert user exists in TS now.
-        flag = new_user in [user.name for user in ts.list_users().data]
+        flag = new_user in [user.name for user in ts.list_users(allOrgs=False).data]
         self.assertTrue(flag)
         # Assert user type is set to LDAP_USER.
-        for user in ts.list_users().data:
+        for user in ts.list_users(allOrgs=False).data:
             if user.name == new_user:
                 self.assertEqual(TSApiWrapper.LDAP_USER, user.type)
         # Create user again and check we get USER_ALREADY_EXISTS status.
@@ -103,22 +103,22 @@ class TestTSApi(unittest.TestCase):
         # Delete user.
         ts.delete_users([user_id])
         # Assert user no longer exists in TS System.
-        flag = new_user in [user.name for user in ts.list_users().data]
+        flag = new_user in [user.name for user in ts.list_users(allOrgs=False).data]
         self.assertFalse(flag)
 
         #######################################################################
 
         # Test for SAML_USER create/delete.
         # Assert user doesnt exist in TS.
-        flag = new_user in [user.name for user in ts.list_users().data]
+        flag = new_user in [user.name for user in ts.list_users(allOrgs=True).data]
         self.assertFalse(flag)
         # Create SAML user
         ts.create_user(new_user, new_user, TSApiWrapper.SAML_USER)
         # Assert user exists in TS now.
-        flag = new_user in [user.name for user in ts.list_users().data]
+        flag = new_user in [user.name for user in ts.list_users(allOrgs=False).data]
         self.assertTrue(flag)
         # Assert user type is set to SAML_USER.
-        for user in ts.list_users().data:
+        for user in ts.list_users(allOrgs=False).data:
             if user.name == new_user:
                 self.assertEqual(TSApiWrapper.SAML_USER, user.type)
         # Create user again and check we get USER_ALREADY_EXISTS status.
@@ -132,7 +132,7 @@ class TestTSApi(unittest.TestCase):
         # Delete user.
         ts.delete_users([user_id])
         # Assert user no longer exists in TS System.
-        flag = new_user in [user.name for user in ts.list_users().data]
+        flag = new_user in [user.name for user in ts.list_users(allOrgs=False).data]
         self.assertFalse(flag)
 
     def test_create_user_weak_password(self):
@@ -145,7 +145,7 @@ class TestTSApi(unittest.TestCase):
 
         # Test for LDAP_USER create/delete with weak password
         # Assert user doesn't exist in TS.
-        flag = new_user in [user.name for user in ts.list_users().data]
+        flag = new_user in [user.name for user in ts.list_users(allOrgs=False).data]
         self.assertFalse(flag)
         # Create LDAP user with weak password
         weak_password = "adqadjdf12"
@@ -153,7 +153,7 @@ class TestTSApi(unittest.TestCase):
             new_user, new_user, TSApiWrapper.LDAP_USER, weak_password).status
         self.assertEqual(status, Constants.OPERATION_FAILURE)
         # Assert user doesn't exist in TS.
-        flag = new_user in [user.name for user in ts.list_users().data]
+        flag = new_user in [user.name for user in ts.list_users(allOrgs=False).data]
         self.assertFalse(flag)
 
     def test_create_delete_group(self):
@@ -166,15 +166,15 @@ class TestTSApi(unittest.TestCase):
 
         # Test for LOCAL_GROUP create/delete.
         # Assert group doesn't exist in TS.
-        flag = new_group in [group.name for group in ts.list_groups().data]
+        flag = new_group in [group.name for group in ts.list_groups(allOrgs=False).data]
         self.assertFalse(flag)
         # Create group.
         ts.create_group(new_group, new_group)
         # Assert group exists in TS now.
-        flag = new_group in [group.name for group in ts.list_groups().data]
+        flag = new_group in [group.name for group in ts.list_groups(allOrgs=False).data]
         self.assertTrue(flag)
         # Assert by default group type is set to LOCL_GROUP
-        for group in ts.list_groups().data:
+        for group in ts.list_groups(allOrgs=False).data:
             if group.name == new_group:
                 self.assertEqual(TSApiWrapper.LOCAL_GROUP, group.type)
         # Create group again and check we get GROUP_ALREADY_EXISTS status.
@@ -186,22 +186,22 @@ class TestTSApi(unittest.TestCase):
         # Delete group.
         ts.delete_groups([group_id])
         # Assert group no longer existe in TS System.
-        flag = new_group in [group.name for group in ts.list_groups().data]
+        flag = new_group in [group.name for group in ts.list_groups(allOrgs=False).data]
         self.assertFalse(flag)
 
         #######################################################################
 
         # Test for LDAP_GROUP create/delete.
         # Assert group doesn't exist in TS.
-        flag = new_group in [group.name for group in ts.list_groups().data]
+        flag = new_group in [group.name for group in ts.list_groups(allOrgs=False).data]
         self.assertFalse(flag)
         # Create group.
         ts.create_group(new_group, new_group, TSApiWrapper.LDAP_GROUP)
         # Assert group exists in TS now.
-        flag = new_group in [group.name for group in ts.list_groups().data]
+        flag = new_group in [group.name for group in ts.list_groups(allOrgs=False).data]
         self.assertTrue(flag)
         # Assert group type is set to LDAP_GROUP
-        for group in ts.list_groups().data:
+        for group in ts.list_groups(allOrgs=False).data:
             if group.name == new_group:
                 self.assertEqual(TSApiWrapper.LDAP_GROUP, group.type)
         # Create group again and check we get GROUP_ALREADY_EXISTS status.
@@ -215,7 +215,7 @@ class TestTSApi(unittest.TestCase):
         # Delete group.
         ts.delete_groups([group_id])
         # Assert group no longer existe in TS System.
-        flag = new_group in [group.name for group in ts.list_groups().data]
+        flag = new_group in [group.name for group in ts.list_groups(allOrgs=False).data]
         self.assertFalse(flag)
 
     def test_add_user_to_group(self):
@@ -462,7 +462,7 @@ class TestTSApi(unittest.TestCase):
 
         # List all ts user objects (including default users Ex. 'system')
         for batchsize in [-1, 0, 100, 150, None]:
-            users_batched = ts.list_users() if batchsize is None \
+            users_batched = ts.list_users(allOrgs=False) if batchsize is None \
                             else ts.list_users(batchsize)
             users_batched = users_batched.data
             # Test if all returned users are unique
@@ -498,9 +498,9 @@ class TestTSApi(unittest.TestCase):
         # Test batched entities call with offset
         offset = 3
         batchsize = 2
-        users_list_ids = [u.id for u in ts.list_users().data]
+        users_list_ids = [u.id for u in ts.list_users(allOrgs=False).data]
         users_batched = ts._get_batched_entities(
-            "User", offset, batchsize).data[0]
+            "User", offset, batchsize, allOrgs=False).data[0]
         users_batched_ids = [u.id for u in users_batched]
         self.assertEqual(users_batched_ids,
                          users_list_ids[offset:offset+batchsize])
@@ -617,7 +617,7 @@ class TestTSApi(unittest.TestCase):
         self.assertEqual(result.status, Constants.OPERATION_FAILURE)
 
         # cleanup
-        result = ts.list_users()
+        result = ts.list_users(allOrgs=False)
         self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
 
         user_ids = []
@@ -670,12 +670,12 @@ class TestTSApi(unittest.TestCase):
         result = ts.update_user_org(
             user_name,
             "ADD",
-            '[' + ','.join(str(id) for id in org_id) + ']'
-            )
+            org_id
+        )
         self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
 
         # verify that the user is added to {org_id}
-        result = ts.list_users()
+        result = ts.list_users(allOrgs=False)
         self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
 
         user_found = 0
@@ -693,12 +693,12 @@ class TestTSApi(unittest.TestCase):
         result = ts.update_user_org(
             user_name,
             "REMOVE",
-            '[' + ','.join(str(id) for id in org_id) + ']'
-            )
+            org_id
+        )
         self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
 
         # verify that the user is removed from {org_id}
-        result = ts.list_users()
+        result = ts.list_users(allOrgs=False)
         self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
 
         user_found = 0
@@ -724,13 +724,13 @@ class TestTSApi(unittest.TestCase):
         ts = TSApiWrapper(DISABLE_SSL)
         ts.login(HOSTPORT, USERNAME, PASSWORD)
 
-        result = ts.list_users()
+        result = ts.list_users(allOrgs=False)
         self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
         for user in result.data:
             org_list = user.orgIds
             self.assertTrue(len(org_list) > 0)
 
-        result = ts.list_groups()
+        result = ts.list_groups(allOrgs=False)
         self.assertEqual(result.status, Constants.OPERATION_SUCCESS)
         for group in result.data:
             org_list = group.orgIds

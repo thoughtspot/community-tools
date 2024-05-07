@@ -10,13 +10,12 @@ import logging
 import sys
 from entityClasses import EntityType
 from globalClasses import Constants
-import syncUsersAndGroups
 import orgAwareUsersAndGroupsSyncUtil
-
+import syncTree
 ######################### Core Classes/Functions ##############################
 
 # pylint: disable=R0903, R0902, R0912, R0915, R1702, C0302, W0108
-class OrgAwareSyncTree(syncUsersAndGroups.SyncTree):
+class OrgAwareSyncTree(syncTree.SyncTree):
     """Class which encapsulates the logic for fetching entities from LDAP
        system and syncing them with ThoughtSpot system.
     """
@@ -695,7 +694,7 @@ class OrgAwareSyncTree(syncUsersAndGroups.SyncTree):
             ldap_user_name_orgs[user.name.lower()]\
                 .update(self.org_map[user_dn])
 
-        result = self.ts_handle.list_users()
+        result = self.ts_handle.list_users(allOrgs=True)
         if result.status == Constants.OPERATION_SUCCESS:
             for user in result.data:
                 ts_user_names.append(user.name.lower())
@@ -755,7 +754,7 @@ class OrgAwareSyncTree(syncUsersAndGroups.SyncTree):
             ldap_group_name_orgs[group.name.lower()]\
                 .update(self.org_map[group_dn])
 
-        result = self.ts_handle.list_groups()
+        result = self.ts_handle.list_groups(allOrgs=True)
 
         if result.status == Constants.OPERATION_SUCCESS:
             for group in result.data:
