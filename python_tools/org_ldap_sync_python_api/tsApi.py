@@ -16,6 +16,7 @@ from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from entityClasses import EntityProperty, EntityType
 from globalClasses import Constants, Result
 
+
 # pylint: disable=R0903, R0902, R0912, R0915, R1702, C0302, C0301, W0108
 def password_gen():
     """Generates random string of length 10 characters for password.
@@ -69,6 +70,193 @@ def pre_check(function):
     return wrapper
 
 
+def _have_user_properties_changed(name,
+                                  display_name,
+                                  email=None,
+                                  ts_user_data=None):
+    """
+    Checks if the user properties have changed.
+
+    @param namer: The LDAP name of the user.
+    @param ldap_display_name: The LDAP display name of the user.
+    @param ldap_email: The LDAP email of the user. Defaults to None.
+    @param ts_user_data: The ThoughtSpot user data. Defaults to None.
+    @return: True if the user properties have changed, False otherwise.
+    """
+    new_properties = {
+        "name": name,
+        "display_name": display_name,
+        "email": email
+    }
+
+    ts_user_data = ts_user_data or {}
+    return any(ts_user_data.get(prop) != value for prop, value in new_properties.items())
+
+
+def _have_orgs_changed(org_ids, ts_user):
+    """
+    Checks if the organizations have changed.
+
+    @param org_ids: The list of organization IDs.
+    @param ts_user: The ThoughtSpot user data.
+    @return: True if the organizations have changed, False otherwise.
+    """
+    return (ts_user and
+            "orgs" in ts_user and
+            set(org_ids) != {org['id'] for org in ts_user['orgs']})
+
+
+def _get_params_for_create_user(name,
+                                display_name,
+                                usertype=None,
+                                password=None,
+                                email=None,
+                                groups=None,
+                                org_ids=None):
+    """
+    Gets the parameters for creating a user.
+
+    @param name: The name of the user.
+    @param display_name: The display name of the user.
+    @param usertype: The type of the user. Defaults to None.
+    @param password: The password of the user. Defaults to None.
+    @param email: The email of the user. Defaults to None.
+    @param groups: The groups of the user. Defaults to None.
+    @param org_ids: The organization IDs of the user. Defaults to None.
+    @return: The parameters for creating a user.
+    """
+    params = {
+        "name": name,
+        "displayname": display_name,
+        "usertype": usertype,
+        # If Password is not passed generate a random string as password.
+        # Used in cases where authentication is done by an external agent.
+        "password": password_gen() if password is None else password,
+        "properties": json.dumps({"mail": email}) if email else None,
+        "groups": json.dumps(groups) if groups else None,
+        "orgids": json.dumps(org_ids) if org_ids else None
+    }
+
+    # Remove None values
+    params = {k: v for k, v in params.items() if v is not None}
+
+    return params
+
+
+def _get_params_for_update_user(user_identifier,
+                                name=None,
+                                display_name=None,
+                                usertype=None,
+                                email=None,
+                                org_ids=None,
+                                all_org_scope=False):
+    """
+    Gets the parameters for updating a user.
+
+    @param user_identifier: The identifier of the user.
+    @param name: The name of the user. Defaults to None.
+    @param display_name: The display name of the user. Defaults to None.
+    @param usertype: The type of the user. Defaults to None.
+    @param email: The email of the user. Defaults to None.
+    @param org_ids: The organization IDs of the user. Defaults to None.
+    @param all_org_scope: Whether the user has all organization scope. Defaults to False.
+    @return: The parameters for updating a user.
+    """
+    params = {
+        "user_identifier": user_identifier,
+        "name": name,
+        "display_name": display_name,
+        "account_type": usertype,
+        "email": email,
+        "org_identifiers": json.dumps(org_ids) if org_ids else None,
+        "org_scope": "ALL" if all_org_scope else None # org override param
+    }
+
+    # Remove None values
+    params = {k: v for k, v in params.items() if v is not None}
+
+    return params
+
+
+def _have_group_properties_changed(name, display_name, grouptype, description, privileges, ts_group):
+    """
+    Checks if the properties of a group have changed.
+
+    @param name (str): The new name of the group.
+    @param display_name (str): The new display name of the group.
+    @param grouptype (str): The new type of the group.
+    @param description (str): The new description of the group.
+    @param privileges (str): The new privileges of the group.
+    @param ts_group (dict): The current properties of the group in a dictionary format.
+
+    @return: True if any property has changed, False otherwise.
+    """
+    new_properties = {
+        "name": name,
+        "display_name": display_name,
+        "description": description,
+        "type": grouptype,
+        "privileges": privileges
+    }
+
+    return any(ts_group.get(prop) != value for prop, value in new_properties.items())
+
+
+def _get_params_for_create_group(name, display_name, grouptype, description, privileges):
+    """
+    Constructs a dictionary of parameters for creating a group.
+
+    @param name (str): The name of the group.
+    @param display_name (str): The display name of the group.
+    @param grouptype (str): The type of the group.
+    @param description (str): The description of the group.
+    @param privileges (list): The privileges of the group.
+
+    @return: dict: A dictionary containing the parameters for creating a group.
+    """
+    params = {
+        "name": name,
+        "display_name": display_name,
+        "grouptype": grouptype,
+        "description": description,
+        "privileges": json.dumps(privileges) if privileges else None
+    }
+
+    # Remove None values
+    params = {k: v for k, v in params.items() if v is not None}
+
+    return params
+
+
+def _get_params_for_update_group(description, display_name, group_identifier, grouptype,
+                                 name, privileges):
+    """
+    Constructs a dictionary of parameters for updating a group.
+
+    @param description (str): The new description of the group.
+    @param display_name (str): The new display name of the group.
+    @param group_identifier (str): The identifier of the group to be updated.
+    @param grouptype (str): The new type of the group.
+    @param name (str): The new name of the group.
+    @param privileges (list): The new privileges of the group.
+
+    @return: dict: A dictionary containing the parameters for updating a group.
+    """
+    params = {
+        "group_identifier": group_identifier,
+        "name": name,
+        "display_name": display_name,
+        "type": grouptype,
+        "description": description,
+        "privileges": json.dumps(privileges) if privileges else None
+    }
+
+    # Remove None values
+    params = {k: v for k, v in params.items() if v is not None}
+
+    return params
+
+
 class TSApiWrapper():
     """Wrapper class to log in and execute commands in TS system."""
 
@@ -76,14 +264,13 @@ class TSApiWrapper():
     SERVER_URL = "{hostport}/callosum/v1"
 
     # All org endpoints
-    UPSERT_USER = SERVER_URL + "/session/ldap/users"
     CREATE_USER = SERVER_URL + "/session/user/create"
     DELETE_USERS = SERVER_URL + "/session/user/deleteusers?orgId=-1"
     GET_MEMBERS = SERVER_URL + "/metadata/list"
     CREATE_ORG = SERVER_URL + "/tspublic/v1/org?orgScope=ALL"
     GET_ORGS = SERVER_URL + "/tspublic/v1/org/search?orgScope=ALL"
     SEARCH_USER = SERVER_URL + "/v2/users/search"
-    UPDATE_USER_ORG = SERVER_URL + "/v2/users/{user_identifier}?operation={op}"
+    UPDATE_USER = SERVER_URL + "/v2/users/{user_identifier}?operation={op}"
 
     LOGIN = SERVER_URL + "/session/login"
     INFO = SERVER_URL + "/session/info"
@@ -97,6 +284,8 @@ class TSApiWrapper():
     LIST_GROUPS_IN_A_GROUP = SERVER_URL + "/session/group/listgroup/{groupid}"
     ADD_USER_TO_GROUP = SERVER_URL + "/session/group/adduser"
     ADD_GROUPS_TO_GROUP = SERVER_URL + "/session/group/addgroups"
+    SEARCH_GROUP = SERVER_URL + "/v2/groups/search"
+    UPDATE_GROUP = SERVER_URL + "/v2/users/{group_identifier}?operation={op}"
 
     # Message constants
     USER_AUTHENTICATION_FAILURE = "User not authenticated."
@@ -201,6 +390,36 @@ class TSApiWrapper():
         return False
 
     @pre_check
+    def search_group(
+            self,
+            group_identifier
+    ):
+        """
+        Searches group in TS.
+        @param group_identifier: group to be searched
+        """
+        params = {
+            "group_identifier": group_identifier,
+        }
+        try:
+            response = self.session.post(
+                TSApiWrapper.SEARCH_GROUP.format(
+                    hostport=self.hostport),
+                data=params,
+            )
+            response_obj = json.loads(response.text)
+            if len(response_obj["data"]) < 1:
+                logging.debug("%s group doesn't exist",
+                              group_identifier)
+                return Result(Constants.OPERATION_FAILURE)
+            logging.debug("%s group exists",
+                          group_identifier)
+            return Result(Constants.OPERATION_SUCCESS, response_obj)
+        except Exception as e:
+            logging.error(e.message)
+            return Result(Constants.OPERATION_FAILURE, e)
+
+    @pre_check
     def sync_group(
             self,
             name,
@@ -220,40 +439,141 @@ class TSApiWrapper():
            @return: Result object with operation status and data. Here data is
            set to None.
         """
-        params = {"name": name, "display_name": display_name}
-        if grouptype is not None:
-            params["grouptype"] = grouptype
-        if description is not None:
-            params["description"] = description
-        if privileges is not None:
-            params["privileges"] = json.dumps(privileges)
+        search_group_result = self.search_group(name)
+        is_new_group = search_group_result.status != Constants.OPERATION_SUCCESS
 
         try:
-            if upsert_group:
-                response = self.session.post(
-                    TSApiWrapper.UPSERT_GROUP.format(hostport=self.hostport),
-                    data=params,
-                )
+            if is_new_group:
+                result = self.create_ts_group(name, display_name, grouptype, description, privileges)
             else:
-                response = self.session.post(
-                    TSApiWrapper.CREATE_GROUP.format(hostport=self.hostport),
-                    data=params,
-                )
+                ts_group = search_group_result.data.get("data", [])[
+                    0] if search_group_result.data.get(
+                    "data") else None
+
+                result = self.sync_existing_group(description, display_name, grouptype, name,
+                                                  privileges, ts_group, upsert_group)
+        except Exception as e:
+            logging.error(e.message)
+            result = Result(Constants.OPERATION_FAILURE, e)
+
+        return result
+
+    def create_ts_group(self, name, display_name, grouptype=None, description=None, privileges=None):
+        """
+        Creates a new group in the ThoughtSpot system.
+
+        Parameters:
+        name (str): The name of the new group.
+        display_name (str): The display name of the new group.
+        grouptype (str, optional): The type of the new group. Defaults to None.
+        description (str, optional): The description of the new group. Defaults to None.
+        privileges (str, optional): The privileges of the new group. Defaults to None.
+
+        Returns:
+        Result: A Result object indicating the success or failure of the operation.
+        """
+        params = _get_params_for_create_group(name, display_name, grouptype, description, privileges)
+
+        try:
+            response = self.session.post(
+                TSApiWrapper.CREATE_GROUP.format(hostport=self.hostport),
+                data=params,
+            )
+
             if response.status_code == http.client.OK:
                 logging.debug("New group %s added.", name)
                 return Result(Constants.OPERATION_SUCCESS)
-            if ((upsert_group
-                 and response.status_code == http.client.NO_CONTENT)
-                    or ((not upsert_group)
-                        and response.status_code == http.client.CONFLICT)):
-                logging.debug("Group %s already exists.", name)
-                return Result(Constants.GROUP_ALREADY_EXISTS)
-            logging.error("New group %s not added. Response: %s", name,
-                          response.text)
-            return Result(Constants.OPERATION_FAILURE, response)
+
+            logging.error("New group %s not added. Response: %s", name, response.text)
+            return Result(Constants.OPERATION_FAILURE, {"response_status": response.status_code, "response_text": response.text})
+
+        except requests.RequestException as e:
+            logging.error("Request failed due to an error: %s", e)
+            return Result(Constants.OPERATION_FAILURE, {"error": str(e)})
+
+    def sync_existing_group(self, description, display_name, grouptype, name, privileges,
+                            ts_group, upsert_group):
+        """
+        Sync existing group in the system. If upsert_group is True and there are changes in the group properties,
+        it updates the group.
+
+        :param description: Description of the group.
+        :param display_name: Display name of the group.
+        :param grouptype: Type of the group.
+        :param name: Name of the group.
+        :param privileges: Privileges of the group.
+        :param ts_group: Existing group data.
+        :param upsert_group: Flag to decide whether to update the group or not.
+        :return: Result object with operation status and data.
+        """
+        result = Result(Constants.GROUP_ALREADY_EXISTS)
+        should_update_group = _have_group_properties_changed(name, display_name, grouptype,
+                                                             description, privileges, ts_group)
+        if upsert_group and should_update_group:
+            result = self.update_group(
+                operation=Constants.Replace,
+                group_identifier=name,
+                name=name,
+                display_name=display_name,
+                grouptype=grouptype,
+                description=description,
+                privileges=privileges
+            )
+            if result.status == Constants.OPERATION_SUCCESS:
+                result = Result(Constants.GROUP_ALREADY_EXISTS)
+
+        return result
+
+    @pre_check
+    def update_group(
+            self,
+            operation,
+            group_identifier,
+            name=None,
+            display_name=None,
+            grouptype=None,
+            description=None,
+            privileges=None
+    ):
+        """
+        Update group in the system.
+
+        :param operation: Operation to be performed.
+        :param group_identifier: Identifier of the group.
+        :param name: Name of the group.
+        :param display_name: Display name of the group.
+        :param grouptype: Type of the group.
+        :param description: Description of the group.
+        :param privileges: Privileges of the group.
+        :return: Result object with operation status and data.
+        """
+        params = _get_params_for_update_group(description, display_name, group_identifier,
+                                              grouptype, name, privileges)
+
+        try:
+            response = self.session.put(
+                TSApiWrapper.UPDATE_GROUP.format(
+                    hostport=self.hostport,
+                    group_identifier=group_identifier,
+                    op=operation),
+                data=params,
+            )
+
+            if response.status_code == http.client.NO_CONTENT:
+                logging.debug("Updated existing group %s.\n"
+                              "Updated attributes: %s", name, params)
+                result = Result(Constants.OPERATION_SUCCESS)
+            else:
+                logging.error("Unable to update group %s.\n"
+                              "Attributes attempted to be updated : %s.\n"
+                              "Response %s", name, params, response.text)
+                result = Result(Constants.OPERATION_FAILURE, response)
+
         except Exception as e:
-            logging.error(e.message)
-            return Result(Constants.OPERATION_FAILURE, e)
+            logging.error("Exception %s occurred with message: %s", type(e).__name__, e.message)
+            result = Result(Constants.OPERATION_FAILURE, e)
+
+        return result
 
     @pre_check
     def switch_org(self, org_id):
@@ -276,7 +596,6 @@ class TSApiWrapper():
         except Exception as e:
             logging.error(e.message)
             return Result(Constants.OPERATION_FAILURE, e)
-
 
     @pre_check
     def search_user(
@@ -304,7 +623,7 @@ class TSApiWrapper():
                 return Result(Constants.OPERATION_FAILURE)
             logging.debug("%s user exists",
                           user_identifier)
-            return Result(Constants.OPERATION_SUCCESS)
+            return Result(Constants.OPERATION_SUCCESS, response_obj)
         except Exception as e:
             logging.error(e.message)
             return Result(Constants.OPERATION_FAILURE, e)
@@ -322,33 +641,8 @@ class TSApiWrapper():
         @param org_identifiers: org ids to be updated.
         @param operation: Operation type.
         """
-        params = {
-            "user_identifier": user_identifier,
-            "org_identifiers": org_identifiers,
-            "org_scope": "ALL",
-        }
-
-        success_msg = "Successfully {} {} orgs".format(
-            operation, org_identifiers)
-        failure_msg = "Failed to {} {} org.".format(
-            operation, org_identifiers)
-        try:
-            response = self.session.put(
-                TSApiWrapper.UPDATE_USER_ORG.format(
-                    hostport=self.hostport,
-                    user_identifier=user_identifier,
-                    op=operation),
-                data=params,
-            )
-            if response.status_code == http.client.NO_CONTENT:
-                logging.debug(success_msg)
-                return Result(Constants.OPERATION_SUCCESS)
-            logging.debug(failure_msg)
-            return Result(Constants.OPERATION_FAILURE, response)
-        except Exception as e:
-            logging.error(e.message)
-            return Result(Constants.OPERATION_FAILURE, e)
-
+        return self.update_user(operation=operation, user_identifier=user_identifier,
+                                org_identifiers=org_identifiers, all_org_scope=True)
 
     @pre_check
     def sync_user(
@@ -357,72 +651,85 @@ class TSApiWrapper():
             display_name,
             usertype=None,
             password=None,
-            properties=None,
+            email=None,
             groups=None,
             upsert_user=False,
+            org_ids=None,
             all_org_scope=False,
     ):
-        """Creates new user and adds it to TS system.
+        """Sync user with TS.
            @param name: Name of the new user.
            @param display_name: Name to be displayed in TS system.
            @param usertype: Type of user to create.
            @param password: Password to be set for the user.
-           @param properties: Extra properties related to the user like
-           user email etc.
+           @param email: Email to be set for user.
            @param groups: List of group ids the user belongs to.
            @param upsert_user: Upsert the users if true else only create.
            @param all_org_scope: if the sync call is in all org scope.
-           @return: Result object with operation status and data. Here data is
-           set to None.
+           @return: Result object with operation status and data.
         """
-        params = {"name": name, "displayname": display_name}
-        if usertype is not None:
-            params["usertype"] = usertype
-        # If Password is not passed generate a random string as password.
-        # Used in cases where authentication is done by an external agent.
-        if password is None:
-            password = password_gen()
-        params["password"] = password
-        if properties is not None:
-            params["properties"] = json.dumps(properties)
-        if groups is not None:
-            params["groups"] = json.dumps(groups)
+        search_user_result = self.search_user(name)
+        is_new_user = search_user_result.status != Constants.OPERATION_SUCCESS
 
-        try:
-            if upsert_user:
-                endpoint_url = (
-                    TSApiWrapper.UPSERT_USER.format(hostport=self.hostport) + "?orgId=-1"
-                    if all_org_scope
-                    else TSApiWrapper.UPSERT_USER.format(hostport=self.hostport)
-                )
-                response = self.session.post(
-                    endpoint_url,
-                    data=params,
-                )
+        if is_new_user:
+            result = self.create_user(name, display_name, usertype, password, email, groups,
+                                      org_ids, all_org_scope)
+        else:
+            ts_user = search_user_result.data.get("data", [])[0] if search_user_result.data.get(
+                "data") else None
+            update_result = self.sync_existing_user(name, display_name, email, usertype, org_ids,
+                                                    all_org_scope, upsert_user, ts_user)
+            if update_result.status in [Constants.OPERATION_SUCCESS, Constants.USER_ALREADY_EXISTS]:
+                result = Result(Constants.USER_ALREADY_EXISTS)
             else:
-                endpoint_url = (
-                    TSApiWrapper.CREATE_USER.format(hostport=self.hostport) + "?orgId=-1"
-                    if all_org_scope
-                    else TSApiWrapper.CREATE_USER.format(hostport=self.hostport)
-                )
-                response = self.session.post(
-                    endpoint_url,
-                    data=params,
-                )
-            if response.status_code == http.client.OK:
-                logging.debug("New user %s added.", name)
-                return Result(Constants.OPERATION_SUCCESS)
-            if ((upsert_user and response.status_code == http.client.NO_CONTENT)
-                    or ((not upsert_user)
-                        and response.status_code == http.client.CONFLICT)):
-                logging.debug("User %s already exists.", name)
-                return Result(Constants.USER_ALREADY_EXISTS)
-            logging.error("New user %s not added. Response %s", name,
-                          response.text)
-            return Result(Constants.OPERATION_FAILURE, response)
-        except Exception as e:
-            logging.error(e.message)
-            return Result(Constants.OPERATION_FAILURE, e)
+                result = Result(Constants.OPERATION_FAILURE, update_result.data)
+
+        return result
+
+    def sync_existing_user(self, name, display_name, email, usertype, org_ids, all_org_scope,
+                           upsert_user, ts_user):
+        """
+        Synchronizes an existing user with the provided properties.
+
+        @param name: The name of the user.
+        @param display_name: The display name of the user.
+        @param email: The email of the user.
+        @param usertype: The type of the user.
+        @param org_ids: The organization IDs of the user.
+        @param all_org_scope: Whether the user has all organization scope.
+        @param upsert_user: Whether to upsert the user.
+        @param ts_user: The ThoughtSpot user data.
+        @return: The result of the synchronization operation.
+        """
+        should_update_properties = _have_user_properties_changed(name, display_name, email, ts_user)
+        should_update_orgs = _have_orgs_changed(org_ids, ts_user)
+
+        if upsert_user and should_update_properties:
+            return self.update_user_properties(name, display_name, usertype, email, org_ids,
+                                               all_org_scope)
+        if should_update_orgs:
+            return self.update_user_org(user_identifier=name,
+                                        operation=Constants.Add,
+                                        org_identifiers=org_ids)
+        logging.debug("User %s already exists. Skipping update.", name)
+        return Result(Constants.USER_ALREADY_EXISTS)
+
+    @pre_check
+    def update_user_properties(self, name, display_name, usertype, email, org_ids, all_org_scope):
+        """
+        Updates the properties of a user.
+
+        @param name: The name of the user.
+        @param display_name: The display name of the user.
+        @param usertype: The type of the user.
+        @param email: The email of the user.
+        @param org_ids: The organization IDs of the user.
+        @param all_org_scope: Whether the user has all organization scope.
+        @return: The result of the update operation.
+        """
+        return self.update_user(operation=Constants.Add, user_identifier=name, name=name,
+                                display_name=display_name, user_type=usertype, email=email,
+                                org_identifiers=org_ids, all_org_scope=all_org_scope)
 
     @pre_check
     def create_user(
@@ -431,7 +738,7 @@ class TSApiWrapper():
             display_name,
             usertype=None,
             password=None,
-            properties=None,
+            email=None,
             groups=None,
             orgids=None,
             all_org_scope=False
@@ -442,26 +749,18 @@ class TSApiWrapper():
         @param display_name: Name to be displayed in TS system.
         @param usertype: Type of user to create.
         @param password: Password to be set for the user.
-        @param properties: Extra properties related to the user like
-        user email etc.
+        @param email: Email to be set for user.
         @param groups: List of group ids the user belongs to.
         @param orgids: orgs in which user belongs
         @param all_org_scope: if the call is in all org scope.
         """
-        params = {"name": name, "displayname": display_name}
-        if usertype is not None:
-            params["usertype"] = usertype
-        # If Password is not passed generate a random string as password.
-        # Used in cases where authentication is done by an external agent.
-        if password is None:
-            password = password_gen()
-        params["password"] = password
-        if properties is not None:
-            params["properties"] = json.dumps(properties)
-        if groups is not None:
-            params["groups"] = json.dumps(groups)
-        if orgids is not None:
-            params["orgids"] = orgids
+        params = _get_params_for_create_user(name,
+                                             display_name,
+                                             usertype,
+                                             password,
+                                             email,
+                                             groups,
+                                             orgids)
 
         try:
             endpoint_url = (
@@ -483,6 +782,60 @@ class TSApiWrapper():
             logging.error(e.message)
             return Result(Constants.OPERATION_FAILURE, e)
 
+    @pre_check
+    def update_user(
+            self,
+            operation,
+            user_identifier,
+            name=None,
+            display_name=None,
+            user_type=None,
+            email=None,
+            org_identifiers=None,
+            all_org_scope=False,
+    ):
+        """
+        Update orgs and/or properties for a user.
+        @param operation: The operation to perform on the user (e.g., 'Add', 'Replace').
+        @param user_identifier: The identifier of the user to update.
+        @param name: Name of the new user.
+        @param display_name: Name to be displayed in TS system.
+        @param user_type: Type of user to create.
+        @param email: Email to be set for user.
+        @param org_identifiers: orgs in which user belongs
+        @param all_org_scope: if the call is in all org scope.
+
+        Returns: A Result object indicating the success or failure of the operation.
+        """
+        params = _get_params_for_update_user(user_identifier,
+                                             name,
+                                             display_name,
+                                             user_type,
+                                             email,
+                                             org_identifiers,
+                                             all_org_scope)
+        try:
+            response = self.session.put(
+                TSApiWrapper.UPDATE_USER.format(
+                    hostport=self.hostport,
+                    user_identifier=user_identifier,
+                    op=operation),
+                data=params,
+            )
+
+            if response.status_code == http.client.NO_CONTENT:
+                logging.debug("Updated existing user %s.\n"
+                              "Updated attributes: %s", name, params)
+                return Result(Constants.OPERATION_SUCCESS)
+
+            logging.error("Unable to update user %s.\n"
+                          "Attributes attempted to be updated : %s.\n"
+                          "Response %s", name, params, response.text)
+            return Result(Constants.OPERATION_FAILURE, response)
+
+        except Exception as e:
+            logging.error(e.message)
+            return Result(Constants.OPERATION_FAILURE, e)
 
     @pre_check
     def create_org(self, name, description):
@@ -574,7 +927,7 @@ class TSApiWrapper():
         return self._delete_entities(EntityType.USER, uid_list)
 
     # List Functions #
-    def _get_batched_entities(self, entity, offset, batchsize):
+    def _get_batched_entities(self, entity, offset, batchsize, allOrgs):
         """Gets entities in TS system.
            @entity: Entity to fetch User/Group
            @batchsize: Number of entities to fetch
@@ -596,7 +949,8 @@ class TSApiWrapper():
             return Result(Constants.OPERATION_FAILURE)
         params["batchsize"] = batchsize
         params["offset"] = offset
-        params["orgId"] = -1
+        if allOrgs:
+            params["orgId"] = -1
 
         try:
             response = self.session.get(
@@ -634,7 +988,7 @@ class TSApiWrapper():
             return Result(Constants.OPERATION_FAILURE, e)
 
     @pre_check
-    def _list_entities(self, entity, batchsize):
+    def _list_entities(self, entity, batchsize, allOrgs):
         """Lists (user/group)s in TS system.
            @param entity: Entity to fetch User/Group.
            @param batchsize: Batch size for pagination.
@@ -652,7 +1006,7 @@ class TSApiWrapper():
         # Paginate the calls to /list
         while not is_last_batch:
             offset = batchsize * batch_count
-            result_obj = self._get_batched_entities(entity, offset, batchsize)
+            result_obj = self._get_batched_entities(entity, offset, batchsize, allOrgs)
             if result_obj.status == Constants.OPERATION_SUCCESS:
                 ent_property_obj, is_last_batch = result_obj.data
                 entity_list.extend(ent_property_obj)
@@ -667,19 +1021,19 @@ class TSApiWrapper():
         logging.debug(success_msg)
         return Result(Constants.OPERATION_SUCCESS, entity_list)
 
-    def list_groups(self, batchsize=200):
+    def list_groups(self, allOrgs, batchsize=200):
         """Lists groups in TS system.
            @return: Result object with operation status and data. Here data is
            a list of (user/group)s in the TS system as EntityProperty objects.
         """
-        return self._list_entities(EntityType.GROUP, batchsize)
+        return self._list_entities(EntityType.GROUP, batchsize, allOrgs)
 
-    def list_users(self, batchsize=200):
+    def list_users(self, allOrgs, batchsize=200):
         """Lists users in TS system.
            @return: Result object with operation status and data. Here data is
            a list of (user/group)s in the TS system as EntityProperty objects.
         """
-        return self._list_entities(EntityType.USER, batchsize)
+        return self._list_entities(EntityType.USER, batchsize, allOrgs)
 
     def list_orgs(self):
         """Lists orgs in TS system.
@@ -710,7 +1064,6 @@ class TSApiWrapper():
         except Exception as e:
             logging.error(e.message)
             return Result(Constants.OPERATION_FAILURE, e)
-
 
     # Add entities to group functions #
     @pre_check
@@ -948,9 +1301,9 @@ class TSApiWrapper():
            ID if user/group is present in the system else None.
         """
         if entity == EntityType.GROUP:
-            entity_list = self.list_groups()
+            entity_list = self.list_groups(allOrgs=False)
         elif entity == EntityType.USER:
-            entity_list = self.list_users()
+            entity_list = self.list_users(allOrgs=False)
         else:
             logging.error(TSApiWrapper.UNKNOWN_ENTITY_TYPE)
             return Result(Constants.OPERATION_FAILURE)

@@ -5,9 +5,11 @@
 
 # pylint: disable=R0912
 import logging
+
+import tsApi
 from entityClasses import EntityType
 from globalClasses import Constants
-import tsApi
+
 
 # pylint: disable=R0903, R0902, R0912, R0915, R1702, C0302, W0108
 def sync_orgs(
@@ -69,7 +71,7 @@ def fetch_ts_org_list(
         org_sync_tree.error_file.write(msg)
         org_sync_tree.file_handle.write(msg)
 
-# todo: introduce new upsert api to handle orgs
+
 def sync_users(
         org_sync_tree,
         dn_to_obj_ldap_map,
@@ -85,6 +87,7 @@ def sync_users(
     """
     logging.info("Syncing users to ThoughtSpot system.")
     for user_dn in org_sync_tree.users_to_create:
+        # Get details from LDAP
         result = org_sync_tree.ldap_handle.dn_to_obj(
             user_dn,
             org_sync_tree.ldap_type,
@@ -95,95 +98,64 @@ def sync_users(
             org_sync_tree.authdomain_identifier,
             org_sync_tree.member_str
         )
-        if (result.status != Constants.OPERATION_SUCCESS
-                or result.data is None):
-            logging.debug(
-                "Failed to obtain user object for user DN (%s)",
-                user_dn
-            )
+        if result.status != Constants.OPERATION_SUCCESS or (not result.data):
+            logging.debug("Failed to obtain user object for user DN (%s)", user_dn)
             continue
         user = result.data
+
+        # Update the mappings
         dn_to_obj_ldap_map[user_dn] = user
         ldap_user_name_to_org[user.name] = [org_name_to_org_id[org_name]
-                            for org_name in org_sync_tree.org_map[user_dn]]
+                                            for org_name in org_sync_tree.org_map[user_dn]]
         ldap_user_names.append(user.name)
-        prop = {"mail": user.email} if user.email else None
-        user_org_id = ldap_user_name_to_org[user.name]
-        if len(user_org_id) < 1:
+        user_org_ids = ldap_user_name_to_org[user.name]
+        if len(user_org_ids) < 1:
             reason = "User doesn't have any specified org"
-            msg = "\nFailed to sync/create user {}. {}\n".format(
-                user.name, reason
-            )
+            msg = f"\nFailed to sync/create user {user.name}. {reason}\n"
             logging.debug(msg)
             org_sync_tree.error_file.write(msg)
             org_sync_tree.file_handle.write(msg)
             continue
-        user_org_ids = '[' + ','.join(str(id) for id in user_org_id) + ']'
-        result = org_sync_tree.ts_handle.search_user(
-            user.name
-        )
+
+        # Sync orgs and properties to TS
+        result = org_sync_tree.ts_handle.sync_user(name=user.name,
+                                                   display_name=user.display_name,
+                                                   usertype=tsApi.TSApiWrapper.LDAP_USER,
+                                                   password=None,
+                                                   email=user.email,
+                                                   groups=None,
+                                                   upsert_user=org_sync_tree.upsert_user,
+                                                   org_ids=user_org_ids,
+                                                   all_org_scope=True)
+
+        # Log details
         if result.status == Constants.OPERATION_SUCCESS:
-            # update user orgs
-            result = org_sync_tree.ts_handle.update_user_org(
-                user.name,
-                Constants.Add,
-                user_org_ids
+            # new user created
+            msg = (
+                f"\n{user.name} User created in "
+                f"{list(org_sync_tree.org_map[user_dn])} orgs\n"
             )
-            if result.status == Constants.OPERATION_SUCCESS:
-                msg = "\n{} User already exists and synced to {} orgs\n" \
-                    .format(user.name, list(org_sync_tree.org_map[user_dn]))
-                users_synced[0] += 1
-            else:
-                reason = (
-                    str(result.data)
-                    if result.data is not None
-                    else super().NORSN
-                )
-                msg = "\nFailed to add user {} to {} orgs\n.{}".format(
-                    user.name, list(org_sync_tree.org_map[user_dn]), reason
-                )
-                logging.debug(msg)
-                org_sync_tree.error_file.write(msg)
-            org_sync_tree.file_handle.write(msg)
-            # sync other properties of user
-            org_sync_tree.ts_handle.sync_user(
-                user.name,
-                user.display_name,
-                tsApi.TSApiWrapper.LDAP_USER,
-                None,  # password
-                prop,
-                None,  # groups
-                org_sync_tree.upsert_user,
-                True # all org scope
+            users_created[0] += 1
+        elif result.status == Constants.USER_ALREADY_EXISTS:
+            msg = (
+                f"\n{user.name} User already exists and synced to "
+                f"{list(org_sync_tree.org_map[user_dn])} orgs\n"
             )
+            users_synced[0] += 1
         else:
-            # create user in given orgs
-            result = org_sync_tree.ts_handle.create_user(
-                user.name,
-                user.display_name,
-                tsApi.TSApiWrapper.LDAP_USER,
-                None,  # password
-                prop,
-                None,  # groups
-                user_org_ids,
-                True # all org scope
+            reason = (
+                str(result.data)
+                if result.data is not None
+                else super().NORSN
             )
-            if result.status == Constants.OPERATION_SUCCESS:
-                msg = "\n{} User created in {} orgs\n".format(user.name,
-                                  list(org_sync_tree.org_map[user_dn]))
-                users_created[0] += 1
-            else:
-                reason = (
-                    str(result.data)
-                    if result.data is not None
-                    else super().NORSN
-                )
-                msg = "\nFailed to create user {} to {} orgs\n.{}".format(
-                    user.name, list(org_sync_tree.org_map[user_dn]), reason
-                )
-                logging.debug(msg)
-                org_sync_tree.error_file.write(msg)
-            org_sync_tree.file_handle.write(msg)
+            msg = (
+                f"\nFailed to sync user {user.name} to "
+                f"{list(org_sync_tree.org_map[user_dn])} orgs.\n{reason}"
+            )
+            logging.debug(msg)
+            org_sync_tree.error_file.write(msg)
+
+        org_sync_tree.file_handle.write(msg)
 
 
 def sync_groups(
@@ -203,6 +175,7 @@ def sync_groups(
     """
     logging.info("Syncing groups to ThoughtSpot system.")
     for group_dn in org_sync_tree.groups_to_create:
+        # Get group details from LDAP
         result = org_sync_tree.ldap_handle.dn_to_obj(
             group_dn,
             org_sync_tree.ldap_type,
@@ -221,6 +194,8 @@ def sync_groups(
             )
             continue
         group = result.data
+
+        # Update the mappings
         dn_to_obj_ldap_map[group_dn] = group
         ldap_group_name_to_org[group.name] = [org_name_to_org_id[org_name]
                           for org_name in org_sync_tree.org_map[group_dn]]
@@ -237,6 +212,8 @@ def sync_groups(
             org_sync_tree.file_handle.write(msg)
             continue
         group_created_orgs, group_exists_orgs = [], []
+
+        # Perform org wise sync of groups with TS
         for org_id in group_org_id:
             org_sync_tree.switch_org(org_id)
             result = org_sync_tree.ts_handle.sync_group(
@@ -246,6 +223,7 @@ def sync_groups(
                 None,  # privileges
                 org_sync_tree.upsert_group
             )
+
             if result.status == Constants.OPERATION_SUCCESS:
                 group_created_orgs \
                     .append(org_id_to_org_name[org_id])
@@ -295,7 +273,7 @@ def fetch_ts_user_list(
     logging.debug("Fetching current users from ThoughtSpot "
                   "system in domain (%s) including recently "
                   "created.", domain_name)
-    result = org_sync_tree.ts_handle.list_users()
+    result = org_sync_tree.ts_handle.list_users(allOrgs=True)
     if result.status == Constants.OPERATION_SUCCESS:
         for user in result.data:
             user_name_to_id_ts_map[user.name] = user.id
@@ -335,7 +313,7 @@ def fetch_ts_group_list(
     logging.debug("Fetching current groups from ThoughtSpot "
                   "system in domain (%s) including recently "
                   "created.", domain_name)
-    result = org_sync_tree.ts_handle.list_groups()
+    result = org_sync_tree.ts_handle.list_groups(allOrgs=True)
     if result.status == Constants.OPERATION_SUCCESS:
         for group in result.data:
             group_name_to_id_ts_map[(group.name,
@@ -705,11 +683,9 @@ def remove_users_from_orgs(
         if ts_org_list.issubset(ldap_org_list):
             continue
         user_org_removal = 1
-        result = org_sync_tree.ts_handle.update_user_org(
-            user_name,
-            Constants.Replace,
-            '[' + ','.join(str(id) for id in ldap_org_list) + ']'
-        )
+        result = org_sync_tree.ts_handle.update_user_org(user_identifier=user_name,
+                                                         operation=Constants.Replace,
+                                                         org_identifiers=ldap_org_list)
         org_list = [org_id_to_org_name[id] for id in
                     ts_org_list if id not in ldap_org_list]
         if result.status == Constants.OPERATION_SUCCESS:
